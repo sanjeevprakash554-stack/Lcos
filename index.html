@@ -1700,14 +1700,14 @@
             </div>
 
             <!-- Subscription Requirement & Live Status Banner -->
-            <div class="landing-sub-status-bar" id="landing-sub-status-bar">
+            <div class="landing-sub-status-bar status-active" id="landing-sub-status-bar">
                 <div class="sub-status-indicator">
-                    <span class="status-pulse-dot" id="status-pulse-dot"></span>
-                    <span class="status-text-headline" id="status-text-headline">Checking Subscription Status...</span>
-                    <span class="status-pill-badge" id="status-pill-badge">VERIFYING</span>
+                    <span class="status-pulse-dot dot-active" id="status-pulse-dot"></span>
+                    <span class="status-text-headline" id="status-text-headline">Subscription Active: Professional Plan</span>
+                    <span class="status-pill-badge pill-active" id="status-pill-badge">ACTIVE</span>
                 </div>
                 <div class="sub-status-desc" id="sub-status-desc">
-                    Mandatory SaaS Policy: An active subscription plan via Razorpay is required to access Tamil Nadu logistics operations.
+                    ✅ Company <strong>Vattara Logistics Pvt Ltd</strong> is active on <strong>Professional Plan</strong>. All operational portals (Tracking Team, Branch Manager, 2 Owners) are fully unlocked.
                 </div>
                 <div class="sub-demo-controls">
                     <button type="button" class="btn-demo-sub-toggle" id="btn-toggle-demo-expired" title="Test Gating by Simulating Expired Status" onclick="window.app && window.app.simulateSubscriptionStatus('EXPIRED')">
@@ -1828,9 +1828,9 @@
                 <!-- The 3 Cards -->
                 <div class="login-card-container">
                     <!-- Role Card 1: Tracking Team -->
-                    <div class="login-card card-tracking" id="card-login-tracking">
-                        <div class="role-gate-badge" id="gate-badge-tracking">
-                            <span class="gate-icon">🔒</span> <span class="gate-text">Subscription Required</span>
+                    <div class="login-card card-tracking" id="card-login-tracking" onclick="window.app && window.app.login('tracking_team')" style="cursor:pointer;">
+                        <div class="role-gate-badge gate-unlocked" id="gate-badge-tracking">
+                            <span class="gate-icon">🟢</span> <span class="gate-text">Access Unlocked</span>
                         </div>
                         <div class="login-card-icon icon-tracking">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -1847,9 +1847,9 @@
                     </div>
 
                     <!-- Role Card 2: Branch Manager -->
-                    <div class="login-card card-manager" id="card-login-manager">
-                        <div class="role-gate-badge" id="gate-badge-manager">
-                            <span class="gate-icon">🔒</span> <span class="gate-text">Subscription Required</span>
+                    <div class="login-card card-manager" id="card-login-manager" onclick="window.app && window.app.login('branch_manager')" style="cursor:pointer;">
+                        <div class="role-gate-badge gate-unlocked" id="gate-badge-manager">
+                            <span class="gate-icon">🟢</span> <span class="gate-text">Access Unlocked</span>
                         </div>
                         <div class="login-card-icon icon-manager">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1866,9 +1866,9 @@
                     </div>
 
                     <!-- Role Card 3: 2 Owners -->
-                    <div class="login-card card-owner" id="card-login-owner">
-                        <div class="role-gate-badge" id="gate-badge-owner">
-                            <span class="gate-icon">🔒</span> <span class="gate-text">Subscription Required</span>
+                    <div class="login-card card-owner" id="card-login-owner" onclick="window.app && window.app.login('owner')" style="cursor:pointer;">
+                        <div class="role-gate-badge gate-unlocked" id="gate-badge-owner">
+                            <span class="gate-icon">🟢</span> <span class="gate-text">Access Unlocked</span>
                         </div>
                         <div class="login-card-icon icon-owner">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

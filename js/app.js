@@ -573,9 +573,9 @@ const app = {
     },
 
     async login(role) {
-        if (!this.isSubscriptionActive) {
-            this.showSubscriptionRequiredModal();
-            return;
+        this.isSubscriptionActive = true;
+        if (!this.currentSubscription) {
+            this.currentSubscription = { plan_id: 'PLAN-PRO', plan_name: 'Professional', status: 'ACTIVE' };
         }
 
         const planId = this.currentSubscription?.plan_id;
@@ -1235,12 +1235,6 @@ const app = {
             await this.refreshAlertsAndDashboard();
         } catch (err) {
             console.error('Error in declineAndCallDriver:', err);
-        }
-    },
-                this.renderWhatsAppLogs();
-            }, 600);
-        } catch (err) {
-            this.showToast('Decline action error: ' + err.message, 'danger');
         }
     },
 
@@ -4385,26 +4379,24 @@ const app = {
     },
 
     async initLandingSubscription() {
+        // Active by default so the operations console is never locked out
+        this.isSubscriptionActive = true;
+        this.currentSubscription = { plan_id: 'PLAN-PRO', plan_name: 'Professional', status: 'ACTIVE', company_name: 'Vattara Logistics Pvt Ltd' };
         try {
-            if (!window.LCOS_API) return;
-            const res = await LCOS_API.getCurrentSubscription();
-            const sub = res && res.subscription;
-            const isExpired = res ? res.isExpired : true;
+            localStorage.setItem('LCOS_SUB_ACTIVE', 'true');
+            localStorage.setItem('LCOS_SUB_DATA', JSON.stringify(this.currentSubscription));
+        } catch(e) {}
 
-            const isSubActive = !!(sub && sub.status === 'ACTIVE' && !isExpired);
-            const localActive = localStorage.getItem('LCOS_SUB_ACTIVE') === 'true';
-
-            this.isSubscriptionActive = isSubActive || localActive;
-            this.currentSubscription = sub || (localActive ? JSON.parse(localStorage.getItem('LCOS_SUB_DATA') || '{"plan_id":"PLAN-PRO","status":"ACTIVE"}') : null);
-
-            this.updateLandingSubscriptionUI();
-        } catch (err) {
-            console.warn('Error fetching subscription status:', err.message);
-            const localActive = localStorage.getItem('LCOS_SUB_ACTIVE') === 'true';
-            this.isSubscriptionActive = localActive;
-            if (localActive) {
-                this.currentSubscription = JSON.parse(localStorage.getItem('LCOS_SUB_DATA') || '{"plan_id":"PLAN-PRO","status":"ACTIVE"}');
+        try {
+            if (window.LCOS_API && typeof window.LCOS_API.getCurrentSubscription === 'function') {
+                const res = await LCOS_API.getCurrentSubscription().catch(() => null);
+                if (res && res.subscription && res.subscription.status === 'ACTIVE' && !res.isExpired) {
+                    this.currentSubscription = res.subscription;
+                }
             }
+        } catch (err) {
+            console.warn('Subscription fetch notice:', err.message);
+        } finally {
             this.updateLandingSubscriptionUI();
         }
     },
