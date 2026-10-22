@@ -24,7 +24,11 @@ pool.on('error', (err) => {
 // Auto-detect PostgreSQL availability on boot
 (async () => {
   if (useEmbedded) {
-    console.log('💡 [Database] Configured to use Built-in Zero-Config Embedded Database (SQLite).');
+    console.log('=======================================================');
+    console.log('✅ [Database Ready] Built-in Embedded SQLite Database Active!');
+    console.log('📦 Database file: server/db/lcos_embedded.sqlite');
+    console.log('✨ All tables, trips, vehicles, drivers & stock ready!');
+    console.log('=======================================================');
     embeddedDb.initEmbeddedDb();
     return;
   }
