@@ -46,7 +46,14 @@ async function checkVehicleStoppages() {
 
       if (alertCheck.rows.length === 0) {
         const alertId = 'ALT-STP-' + Math.floor(1000 + Math.random() * 9000);
-        const durationMins = Math.round((new Date() - new Date(row.stoppage_start_time)) / 60000);
+        const parseUtc = (s) => {
+          if (!s) return new Date();
+          if (s instanceof Date) return s;
+          const str = String(s).trim();
+          if (str.endsWith('Z') || str.includes('+')) return new Date(str);
+          return new Date(str.replace(' ', 'T') + 'Z');
+        };
+        const durationMins = Math.max(thresholdMinutes, Math.round((new Date() - parseUtc(row.stoppage_start_time)) / 60000));
         const msg = `AUTOMATIC DETECTED: Vehicle ${row.vehicle_id} (${row.driver_name || 'Driver'}) stopped at location (${row.current_lat}, ${row.current_lng}) for over ${durationMins} minutes! (Threshold: ${thresholdMinutes} mins)`;
 
         const newAlert = await db.query(

@@ -71,13 +71,18 @@ async function processPaymentSuccess(companyId, planId, amount, orderId, payment
   // 3. Create or update subscription
   await db.query(`UPDATE subscriptions SET status = 'SUPERSEDED', updated_at = NOW() WHERE company_id = $1 AND status = 'ACTIVE'`, [companyId]);
   const subId = 'SUB-' + Math.floor(1000 + Math.random() * 9000);
+  
+  const expiryDate = new Date();
+  expiryDate.setMonth(expiryDate.getMonth() + durationMonths);
+  const expiryDateStr = expiryDate.toISOString();
+
   const subRes = await db.query(
     `INSERT INTO subscriptions (id, company_id, plan_id, status, start_date, expiry_date, auto_renew, updated_at)
-     VALUES ($1, $2, $3, 'ACTIVE', NOW(), NOW() + INTERVAL '1 month' * $4, true, NOW())
+     VALUES ($1, $2, $3, 'ACTIVE', NOW(), $4, 1, NOW())
      ON CONFLICT (id) DO UPDATE 
-     SET plan_id = EXCLUDED.plan_id, status = 'ACTIVE', expiry_date = NOW() + INTERVAL '1 month' * $4, updated_at = NOW()
+     SET plan_id = EXCLUDED.plan_id, status = 'ACTIVE', expiry_date = $4, updated_at = NOW()
      RETURNING *`,
-    [subId, companyId, planId, durationMonths]
+    [subId, companyId, planId, expiryDateStr]
   );
 
   // Update subscription_id in payment

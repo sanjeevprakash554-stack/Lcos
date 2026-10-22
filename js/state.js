@@ -483,22 +483,39 @@ const LCOS_State = {
 
 
     async addCallLog(log) {
+        const localLog = {
+            id: 'CL-' + Math.floor(100 + Math.random() * 900),
+            tripId: log.tripId || null,
+            timestamp: new Date().toISOString(),
+            type: log.type || log.category || 'Transit Update',
+            caller: log.caller || 'Admin Office',
+            recipient: log.recipient || 'Driver',
+            locationCheckin: log.location || log.locationCheckin || '',
+            operatorEmpId: log.empId || log.operatorEmpId || 'EMP-101',
+            notes: log.notes
+        };
         try {
-            const apiRes = await LCOS_API.addCallLog({
-                tripId: log.tripId,
-                category: log.type || log.category || 'Transit Update',
-                caller: log.caller || 'Admin Office',
-                recipient: log.recipient || 'Driver',
-                locationCheckin: log.location || log.locationCheckin || '',
-                notes: log.notes
-            });
-            if (apiRes.success) {
-                await this.loadFromBackend();
-                return apiRes.callLog ? apiRes.callLog.id : true;
+            if (window.LCOS_API && typeof LCOS_API.addCallLog === 'function') {
+                const apiRes = await LCOS_API.addCallLog({
+                    tripId: log.tripId || null,
+                    category: log.type || log.category || 'Transit Update',
+                    caller: log.caller || 'Admin Office',
+                    recipient: log.recipient || 'Driver',
+                    locationCheckin: log.location || log.locationCheckin || '',
+                    empId: log.empId || log.operatorEmpId || 'EMP-101',
+                    notes: log.notes
+                });
+                if (apiRes && apiRes.success) {
+                    await this.loadFromBackend();
+                    return apiRes.callLog ? apiRes.callLog.id : localLog.id;
+                }
             }
         } catch (err) {
             console.error('API addCallLog error:', err);
         }
+        if (!this.data.callLogs) this.data.callLogs = [];
+        this.data.callLogs.unshift(localLog);
+        return localLog.id;
     },
 
 

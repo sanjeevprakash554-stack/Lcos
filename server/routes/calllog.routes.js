@@ -42,8 +42,7 @@ router.post('/', authenticateToken, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Category, caller, and notes required' });
     }
 
-    const countRes = await db.query(`SELECT COUNT(*) FROM call_logs`);
-    const id = 'CL-' + String(parseInt(countRes.rows[0].count, 10) + 101);
+    const id = 'CL-' + Date.now().toString().slice(-5) + Math.floor(100 + Math.random() * 900);
 
     const result = await db.query(
       `INSERT INTO call_logs (id, company_id, trip_id, call_category, caller, recipient, location_checkin, operator_emp_id, conversation_notes, created_at)

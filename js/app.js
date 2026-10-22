@@ -467,11 +467,37 @@ const app = {
             }
         });
 
-        // WhatsApp Driver Picker auto-fill phone
+        // WhatsApp Driver Picker auto-fill phone and sync trip
         document.getElementById('wa-send-driver-picker')?.addEventListener('change', (e) => {
             const phone = e.target.value;
             if (phone) {
                 document.getElementById('wa-send-phone').value = phone.replace(/[^0-9]/g, '');
+                // Auto-sync trip picker to this driver's trip
+                const driver = LCOS_State.getDrivers().find(d => d.phone === phone);
+                if (driver) {
+                    const trip = LCOS_State.getTrips().find(t => t.driverId === driver.id);
+                    const tripPicker = document.getElementById('wa-send-trip-picker');
+                    if (trip && tripPicker) {
+                        tripPicker.value = trip.id;
+                    }
+                }
+            }
+        });
+
+        // WhatsApp Trip Picker auto-fill driver and phone
+        document.getElementById('wa-send-trip-picker')?.addEventListener('change', (e) => {
+            const tripId = e.target.value;
+            if (tripId) {
+                const trip = LCOS_State.getTripById(tripId);
+                if (trip) {
+                    const driver = LCOS_State.getDrivers().find(d => d.id === trip.driverId);
+                    if (driver) {
+                        const driverPicker = document.getElementById('wa-send-driver-picker');
+                        const phoneInput = document.getElementById('wa-send-phone');
+                        if (driverPicker) driverPicker.value = driver.phone;
+                        if (phoneInput) phoneInput.value = driver.phone.replace(/[^0-9]/g, '');
+                    }
+                }
             }
         });
 
@@ -479,7 +505,7 @@ const app = {
         document.getElementById('wa-send-type')?.addEventListener('change', (e) => {
             const tripGroup = document.getElementById('wa-send-trip-group');
             const msgGroup = document.getElementById('wa-send-message-group');
-            if (e.target.value === 'trip_dispatch') {
+            if (e.target.value === 'trip_dispatch' || e.target.value === 'stoppage_inquiry') {
                 if (tripGroup) tripGroup.style.display = 'block';
                 if (msgGroup) msgGroup.style.display = 'none';
             } else {
@@ -567,95 +593,110 @@ const app = {
     },
 
     getAllowedRolesForPlan(planId) {
-        if (!planId && !this.isSubscriptionActive) return [];
+        if (!this.isSubscriptionActive) return [];
         // Any active subscription plan unlocks access to all 3 operational portals
         return ['tracking_team', 'branch_manager', 'owner'];
     },
 
     async login(role) {
-        this.isSubscriptionActive = true;
-        if (!this.currentSubscription) {
-            this.currentSubscription = { plan_id: 'PLAN-PRO', plan_name: 'Professional', status: 'ACTIVE' };
-        }
-
-        const planId = this.currentSubscription?.plan_id;
-        const allowedRoles = this.getAllowedRolesForPlan(planId);
-
-        if (!allowedRoles.includes(role)) {
-            const roleLabels = {
-                tracking_team: 'Tracking Team',
-                branch_manager: 'Branch Manager',
-                owner: '2 Owners Executive'
-            };
-            const roleName = roleLabels[role] || role;
-
-            this.showToast(`🔒 ${roleName} portal is locked. Please activate your subscription to access this portal.`, 'warning');
-            this.showSubscriptionRequiredModal();
-            return;
-        }
-
-        LCOS_State.setCurrentRole(role);
-        
-        let username = 'tracking';
-        if (role === 'branch_manager') username = 'manager';
-        else if (role === 'owner') username = 'owner';
+        if (this._isLoggingIn) return;
+        this._isLoggingIn = true;
 
         try {
-            if (window.LCOS_API) {
-                await LCOS_API.login(username, role);
-                await LCOS_State.loadFromBackend();
+            if (!this.currentSubscription) {
+                this.currentSubscription = { plan_id: 'PLAN-PRO', plan_name: 'Professional', status: 'ACTIVE' };
             }
-        } catch (e) {
-            console.warn('Backend login notice:', e.message);
-        }
 
-        const loginPage = document.getElementById('login-page');
-        const appContainer = document.getElementById('app-container');
-        
-        loginPage.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
-        loginPage.style.opacity = '0';
-        loginPage.style.transform = 'scale(1.05)';
-        
-        setTimeout(() => {
-            loginPage.style.display = 'none';
-            appContainer.style.display = 'flex';
-            appContainer.style.opacity = '1';
+            const planId = this.currentSubscription?.plan_id;
+            const allowedRoles = this.getAllowedRolesForPlan(planId);
+
+            if (!this.isSubscriptionActive || !allowedRoles.includes(role)) {
+                this.pendingPortalRole = role;
+                const roleLabels = {
+                    tracking_team: 'Tracking Team',
+                    branch_manager: 'Branch Manager',
+                    owner: '2 Owners Executive'
+                };
+                const roleName = roleLabels[role] || role;
+
+                this.showToast(`🔒 ${roleName} portal is locked. Please activate your subscription to access this portal.`, 'warning');
+                this.showSubscriptionRequiredModal();
+                this._isLoggingIn = false;
+                return;
+            }
+
+            LCOS_State.setCurrentRole(role);
             
+            let username = 'tracking';
+            if (role === 'branch_manager') username = 'manager';
+            else if (role === 'owner') username = 'owner';
+
             try {
-                // Switch to Dashboard tab by default on login to any portal
-                this.switchTab('dashboard');
-
-                // Reset filters so the full Tamil Nadu regional structure is shown cleanly
-                const districtSelect = document.getElementById('map-filter-district');
-                const vehSelect = document.getElementById('map-filter-vehicle');
-                const timeframeSelect = document.getElementById('map-filter-timeframe');
-                if (districtSelect) districtSelect.value = '';
-                if (vehSelect) vehSelect.value = '';
-                if (timeframeSelect) timeframeSelect.value = 'today';
-
-                this.renderMap();
-                this.resetMapToTamilNadu();
-                this.renderAll();
-            } catch (err) {
-                console.error('Portal render notice:', err);
-            } finally {
-                // Ensure dashboard container is fully visible regardless of any render warnings
-                appContainer.style.display = 'flex';
-                appContainer.style.opacity = '1';
+                if (window.LCOS_API) {
+                    await LCOS_API.login(username, role);
+                    await LCOS_State.loadFromBackend();
+                }
+            } catch (e) {
+                console.warn('Backend login notice:', e.message);
             }
 
-            // Staggered size recalculations for Leaflet container bounds
-            [50, 150, 300, 600, 1000].forEach(delay => {
-                setTimeout(() => {
-                    if (this.leafletMap) {
-                        this.leafletMap.invalidateSize();
-                    }
-                }, delay);
-            });
+            const loginPage = document.getElementById('login-page');
+            const appContainer = document.getElementById('app-container');
             
-            const roleName = role === 'owner' ? 'Owner' : role === 'branch_manager' ? 'Branch Manager' : 'Tracking Team';
-            this.showToast(`Logged in successfully as ${roleName}. Tamil Nadu Logistics Network Loaded.`, 'success');
-        }, 400);
+            if (loginPage) {
+                loginPage.style.transition = 'opacity 0.35s ease, transform 0.35s ease';
+                loginPage.style.opacity = '0';
+                loginPage.style.transform = 'scale(1.04)';
+            }
+            
+            setTimeout(() => {
+                if (loginPage) loginPage.style.display = 'none';
+                if (appContainer) {
+                    appContainer.style.display = 'flex';
+                    appContainer.style.opacity = '1';
+                }
+                
+                try {
+                    // Switch to Dashboard tab by default on login to any portal
+                    this.switchTab('dashboard');
+
+                    // Reset filters so the full Tamil Nadu regional structure is shown cleanly
+                    const districtSelect = document.getElementById('map-filter-district');
+                    const vehSelect = document.getElementById('map-filter-vehicle');
+                    const timeframeSelect = document.getElementById('map-filter-timeframe');
+                    if (districtSelect) districtSelect.value = '';
+                    if (vehSelect) vehSelect.value = '';
+                    if (timeframeSelect) timeframeSelect.value = 'today';
+
+                    this.renderMap();
+                    this.resetMapToTamilNadu();
+                    this.renderAll();
+                } catch (err) {
+                    console.error('Portal render notice:', err);
+                } finally {
+                    if (appContainer) {
+                        appContainer.style.display = 'flex';
+                        appContainer.style.opacity = '1';
+                    }
+                    this._isLoggingIn = false;
+                }
+
+                // Staggered size recalculations for Leaflet container bounds
+                [50, 150, 300, 600, 1000].forEach(delay => {
+                    setTimeout(() => {
+                        if (this.leafletMap) {
+                            this.leafletMap.invalidateSize();
+                        }
+                    }, delay);
+                });
+                
+                const roleName = role === 'owner' ? 'Owner' : role === 'branch_manager' ? 'Branch Manager' : 'Tracking Team';
+                this.showToast(`Logged in successfully as ${roleName}. Tamil Nadu Logistics Network Loaded.`, 'success');
+            }, 350);
+        } catch (err) {
+            console.error('Login error:', err);
+            this._isLoggingIn = false;
+        }
     },
 
     logout() {
@@ -982,9 +1023,18 @@ const app = {
             // Populate Trips Picker
             const tripPicker = document.getElementById('wa-send-trip-picker');
             if (tripPicker) {
-                const trips = LCOS_State.getTrips();
-                tripPicker.innerHTML = `<option value="">-- Choose Trip --</option>` +
-                    trips.map(t => `<option value="${t.id}">${t.id} - ${t.vehicleId} (${t.status})</option>`).join('');
+                const trips = LCOS_State.getTrips() || [];
+                const branches = LCOS_State.getBranches() || [];
+                const drivers = LCOS_State.getDrivers() || [];
+                tripPicker.innerHTML = `<option value="">-- Choose Trip / Route --</option>` +
+                    trips.map(t => {
+                        const src = branches.find(b => b.id === t.sourceBranchId);
+                        const dest = branches.find(b => b.id === t.destinationBranchId);
+                        const drv = drivers.find(d => d.id === t.driverId);
+                        const routeStr = src && dest ? `${src.name} ➔ ${dest.name}` : t.id;
+                        const drvStr = drv ? ` - ${drv.name}` : '';
+                        return `<option value="${t.id}">${t.id} : ${t.vehicleId} (${routeStr}${drvStr})</option>`;
+                    }).join('');
             }
 
             this.renderWhatsAppLogs();
@@ -998,9 +1048,14 @@ const app = {
         const driverPicker = document.getElementById('wa-send-driver-picker');
         if (driverPicker) {
             const drivers = LCOS_State.getDrivers() || [];
+            const trips = LCOS_State.getTrips() || [];
             const currentVal = driverPicker.value;
             driverPicker.innerHTML = `<option value="">-- Choose Registered Driver --</option>` +
-                drivers.map(d => `<option value="${d.phone}" ${d.phone === currentVal ? 'selected' : ''}>${d.name} (${d.phone})</option>`).join('');
+                drivers.map(d => {
+                    const trip = trips.find(t => t.driverId === d.id);
+                    const vehStr = trip ? ` [${trip.vehicleId}]` : '';
+                    return `<option value="${d.phone}" ${d.phone === currentVal ? 'selected' : ''}>${d.name}${vehStr} (${d.phone})</option>`;
+                }).join('');
         }
     },
 
@@ -1125,30 +1180,76 @@ const app = {
                 btn.disabled = true;
                 btn.textContent = '⏳ Running Stoppage Detection...';
             }
-            this.showToast('Checking vehicle stoppage (>20 mins) & dispatching WhatsApp alert with sound...', 'info');
+            this.showToast('Checking vehicle stoppage (>20 mins) & dispatching WhatsApp alert...', 'info');
 
-            const testPhone = document.getElementById('wa-send-phone')?.value?.trim() || '916382897998';
+            const phoneInput = document.getElementById('wa-send-phone')?.value?.trim();
+            const driverPicker = document.getElementById('wa-send-driver-picker');
+            const tripPicker = document.getElementById('wa-send-trip-picker');
+            
+            let selectedTripId = tripPicker?.value || null;
+            let selectedPhone = phoneInput || driverPicker?.value || null;
+            let selectedVehicleId = null;
+
+            // 1. Check if trip selected in dropdown
+            if (selectedTripId) {
+                const trip = LCOS_State.getTripById(selectedTripId);
+                if (trip) {
+                    selectedVehicleId = trip.vehicleId;
+                    const drv = LCOS_State.getDrivers().find(d => d.id === trip.driverId);
+                    if (drv && !selectedPhone) selectedPhone = drv.phone;
+                }
+            }
+
+            // 2. Check if driver selected in dropdown
+            if (!selectedVehicleId && driverPicker?.value) {
+                const drvPhone = driverPicker.value;
+                const driver = LCOS_State.getDrivers().find(d => d.phone === drvPhone);
+                if (driver) {
+                    const trip = LCOS_State.getTrips().find(t => t.driverId === driver.id);
+                    if (trip) {
+                        selectedVehicleId = trip.vehicleId;
+                        selectedTripId = trip.id;
+                    }
+                    if (!selectedPhone) selectedPhone = driver.phone;
+                }
+            }
+
+            // 3. Check if phone entered matches any driver in state
+            if (!selectedVehicleId && selectedPhone) {
+                const clean = selectedPhone.replace(/[^0-9]/g, '');
+                const driver = LCOS_State.getDrivers().find(d => d.phone && d.phone.replace(/[^0-9]/g, '').endsWith(clean.slice(-10)));
+                if (driver) {
+                    const trip = LCOS_State.getTrips().find(t => t.driverId === driver.id);
+                    if (trip) {
+                        selectedVehicleId = trip.vehicleId;
+                        selectedTripId = trip.id;
+                    }
+                }
+            }
+
             const res = await window.LCOS_API.triggerTestStoppage({
-                vehicleId: 'TN-59-EF-9012',
+                vehicleId: selectedVehicleId || null,
+                tripId: selectedTripId || null,
                 minutes: 25,
-                testPhone: testPhone
+                testPhone: selectedPhone || '916382897998'
             });
 
             if (res.success) {
-                this.showToast(`🚨 Stoppage alert sent! Audio alert dispatched to WhatsApp (${res.higherOfficialPhone || testPhone})`, 'success');
+                const vehMsg = res.vehicleId || 'Vehicle';
+                this.showToast(`🚨 Stoppage alert sent for ${vehMsg}! Dispatched to WhatsApp (${res.driverPhone || selectedPhone})`, 'success');
                 const reasonText = document.getElementById('wa-stoppage-reason-text');
                 const badge = document.getElementById('wa-stoppage-vehicle-badge');
                 if (reasonText) {
-                    reasonText.innerHTML = '<span style="color:#fbbf24;">⚡ Alert sent to WhatsApp. Waiting for driver button reply...</span>';
+                    reasonText.innerHTML = `<span style="color:#fbbf24;">⚡ Alert sent for ${vehMsg}. Waiting for driver button reply...</span>`;
                 }
                 if (badge) {
                     badge.style.background = 'rgba(239, 68, 68, 0.15)';
                     badge.style.color = '#f87171';
-                    badge.textContent = `${res.vehicleId || 'TN-59-EF-9012'} (Halted >20m)`;
+                    badge.textContent = `${vehMsg} (Halted >20m)`;
                 }
                 setTimeout(() => {
                     this.renderWhatsAppLogs();
-            this.loadActiveStoppage();
+                    this.loadActiveStoppage();
                     if (typeof this.loadAlerts === 'function') this.loadAlerts();
                 }, 800);
             } else {
@@ -1267,19 +1368,30 @@ const app = {
             // 1. Post decline to backend so driver receives WhatsApp rejection notification & alert is marked Escalated
             window.LCOS_API.declineStoppageReason({ vehicleId, alertId }).catch(console.error);
 
-            // 2. Open call dialog with driver's details prefilled
+            // 2. Find matching trip for this vehicle
+            const trips = LCOS_State.getTrips() || [];
+            const activeTrip = trips.find(t => t.vehicleId === vehicleId && t.status !== 'CLOSED' && t.status !== 'COMPLETED_RETURN') 
+                            || trips.find(t => t.vehicleId === vehicleId) 
+                            || trips[0];
+            const resolvedTripId = activeTrip ? activeTrip.id : 'TRIP-1002';
+
+            // 3. Open call dialog with driver's details prefilled
             this.openModal('modal-log-call');
+            const idInput = document.getElementById('call-trip-id');
             const refInput = document.getElementById('call-trip-ref');
             const catSelect = document.getElementById('call-category');
             const notes = document.getElementById('call-notes');
             const locationInput = document.getElementById('call-location');
+            const empInput = document.getElementById('call-emp-id');
 
-            if (refInput) refInput.value = `TRIP / ${vehicleId}`;
+            if (idInput) idInput.value = resolvedTripId;
+            if (refInput) refInput.value = `${resolvedTripId} (${vehicleId})`;
             if (catSelect) catSelect.value = 'Delay Check';
             if (notes) notes.value = `Manager declined reported stoppage delay for ${vehicleId}. Calling driver directly at ${phone}.`;
             if (locationInput) locationInput.value = 'Salem NH Highway Stoppage';
+            if (empInput && !empInput.value.trim()) empInput.value = this.operatorEmpId || 'EMP-101';
 
-            // 3. Directly trigger phone dialer protocol
+            // 4. Directly trigger phone dialer protocol
             const cleanDigits = String(phone).replace(/[^0-9+]/g, '');
             try {
                 window.location.href = `tel:${cleanDigits}`;
@@ -1287,7 +1399,7 @@ const app = {
                 console.warn('Direct tel protocol notice:', e);
             }
 
-            this.showToast(`❌ Reason declined. Directly calling driver at ${phone}...`, 'warning');
+            this.showToast(`❌ Reason declined. Calling driver ${vehicleId} (${phone})...`, 'warning');
 
             await this.refreshAlertsAndDashboard();
         } catch (err) {
@@ -3228,10 +3340,12 @@ const app = {
             return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + date.toLocaleDateString([], { day: '2-digit', month: 'short' });
         };
 
-        filtered.reverse().forEach(l => {
+        const sorted = [...filtered].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        sorted.forEach(l => {
             tbody.innerHTML += `
                 <tr>
-                    <td style="font-family:monospace; font-weight:700;">${l.id}</td>
+                    <td style="font-family:monospace; font-weight:700; color:var(--color-primary);">${l.id}</td>
                     <td style="font-size:0.75rem; color:var(--text-secondary);">${formatDate(l.timestamp)}</td>
                     <td style="font-weight:600; color:var(--color-secondary);">${l.tripId || '--'}</td>
                     <td><span class="badge badge-draft" style="font-size:0.7rem; padding:0.15rem 0.35rem;">${l.type}</span></td>
@@ -3998,54 +4112,78 @@ const app = {
     },
 
     async handleLogCall() {
-        const tripId = document.getElementById('call-trip-id').value;
-        const category = document.getElementById('call-category').value;
-        const caller = document.getElementById('call-caller').value;
-        const loc = document.getElementById('call-location').value;
-        const notes = document.getElementById('call-notes').value;
+        let tripId = document.getElementById('call-trip-id')?.value?.trim();
+        const tripRef = document.getElementById('call-trip-ref')?.value?.trim() || '';
+        const category = document.getElementById('call-category')?.value || 'Delay Check';
+        const caller = document.getElementById('call-caller')?.value || 'Admin Office';
+        const loc = document.getElementById('call-location')?.value || '';
+        const notes = document.getElementById('call-notes')?.value || '';
 
-        const empId = document.getElementById('call-emp-id').value.trim();
+        const empInput = document.getElementById('call-emp-id');
+        let empId = empInput ? empInput.value.trim() : '';
         if (!empId) {
-            this.showToast('Operator Employee ID is required to log this call.', 'warning');
-            return;
+            empId = this.operatorEmpId || 'EMP-101';
+            if (empInput) empInput.value = empId;
         }
         this.operatorEmpId = empId;
 
-        const trip = LCOS_State.getTripById(tripId);
-        if (!trip) return;
+        // Smart Trip resolution
+        const allTrips = LCOS_State.getTrips() || [];
+        let trip = tripId ? LCOS_State.getTripById(tripId) : null;
+
+        if (!trip && tripRef) {
+            const cleanRef = tripRef.replace(/^TRIP\s*[\/\-]\s*/i, '').trim();
+            trip = allTrips.find(t => 
+                t.id === cleanRef || 
+                t.vehicleId === cleanRef || 
+                tripRef.includes(t.vehicleId) || 
+                tripRef.includes(t.id)
+            );
+        }
+        if (!trip && tripId) {
+            trip = allTrips.find(t => t.vehicleId === tripId);
+        }
+        if (!trip && allTrips.length > 0) {
+            trip = allTrips[0];
+        }
+
+        const finalTripId = trip ? trip.id : (tripId || (tripRef ? tripRef.replace(/^TRIP\s*[\/\-]\s*/i, '') : 'TRIP-1002'));
 
         try {
-            const drv = LCOS_State.getDrivers().find(d => d.id === trip.driverId);
+            const drv = trip ? LCOS_State.getDrivers().find(d => d.id === trip.driverId) : null;
             const callerText = caller === 'Driver' ? `Driver (${drv ? drv.name : 'Driver'})` : caller;
-            const recipientText = caller === 'Driver' ? 'Admin Office' : 'Driver/Manager';
+            const recipientText = caller === 'Driver' ? 'Admin Office' : (drv ? `Driver (${drv.name})` : 'Driver/Manager');
 
-            await LCOS_State.addCallLog({
-                tripId,
+            const logId = await LCOS_State.addCallLog({
+                tripId: finalTripId,
                 type: category,
                 caller: callerText,
                 recipient: recipientText,
                 location: loc,
+                empId: empId,
                 notes: `Location: ${loc || '--'}. Operator: ${empId}. Notes: ${notes}`
             });
 
-            if (loc || notes) {
+            if (trip && (loc || notes)) {
                 const simTime = LCOS_State.getSystemSettings().simulationTime || new Date().toISOString();
                 const transitUpdate = {
                     timestamp: simTime,
                     location: loc || 'Transit Route Checkpoint',
                     condition: 'Good',
-                    status: trip.status,
+                    status: trip.status || 'IN_TRANSIT',
                     delayReason: '',
                     remarks: `Call logged by ${empId}: ${notes}`,
                     operatorId: empId
                 };
 
-                await LCOS_State.updateTripStatus(trip.id, trip.status, null, transitUpdate);
+                await LCOS_State.updateTripStatus(trip.id, trip.status || 'IN_TRANSIT', null, transitUpdate);
             }
 
             this.closeModal('modal-log-call');
-            document.getElementById('form-log-call').reset();
-            this.showToast(`Phone conversation logged successfully for ${tripId}!`, 'success');
+            const form = document.getElementById('form-log-call');
+            if (form) form.reset();
+
+            this.showToast(`✅ Call conversation logged (${logId || 'Recorded'})! Available in Call Logs tab.`, 'success');
             await LCOS_State.loadFromBackend();
             this.renderAll();
         } catch (err) {
@@ -4436,26 +4574,37 @@ const app = {
     },
 
     async initLandingSubscription() {
-        // Active by default so the operations console is never locked out
-        this.isSubscriptionActive = true;
-        this.currentSubscription = { plan_id: 'PLAN-PRO', plan_name: 'Professional', status: 'ACTIVE', company_name: 'Vattara Logistics Pvt Ltd' };
-        try {
-            localStorage.setItem('LCOS_SUB_ACTIVE', 'true');
-            localStorage.setItem('LCOS_SUB_DATA', JSON.stringify(this.currentSubscription));
-        } catch(e) {}
-
         try {
             if (window.LCOS_API && typeof window.LCOS_API.getCurrentSubscription === 'function') {
                 const res = await LCOS_API.getCurrentSubscription().catch(() => null);
-                if (res && res.subscription && res.subscription.status === 'ACTIVE' && !res.isExpired) {
+                if (res && res.subscription) {
                     this.currentSubscription = res.subscription;
+                    this.isSubscriptionActive = res.subscription.status === 'ACTIVE' && !res.isExpired;
+                    if (this.isSubscriptionActive) {
+                        localStorage.setItem('LCOS_SUB_ACTIVE', 'true');
+                        localStorage.setItem('LCOS_SUB_DATA', JSON.stringify(this.currentSubscription));
+                    }
                 }
             }
         } catch (err) {
             console.warn('Subscription fetch notice:', err.message);
-        } finally {
-            this.updateLandingSubscriptionUI();
         }
+
+        if (!this.currentSubscription) {
+            const cachedActive = localStorage.getItem('LCOS_SUB_ACTIVE');
+            const cachedData = localStorage.getItem('LCOS_SUB_DATA');
+            if (cachedData) {
+                try {
+                    this.currentSubscription = JSON.parse(cachedData);
+                } catch(e) {}
+            }
+            if (!this.currentSubscription) {
+                this.currentSubscription = { plan_id: 'PLAN-PRO', plan_name: 'Professional', status: 'ACTIVE', company_name: 'Vattara Logistics Pvt Ltd' };
+            }
+            this.isSubscriptionActive = cachedActive !== 'false';
+        }
+
+        this.updateLandingSubscriptionUI();
     },
 
     updateLandingSubscriptionUI() {
@@ -4611,6 +4760,9 @@ const app = {
     },
 
     async handleLandingPayment(planId) {
+        if (this._isPaying) return;
+        this._isPaying = true;
+
         const modalBtnSuffix = planId === 'PLAN-BASIC' ? 'basic' : (planId === 'PLAN-PRO' ? 'pro' : 'ent');
         const btn = document.querySelector(`.landing-pay-btn[data-plan-id="${planId}"], #btn-modal-pay-${modalBtnSuffix}`);
         const originalText = btn ? btn.innerHTML : '';
@@ -4655,6 +4807,7 @@ const app = {
                         },
                         modal: {
                             ondismiss: () => {
+                                this._isPaying = false;
                                 if (btn) {
                                     btn.disabled = false;
                                     btn.innerHTML = originalText;
@@ -4679,18 +4832,29 @@ const app = {
                                     localStorage.setItem('LCOS_SUB_ACTIVE', 'true');
                                     if (verifyRes.subscription) {
                                         localStorage.setItem('LCOS_SUB_DATA', JSON.stringify(verifyRes.subscription));
+                                        this.currentSubscription = verifyRes.subscription;
                                     }
                                     this.isSubscriptionActive = true;
                                     this.closeLivePaymentModal();
                                     await this.initLandingSubscription();
+
+                                    const targetRole = this.pendingPortalRole || 'owner';
+                                    this.pendingPortalRole = null;
+
+                                    this.showToast('✅ Payment Successful! Opening Logistics Portal...', 'success');
+
+                                    // Automatically open the operational workspace portal
+                                    await this.login(targetRole);
+
+                                    // Display confirmation summary inside the portal
                                     this.showPaymentSuccessModal(verifyRes);
-                                    this.showToast('✅ Payment Successful! All 3 portals are now unlocked.', 'success');
                                 } else {
                                     throw new Error(verifyRes?.message || 'Payment verification failed');
                                 }
                             } catch (e) {
                                 this.showToast(`Verification error: ${e.message}`, 'danger');
                             } finally {
+                                this._isPaying = false;
                                 if (btn) {
                                     btn.disabled = false;
                                     btn.innerHTML = originalText;
@@ -4702,6 +4866,7 @@ const app = {
                     const rzp = new window.Razorpay(options);
                     rzp.on('payment.failed', (resp) => {
                         console.error('Razorpay payment failed:', resp.error);
+                        this._isPaying = false;
                         this.openInAppRazorpayModal(orderRes, planId);
                     });
                     rzp.open();
@@ -4713,6 +4878,7 @@ const app = {
             }
 
             if (!nativeOpened) {
+                this._isPaying = false;
                 // Instantly open the In-App Razorpay Checkout Modal
                 this.openInAppRazorpayModal(orderRes, planId);
             }
@@ -4720,6 +4886,7 @@ const app = {
         } catch (err) {
             console.error('Landing Payment Error:', err);
             this.showToast(`Payment error: ${err.message}`, 'danger');
+            this._isPaying = false;
             // Even on error, allow in-app payment modal with generated fallback order
             this.openInAppRazorpayModal({ orderId: 'order_' + Math.floor(100000 + Math.random() * 900000), keyId: 'rzp_test_TCr9Me1AydiZMF' }, planId);
         } finally {
@@ -4868,6 +5035,8 @@ const app = {
         });
 
         submitBtn?.addEventListener('click', async () => {
+            if (this._isSubmittingInAppPay) return;
+            this._isSubmittingInAppPay = true;
             submitBtn.disabled = true;
             submitBtn.innerHTML = `<span class="spinner" style="display:inline-block; width:16px; height:16px; border:2px solid #fff; border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite;"></span> Verifying with Razorpay...`;
 
@@ -4887,13 +5056,23 @@ const app = {
                     localStorage.setItem('LCOS_SUB_ACTIVE', 'true');
                     if (verifyRes.subscription) {
                         localStorage.setItem('LCOS_SUB_DATA', JSON.stringify(verifyRes.subscription));
+                        this.currentSubscription = verifyRes.subscription;
                     }
                     modalEl?.remove();
                     this.isSubscriptionActive = true;
                     this.closeLivePaymentModal();
                     await this.initLandingSubscription();
+
+                    const targetRole = this.pendingPortalRole || 'owner';
+                    this.pendingPortalRole = null;
+
+                    this.showToast('✅ Payment Successful! Opening Logistics Portal...', 'success');
+
+                    // Automatically open the operational workspace portal
+                    await this.login(targetRole);
+
+                    // Display confirmation summary inside the portal
                     this.showPaymentSuccessModal(verifyRes);
-                    this.showToast('✅ Payment Successful! All 3 portals are now unlocked.', 'success');
                 } else {
                     throw new Error(verifyRes?.message || 'Payment verification failed');
                 }
@@ -4901,6 +5080,9 @@ const app = {
                 this.showToast('Payment verification error: ' + e.message, 'danger');
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = `✓ Authorize & Pay ₹${totalInr.toLocaleString('en-IN')}`;
+            } finally {
+                this._isSubmittingInAppPay = false;
+                this._isPaying = false;
             }
         });
     },
@@ -4915,22 +5097,24 @@ const app = {
         const existingModal = document.getElementById('payment-success-modal');
         if (existingModal) existingModal.remove();
 
+        const planName = verifyRes.subscription?.plan_name || (verifyRes.subscription?.plan_id === 'PLAN-ENT' ? 'Enterprise' : (verifyRes.subscription?.plan_id === 'PLAN-BASIC' ? 'Basic' : 'Professional'));
+
         const modalHTML = `
         <div id="payment-success-modal" class="modal-backdrop" style="display: flex; z-index: 99999;">
             <div class="modal-container" style="max-width: 530px; text-align: center; background: #081024; border: 1.5px solid #10b981; box-shadow: 0 25px 60px rgba(0,0,0,0.85), 0 0 45px rgba(16,185,129,0.3); border-radius: 18px; padding: 2rem;">
                 <div style="font-size: 3rem; margin-bottom: 0.5rem;">🎉</div>
                 <h3 style="color: #34d399; font-size: 1.55rem; font-weight: 800; margin-bottom: 0.35rem;">Payment Successful!</h3>
                 <p style="color: #cbd5e1; font-size: 0.92rem; margin-bottom: 1.25rem;">
-                    Your SaaS Subscription has been successfully activated via Razorpay. All 3 role portals are now unlocked and ready!
+                    Your <strong>${planName} Plan</strong> SaaS Subscription is active. The Logistics Operations Control System is unlocked and operational!
                 </p>
                 <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; text-align: left; font-size: 0.88rem;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 0.45rem;">
-                        <span style="color: #94a3b8;">Tax Invoice:</span>
+                        <span style="color: #94a3b8;">Official Tax Invoice:</span>
                         <strong style="color: #38bdf8;">${invNum}</strong>
                     </div>
                     <div style="display: flex; justify-content: space-between; margin-bottom: 0.45rem;">
                         <span style="color: #94a3b8;">Plan Subscribed:</span>
-                        <strong style="color: #f8fafc;">${verifyRes.subscription?.plan_id || 'Professional'}</strong>
+                        <strong style="color: #f8fafc;">${planName}</strong>
                     </div>
                     <div style="display: flex; justify-content: space-between; margin-bottom: 0.45rem;">
                         <span style="color: #94a3b8;">Base Plan:</span>
@@ -4946,7 +5130,7 @@ const app = {
                     </div>
                 </div>
                 <div style="margin-bottom: 1rem; color: #94a3b8; font-size: 0.85rem; font-weight: 600;">
-                    Choose a portal to enter immediately:
+                    You are currently in operations. Switch role or continue to dashboard:
                 </div>
                 <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
                     <button type="button" class="btn btn-primary" id="btn-enter-pay-tracking" style="background: linear-gradient(135deg, #0284c7, #0369a1); color: #ffffff; font-weight: 700; padding: 0.65rem 1rem; border-radius: 8px; font-size: 0.85rem; border: none; cursor: pointer;">
@@ -4958,8 +5142,8 @@ const app = {
                     <button type="button" class="btn btn-primary" id="btn-enter-pay-owner" style="background: linear-gradient(135deg, #10b981, #059669); color: #ffffff; font-weight: 700; padding: 0.65rem 1rem; border-radius: 8px; font-size: 0.85rem; border: none; cursor: pointer;">
                         👑 2 Owners Login
                     </button>
-                    <button type="button" id="btn-close-payment-modal" class="btn btn-secondary" style="background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1; padding: 0.65rem 1rem; border-radius: 8px; font-size: 0.85rem; cursor: pointer;">
-                        Stay on Landing
+                    <button type="button" id="btn-close-payment-modal" class="btn btn-success" style="background: #10b981; border: 1px solid #059669; color: #ffffff; font-weight: 700; padding: 0.65rem 1.25rem; border-radius: 8px; font-size: 0.85rem; cursor: pointer;">
+                        ✓ Go to Dashboard
                     </button>
                 </div>
             </div>
@@ -5360,12 +5544,12 @@ window.handleLandingPayment = function(planId) {
 
 // Global click listener delegation for landing payment buttons
 document.addEventListener('click', (e) => {
-    const payBtn = e.target.closest && e.target.closest('.landing-pay-btn, [data-plan-id]');
+    const payBtn = e.target.closest && e.target.closest('.landing-pay-btn');
     if (payBtn) {
         const planId = payBtn.getAttribute('data-plan-id') || 'PLAN-PRO';
-        e.preventDefault();
-        e.stopPropagation();
-        if (window.app && typeof window.app.handleLandingPayment === 'function') {
+        if (window.app && typeof window.app.handleLandingPayment === 'function' && !window.app._isPaying) {
+            e.preventDefault();
+            e.stopPropagation();
             window.app.handleLandingPayment(planId);
         }
     }

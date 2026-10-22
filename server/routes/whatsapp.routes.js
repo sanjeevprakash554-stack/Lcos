@@ -821,12 +821,38 @@ router.post('/simulate-incoming', async (req, res) => {
  */
 router.post('/test-stoppage-alert', async (req, res) => {
   try {
-    const { vehicleId, testPhone, minutes } = req.body || {};
+    const { vehicleId, tripId, testPhone, minutes } = req.body || {};
     const stoppageMins = parseInt(minutes, 10) || 25;
     const phoneToUse = testPhone || process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
 
-    // Pick active vehicle (e.g. TN-59-EF-9012 or specified)
     let targetVehicle = vehicleId;
+
+    // 1. If tripId was passed, find its vehicle
+    if (!targetVehicle && tripId) {
+      const tripRes = await db.query(`SELECT vehicle_id FROM trips WHERE id = $1`, [tripId]);
+      if (tripRes.rows.length > 0) {
+        targetVehicle = tripRes.rows[0].vehicle_id;
+      }
+    }
+
+    // 2. If testPhone was provided and targetVehicle is not set, find which driver owns this phone
+    if (!targetVehicle && phoneToUse) {
+      const clean = String(phoneToUse).replace(/[^0-9]/g, '');
+      const last10 = clean.slice(-10);
+      const drvRes = await db.query(
+        `SELECT t.vehicle_id 
+         FROM drivers d
+         JOIN trips t ON t.driver_id = d.id AND t.status IN ('IN_TRANSIT', 'DELAYED', 'CREATED')
+         WHERE REPLACE(REPLACE(REPLACE(d.phone, ' ', ''), '+', ''), '-', '') LIKE '%' || $1
+         LIMIT 1`,
+        [last10]
+      );
+      if (drvRes.rows.length > 0 && drvRes.rows[0].vehicle_id) {
+        targetVehicle = drvRes.rows[0].vehicle_id;
+      }
+    }
+
+    // 3. Fallback: pick any active vehicle
     if (!targetVehicle) {
       const activeVehRes = await db.query(
         `SELECT v.id FROM vehicles v 
@@ -836,16 +862,7 @@ router.post('/test-stoppage-alert', async (req, res) => {
       targetVehicle = activeVehRes.rows[0]?.id || 'TN-59-EF-9012';
     }
 
-    // 1. Assign verified test phone number to the driver so Meta sandbox delivers successfully
-    if (phoneToUse) {
-      await db.query(
-        `UPDATE drivers SET phone = $1 
-         WHERE id IN (SELECT driver_id FROM trips WHERE vehicle_id = $2 LIMIT 1)`,
-        [phoneToUse, targetVehicle]
-      );
-    }
-
-    // 2. Set vehicle stopped in the past (> 20 mins ago)
+    // 4. Set vehicle stopped in the past (> 20 mins ago) in UTC
     const isEmbedded = db.isUsingEmbedded && db.isUsingEmbedded();
     if (isEmbedded) {
       await db.query(
@@ -865,18 +882,26 @@ router.post('/test-stoppage-alert', async (req, res) => {
       );
     }
 
-    // 3. Clear previous stoppage alerts for this vehicle to allow new trigger
+    // 5. Clear previous stoppage alerts for this vehicle to allow new trigger
     await db.query(
       `DELETE FROM alerts WHERE vehicle_id = $1 AND type = 'Stoppage Detected'`,
       [targetVehicle]
     );
 
-    // 4. Run automated stoppage detector
+    // 6. Run automated stoppage detector
     await stoppageDetector.checkVehicleStoppages();
 
-    // 5. Fetch generated alert
+    // 7. Fetch generated alert
     const alertRes = await db.query(
-      `SELECT * FROM alerts WHERE vehicle_id = $1 AND type = 'Stoppage Detected' ORDER BY created_at DESC LIMIT 1`,
+      `SELECT a.*, d.name AS driver_name, d.phone AS driver_phone,
+              sb.name AS source_name, dest_b.name AS dest_name
+       FROM alerts a
+       LEFT JOIN drivers d ON d.id = a.driver_id
+       LEFT JOIN trips t ON t.id = a.trip_id
+       LEFT JOIN branches sb ON sb.id = t.source_branch_id
+       LEFT JOIN branches dest_b ON dest_b.id = t.destination_branch_id
+       WHERE a.vehicle_id = $1 AND a.type = 'Stoppage Detected' 
+       ORDER BY a.created_at DESC LIMIT 1`,
       [targetVehicle]
     );
 
@@ -886,7 +911,7 @@ router.post('/test-stoppage-alert', async (req, res) => {
       vehicleId: targetVehicle,
       stoppageMinutes: stoppageMins,
       alert: alertRes.rows[0] || null,
-      driverPhone: phoneToUse,
+      driverPhone: alertRes.rows[0]?.driver_phone || phoneToUse,
       higherOfficialPhone: process.env.HIGHER_OFFICIAL_PHONE,
     });
   } catch (err) {
