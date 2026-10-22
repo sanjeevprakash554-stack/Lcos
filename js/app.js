@@ -1160,8 +1160,65 @@ const app = {
             const btn = document.getElementById('btn-trigger-test-stoppage');
             if (btn) {
                 btn.disabled = false;
-                btn.textContent = '⚡ Run Stoppage Check & Send WhatsApp Alerts';
+                btn.textContent = '🚨 Test 20m Stoppage Alert';
             }
+        }
+    },
+
+    async simulateDriverButtonReply(type = 'traffic', vehicleId = 'TN-59-EF-9012') {
+        const buttonIds = {
+            traffic: `stp_traffic_${vehicleId}`,
+            breakdown: `stp_breakdown_${vehicleId}`,
+            resuming: `stp_moving_${vehicleId}`
+        };
+        const titles = {
+            traffic: 'Traffic / Toll Delay',
+            breakdown: 'Puncture / Breakdown',
+            resuming: 'Resuming Movement'
+        };
+
+        const buttonId = buttonIds[type] || buttonIds.traffic;
+        const title = titles[type] || titles.traffic;
+
+        const payload = {
+            object: 'whatsapp_business_account',
+            entry: [{
+                id: 'WHATSAPP_BUSINESS_ACCOUNT_ID',
+                changes: [{
+                    value: {
+                        messaging_product: 'whatsapp',
+                        metadata: { display_phone_number: '1555000', phone_number_id: '1246879781843655' },
+                        contacts: [{ profile: { name: 'Saravanan K.' }, wa_id: '916382897998' }],
+                        messages: [{
+                            from: '916382897998',
+                            id: 'wamid.sim_' + Date.now(),
+                            timestamp: Math.floor(Date.now() / 1000).toString(),
+                            type: 'interactive',
+                            interactive: {
+                                type: 'button_reply',
+                                button_reply: {
+                                    id: buttonId,
+                                    title: title
+                                }
+                            }
+                        }]
+                    },
+                    field: 'messages'
+                }]
+            }]
+        };
+
+        try {
+            this.showToast(`Simulating driver tapped "${title}"...`, 'info');
+            await fetch('/api/whatsapp/webhook', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            await this.refreshAlertsAndDashboard();
+        } catch (e) {
+            console.error('Simulation error:', e);
+            this.showToast('Simulation error: ' + e.message, 'danger');
         }
     },
 
