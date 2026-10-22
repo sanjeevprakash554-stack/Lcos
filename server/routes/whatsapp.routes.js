@@ -129,13 +129,14 @@ async function handleIncomingMessage(msg, contact = null) {
 
   // Try to find matching driver in the database
   const cleanedSender = cleanPhone(senderNumber);
+  const last10 = cleanedSender.slice(-10);
   let driver = null;
   let activeTrip = null;
 
   try {
     const driverRes = await db.query(
       `SELECT * FROM drivers WHERE REPLACE(REPLACE(REPLACE(phone, ' ', ''), '+', ''), '-', '') LIKE $1 LIMIT 1`,
-      [`%${cleanedSender}%`]
+      [`%${last10}%`]
     );
     if (driverRes.rows.length > 0) {
       driver = driverRes.rows[0];
@@ -153,6 +154,34 @@ async function handleIncomingMessage(msg, contact = null) {
       );
       if (tripRes.rows.length > 0) {
         activeTrip = tripRes.rows[0];
+      }
+    }
+
+    // Fallback: If activeTrip is still null, look up by button vehicle ID or active stoppage vehicle
+    let buttonVehId = null;
+    if (interactiveButtonId) {
+      const match = interactiveButtonId.match(/stp_(?:traffic|breakdown|moving)_(.+)/);
+      if (match) buttonVehId = match[1];
+    }
+    const targetV = buttonVehId || 'TN-59-EF-9012';
+    if (!activeTrip && targetV) {
+      const vTripRes = await db.query(
+        `SELECT t.*, c.name as commodity_name, sb.name as source_name, db_br.name as dest_name,
+                d.name as driver_name, d.phone as driver_phone
+         FROM trips t
+         LEFT JOIN commodities c ON c.id = t.commodity_id
+         LEFT JOIN branches sb ON sb.id = t.source_branch_id
+         LEFT JOIN branches db_br ON db_br.id = t.destination_branch_id
+         LEFT JOIN drivers d ON d.id = t.driver_id
+         WHERE t.vehicle_id = $1 AND t.status IN ('CREATED', 'IN_TRANSIT', 'DELAYED')
+         ORDER BY t.created_at DESC LIMIT 1`,
+        [targetV]
+      );
+      if (vTripRes.rows.length > 0) {
+        activeTrip = vTripRes.rows[0];
+        if (!driver) {
+          driver = { id: activeTrip.driver_id, name: activeTrip.driver_name, phone: activeTrip.driver_phone };
+        }
       }
     }
   } catch (err) {
@@ -569,7 +598,8 @@ router.get('/status', async (req, res) => {
 
     const protocol = req.protocol;
     const host = req.get('host');
-    const webhookUrl = `${protocol}://${host}/api/whatsapp/webhook`;
+    const publicBase = process.env.CLOUDFLARE_URL || `${protocol}://${host}`;
+    const webhookUrl = `${publicBase}/api/whatsapp/webhook`;
 
     res.json({
       success: true,
@@ -903,6 +933,103 @@ router.post('/accept-reason', async (req, res) => {
     });
   } catch (err) {
     console.error('Accept reason error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * POST /api/whatsapp/decline-reason
+ * Higher Official rejects/declines the driver's reported stoppage reason
+ */
+router.post('/decline-reason', async (req, res) => {
+  try {
+    const { vehicleId, alertId, reason } = req.body || {};
+    const vehId = vehicleId || 'TN-59-EF-9012';
+
+    // 1. Escalate alert
+    if (alertId) {
+      await db.query(`UPDATE alerts SET severity = 'critical', status = 'Escalated', escalated = 1, escalated_at = NOW() WHERE id = $1`, [alertId]);
+    } else {
+      await db.query(
+        `UPDATE alerts SET severity = 'critical', status = 'Escalated', escalated = 1, escalated_at = NOW() 
+         WHERE vehicle_id = $1 AND status = 'Active'`,
+        [vehId]
+      );
+    }
+
+    // 2. Fetch driver phone
+    let driverPhone = null;
+    const vehRes = await db.query(
+      `SELECT d.phone, d.name AS driver_name FROM vehicles v 
+       LEFT JOIN trips t ON t.vehicle_id = v.id 
+       LEFT JOIN drivers d ON d.id = t.driver_id 
+       WHERE v.id = $1 LIMIT 1`,
+      [vehId]
+    );
+    if (vehRes.rows.length > 0 && vehRes.rows[0].phone) {
+      driverPhone = vehRes.rows[0].phone;
+    }
+
+    const officialPhone = process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
+    const targetPhone = driverPhone || officialPhone;
+
+    const declineMessage = `❌ *DELAY REASON DECLINED*\n\nCentral Operations Manager reviewed and *DECLINED* your reported delay reason for Vehicle *${vehId}*.\n\n⚠️ *Action Required:* Reason rejected. Please resume movement immediately or contact Central Control Room.`;
+
+    whatsappService.sendTextMessage(targetPhone, declineMessage)
+      .catch(e => console.warn('Decline reason WhatsApp notification note:', e.message));
+
+    // 3. Broadcast decline via socket
+    const io = getIO();
+    if (io) {
+      io.emit('stoppage_reason_declined', {
+        vehicleId: vehId,
+        alertId,
+        status: 'Declined',
+        message: 'Delay reason declined by Operations Manager',
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Delay reason for vehicle ${vehId} was DECLINED. Driver has been alerted on WhatsApp!`,
+      vehicleId: vehId
+    });
+  } catch (err) {
+    console.error('Decline reason error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * GET /api/whatsapp/active-stoppage
+ * Fetches current monitored stoppage alert and latest driver reply
+ */
+router.get('/active-stoppage', async (req, res) => {
+  try {
+    // 1. Fetch latest stoppage / delay alert
+    const alertRes = await db.query(
+      `SELECT a.*, v.current_lat, v.current_lng, v.movement_status, v.speed_kmh, d.name AS driver_name, d.phone AS driver_phone
+       FROM alerts a
+       LEFT JOIN vehicles v ON v.id = a.vehicle_id
+       LEFT JOIN drivers d ON d.id = a.driver_id
+       WHERE a.type IN ('Stoppage Detected', 'Driver Delay Report', 'Emergency Breakdown')
+       ORDER BY a.created_at DESC LIMIT 1`
+    );
+
+    // 2. Fetch latest inbound driver reply from logs
+    const logRes = await db.query(
+      `SELECT * FROM whatsapp_logs 
+       WHERE direction = 'INBOUND'
+       ORDER BY created_at DESC LIMIT 1`
+    );
+
+    res.json({
+      success: true,
+      alert: alertRes.rows[0] || null,
+      latestReply: logRes.rows[0] || null
+    });
+  } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });

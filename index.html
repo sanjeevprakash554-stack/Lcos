@@ -1111,72 +1111,78 @@
                                 </form>
                             </div>
 
-                            <!-- Card 2: Live 20-Min Stoppage Watchdog & Driver Reason Review -->
+                            <!-- Card 2: Driver Stoppage: Accept or Decline Decision Panel -->
                             <div class="glass-card" id="wa-stoppage-monitor-panel">
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid var(--border-glass); padding-bottom:0.75rem;">
-                                    <h4 style="margin:0; font-size:1rem; font-weight:600; display:flex; align-items:center; gap:0.5rem;">
-                                        <span>⏱️</span> 20-Min Stoppage & Driver Reason Review
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem; border-bottom:1px solid var(--border-glass); padding-bottom:0.75rem;">
+                                    <h4 style="margin:0; font-size:1.05rem; font-weight:700; display:flex; align-items:center; gap:0.5rem; color:#f8fafc;">
+                                        <span>📋</span> Driver Stoppage: Accept or Decline
                                     </h4>
-                                    <span class="badge" style="background:rgba(16, 185, 129, 0.15); color:#10b981; font-size:0.7rem; font-weight:600;">🟢 LIVE 20-MIN WATCHDOG</span>
+                                    <span id="wa-decision-status-badge" class="badge" style="background:rgba(245, 158, 11, 0.2); color:#fbbf24; border:1px solid rgba(245, 158, 11, 0.4); font-size:0.75rem; font-weight:700;">
+                                        ⚡ MONITORING ACTIVE
+                                    </span>
                                 </div>
 
-                                <!-- Workflow Explanation Banner -->
-                                <div style="background:rgba(59, 130, 246, 0.08); border:1px solid rgba(59, 130, 246, 0.2); border-radius:8px; padding:0.75rem; margin-bottom:0.75rem; font-size:0.75rem; color:var(--text-main); line-height:1.5;">
-                                    <div style="font-weight:600; margin-bottom:0.25rem; color:#60a5fa; display:flex; align-items:center; gap:0.35rem;">
-                                        <span>🚨🔊</span> Automated Stoppage Rule with Urgent Audio Alert:
-                                    </div>
-                                    <div style="color:var(--text-muted); font-size:0.72rem;">
-                                        • When a vehicle halts &gt; 20 mins, an automated alert + sound notification sends to Driver & Higher Official (<span id="wa-display-official-phone">916382897998</span>).<br>
-                                        • Driver taps an interactive button on WhatsApp: <strong>Traffic / Toll Delay</strong>, <strong>Breakdown</strong>, or <strong>Resuming Movement</strong>.<br>
-                                        • Driver's reason updates live below and on the tracking map. Higher Official clicks <strong>Accept Reason</strong> to validate.
-                                    </div>
+                                <!-- Explanation Box -->
+                                <div style="background:rgba(59, 130, 246, 0.08); border:1px solid rgba(59, 130, 246, 0.2); border-radius:8px; padding:0.6rem 0.85rem; margin-bottom:0.75rem; font-size:0.74rem; color:var(--text-main); line-height:1.4;">
+                                    <strong>How This Works:</strong> When lorry halts &gt;20 mins, WhatsApp sends 3 buttons to driver (<em>Traffic, Breakdown, Moving</em>). When driver taps, their reason appears in the box below for manager to <strong>Accept</strong> or <strong>Decline</strong>.
                                 </div>
 
-                                <!-- Live Driver Stoppage Status & Action Box -->
-                                <div id="wa-live-stoppage-status-box" style="background:rgba(15, 23, 42, 0.6); border:1px solid var(--border-glass); border-radius:8px; padding:0.85rem; margin-bottom:0.75rem;">
-                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
-                                        <span style="font-size:0.72rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Monitored Lorry</span>
-                                        <span id="wa-stoppage-vehicle-badge" class="badge" style="background:rgba(239, 68, 68, 0.15); color:#f87171; font-size:0.72rem;">TN-59-EF-9012 (Halted &gt;20m)</span>
+                                <!-- Vehicle & Stoppage Details Header -->
+                                <div style="background:rgba(15, 23, 42, 0.7); border:1px solid var(--border-glass); border-radius:8px; padding:0.75rem; margin-bottom:0.75rem;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem; flex-wrap:wrap; gap:0.4rem;">
+                                        <div style="font-size:0.78rem;">
+                                            <span style="color:var(--text-muted);">Vehicle:</span>
+                                            <strong id="wa-stoppage-vehicle-id" style="color:#67e8f9; font-size:0.9rem; margin-left:0.25rem;">TN-59-EF-9012</strong>
+                                            <span style="color:var(--text-muted); margin-left:0.5rem;">Driver:</span>
+                                            <strong id="wa-stoppage-driver-name" style="color:#f8fafc; margin-left:0.25rem;">Saravanan K.</strong>
+                                            <span style="color:#94a3b8; font-size:0.72rem;">(916382897998)</span>
+                                        </div>
+                                        <span id="wa-stoppage-duration-badge" class="badge" style="background:rgba(239, 68, 68, 0.2); color:#f87171; border:1px solid rgba(239,68,68,0.3); font-size:0.72rem; font-weight:700;">
+                                            ⏱️ Stationary: 25+ Mins
+                                        </span>
                                     </div>
 
-                                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.5rem; margin-bottom:0.6rem; font-size:0.75rem;">
-                                        <div>
-                                            <span style="color:var(--text-muted);">Vehicle ID:</span>
-                                            <strong id="wa-stoppage-vehicle-id" style="color:#67e8f9; margin-left:0.25rem;">TN-59-EF-9012</strong>
+                                    <!-- THE DRIVER REASON DISPLAY BOX (PROMINENT & HIGH VISIBILITY) -->
+                                    <div id="wa-reason-highlight-box" style="background:rgba(30, 41, 59, 0.95); border:2px solid #38bdf8; border-radius:8px; padding:0.85rem; margin-bottom:0.75rem; transition:all 0.3s ease;">
+                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem;">
+                                            <span style="font-size:0.7rem; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px;">
+                                                Driver's WhatsApp Selected Reason:
+                                            </span>
+                                            <span id="wa-stoppage-reply-time" style="font-size:0.7rem; color:#38bdf8; font-weight:600;">--</span>
                                         </div>
-                                        <div>
-                                            <span style="color:var(--text-muted);">Stationary:</span>
-                                            <strong id="wa-stoppage-duration" style="color:#fbbf24; margin-left:0.25rem;">25+ Mins</strong>
-                                        </div>
-                                    </div>
-
-                                    <!-- Driver WhatsApp Response Box -->
-                                    <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:6px; padding:0.6rem; margin-bottom:0.75rem;">
-                                        <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:0.25rem; display:flex; justify-content:space-between;">
-                                            <span>Driver WhatsApp Interactive Reply:</span>
-                                            <span id="wa-stoppage-reply-time" style="font-size:0.68rem; color:#94a3b8;">--</span>
-                                        </div>
-                                        <div id="wa-stoppage-driver-reason" style="font-size:0.82rem; font-weight:600; color:#38bdf8; display:flex; align-items:center; gap:0.4rem;">
+                                        <div id="wa-stoppage-driver-reason" style="font-size:1.1rem; font-weight:800; color:#38bdf8; display:flex; align-items:center; gap:0.5rem; word-break:break-word;">
                                             <span>💬</span> <span id="wa-stoppage-reason-text">Awaiting driver button reply from WhatsApp...</span>
                                         </div>
+                                        <div id="wa-stoppage-reason-subtext" style="font-size:0.72rem; color:#94a3b8; margin-top:0.35rem;">
+                                            Central Operations must review the driver's response and choose an action below:
+                                        </div>
                                     </div>
 
-                                    <!-- Higher Official Action: Accept Reason & Clear Alert -->
-                                    <div style="display:flex; gap:0.5rem; align-items:center; justify-content:space-between; flex-wrap:wrap;">
-                                        <button type="button" class="btn btn-success" id="btn-accept-driver-reason" style="font-size:0.78rem; font-weight:600; padding:0.45rem 1rem; background:#10b981; border-color:#059669; flex:1;" onclick="window.app && window.app.acceptCurrentStoppageReason()">
-                                            ✅ Accept Reason & Clear Alert
+                                    <!-- TWO LARGE ACTION BUTTONS: ACCEPT OR DECLINE -->
+                                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.75rem; margin-bottom:0.5rem;">
+                                        <button type="button" class="btn" id="btn-accept-driver-reason" style="background:#10b981; border:1px solid #059669; color:#fff; font-size:0.88rem; font-weight:700; padding:0.65rem 0.75rem; border-radius:8px; display:flex; align-items:center; justify-content:center; gap:0.4rem; cursor:pointer;" onclick="window.app && window.app.acceptCurrentStoppageReason()">
+                                            <span>✅</span> ACCEPT REASON (Approve)
                                         </button>
-                                        <button type="button" class="btn btn-secondary" id="btn-clear-stoppage-alert" style="font-size:0.78rem; padding:0.45rem 0.75rem;" onclick="window.app && window.app.dismissStoppageAlert()">
-                                            Dismiss
+                                        <button type="button" class="btn" id="btn-decline-driver-reason" style="background:#ef4444; border:1px solid #dc2626; color:#fff; font-size:0.88rem; font-weight:700; padding:0.65rem 0.75rem; border-radius:8px; display:flex; align-items:center; justify-content:center; gap:0.4rem; cursor:pointer;" onclick="window.app && window.app.declineCurrentStoppageReason()">
+                                            <span>❌</span> DECLINE REASON (Reject)
                                         </button>
+                                    </div>
+
+                                    <!-- Decision Result Feedback Banner -->
+                                    <div id="wa-decision-feedback" style="display:none; padding:0.5rem 0.75rem; border-radius:6px; font-size:0.76rem; font-weight:600; text-align:center;">
                                     </div>
                                 </div>
 
-                                <!-- On-Demand Stoppage Check (Simple 1-Click for Instant Testing) -->
-                                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; padding-top:0.35rem;">
-                                    <span style="font-size:0.72rem; color:var(--text-muted);">Want to simulate/trigger right now?</span>
-                                    <button type="button" class="btn" id="btn-trigger-test-stoppage" style="font-size:0.75rem; font-weight:600; padding:0.35rem 0.85rem; background:rgba(245, 158, 11, 0.15); border:1px solid #f59e0b; color:#fbbf24; cursor:pointer;" onclick="window.app && window.app.triggerTestStoppage()">
-                                        ⚡ Run Stoppage Check & Send WhatsApp Alerts
+                                <!-- Test & Demo Tools for Anyone to Test Easily -->
+                                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; padding-top:0.35rem; border-top:1px dashed var(--border-glass);">
+                                    <div style="font-size:0.72rem; color:var(--text-muted); display:flex; align-items:center; gap:0.35rem;">
+                                        <span>🧪 Test Driver Reply:</span>
+                                        <button type="button" class="btn btn-secondary" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="window.app && window.app.simulateDriverReply('Traffic / Toll Delay')">🟡 Traffic</button>
+                                        <button type="button" class="btn btn-secondary" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="window.app && window.app.simulateDriverReply('Tyre Puncture / Breakdown')">🔴 Breakdown</button>
+                                        <button type="button" class="btn btn-secondary" style="font-size:0.7rem; padding:0.2rem 0.5rem;" onclick="window.app && window.app.simulateDriverReply('Resuming Movement')">🟢 Moving</button>
+                                    </div>
+                                    <button type="button" class="btn" id="btn-trigger-test-stoppage" style="font-size:0.72rem; font-weight:700; padding:0.25rem 0.65rem; background:rgba(245, 158, 11, 0.15); border:1px solid #f59e0b; color:#fbbf24; cursor:pointer;" onclick="window.app && window.app.triggerTestStoppage()">
+                                        ⚡ Trigger Alert
                                     </button>
                                 </div>
                             </div>
