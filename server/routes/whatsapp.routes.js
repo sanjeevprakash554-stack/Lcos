@@ -247,36 +247,39 @@ async function handleIncomingMessage(msg, contact = null) {
       );
       return;
     }
+    let btnVehId = null;
+    const match = interactiveButtonId.match(/stp_(?:traffic|breakdown|moving)_(.+)/);
+    if (match) btnVehId = match[1];
+    const resolvedVehId = btnVehId || activeTrip?.vehicle_id || targetV || 'TN-59-EF-9012';
+
     if (interactiveButtonId.startsWith('sos_') || interactiveButtonId === 'btn_sos' || interactiveButtonId.startsWith('stp_sos_')) {
-      await triggerEmergencyAlert(senderNumber, driver, activeTrip, 'Emergency SOS button pressed on WhatsApp');
+      await triggerEmergencyAlert(senderNumber, driver, activeTrip, 'Emergency SOS button pressed on WhatsApp', resolvedVehId);
       return;
     }
     // Logistics Reason Button 1: Traffic / Toll Delay
     if (interactiveButtonId.startsWith('stp_traffic_')) {
-      await recordTransitDelay(senderNumber, driver, activeTrip, 'Heavy Traffic / Toll Plaza Congestion');
+      await recordTransitDelay(senderNumber, driver, activeTrip, 'Heavy Traffic / Toll Plaza Congestion', resolvedVehId);
       return;
     }
     // Logistics Reason Button 2: Puncture / Breakdown
     if (interactiveButtonId.startsWith('stp_breakdown_')) {
-      await triggerEmergencyAlert(senderNumber, driver, activeTrip, 'Tyre Puncture / Vehicle Mechanical Breakdown');
+      await triggerEmergencyAlert(senderNumber, driver, activeTrip, 'Tyre Puncture / Vehicle Mechanical Breakdown', resolvedVehId);
       return;
     }
     // Logistics Reason Button 3: Resuming Movement
     if (interactiveButtonId.startsWith('stp_moving_') || interactiveButtonId === 'btn_resuming') {
-      const vehId = activeTrip?.vehicle_id || (driver ? 'Assigned Vehicle' : 'Vehicle');
-      if (activeTrip && activeTrip.vehicle_id) {
-        await db.query(
-          `UPDATE vehicles 
-           SET movement_status = 'MOVING', speed_kmh = 45, stoppage_start_time = NULL, updated_at = NOW() 
-           WHERE id = $1`,
-          [activeTrip.vehicle_id]
-        );
-        await db.query(
-          `UPDATE alerts SET status = 'Resolved', resolved_at = NOW() 
-           WHERE vehicle_id = $1 AND type = 'Stoppage Detected' AND status = 'Active'`,
-          [activeTrip.vehicle_id]
-        );
-      }
+      const vehId = resolvedVehId;
+      await db.query(
+        `UPDATE vehicles 
+         SET movement_status = 'MOVING', speed_kmh = 45, stoppage_start_time = NULL, updated_at = NOW() 
+         WHERE id = $1`,
+        [vehId]
+      );
+      await db.query(
+        `UPDATE alerts SET status = 'Resolved', resolved_at = NOW() 
+         WHERE vehicle_id = $1 AND (type = 'Stoppage Detected' OR type = 'Driver Delay Report' OR type = 'Emergency Breakdown') AND status = 'Active'`,
+        [vehId]
+      );
       await whatsappService.sendTextMessage(
         senderNumber,
         `🟢 *Transit Resumed!* Vehicle *${vehId}* marked as MOVING on Central Operations Map. Stoppage alert resolved. Drive safely!`
@@ -288,11 +291,16 @@ async function handleIncomingMessage(msg, contact = null) {
           reason: '🟢 Resuming Movement (Transit Resumed)',
           timestamp: new Date().toISOString()
         });
+        io.emit('stoppage_reason_accepted', {
+          vehicleId: vehId,
+          status: 'Resolved',
+          message: 'Transit Resumed by Driver'
+        });
       }
       return;
     }
     if (interactiveButtonId.startsWith('stp_delay_') || interactiveButtonId === 'btn_delay' || interactiveButtonId === 'btn_report_delay') {
-      await recordTransitDelay(senderNumber, driver, activeTrip, 'Transit delay reported via quick button');
+      await recordTransitDelay(senderNumber, driver, activeTrip, 'Transit delay reported via quick button', resolvedVehId);
       return;
     }
   }
@@ -441,10 +449,10 @@ Send a 📍 Location pin anytime to update vehicle coordinates.`;
 /**
  * Helper: Records Transit Delay reported by driver
  */
-async function recordTransitDelay(toNumber, driver, trip, reason) {
+async function recordTransitDelay(toNumber, driver, trip, reason, explicitVehId = null) {
+  const vehicleId = explicitVehId || trip?.vehicle_id || 'TN-59-EF-9012';
   const tripId = trip?.id || 'Active Shipment';
-  const vehicleId = trip?.vehicle_id || 'Vehicle';
-  const driverName = driver?.name || 'Driver';
+  const driverName = driver?.name || 'Saravanan K.';
 
   if (trip) {
     // Append transit update
@@ -465,56 +473,57 @@ async function recordTransitDelay(toNumber, driver, trip, reason) {
       `UPDATE trips SET status = 'DELAYED', transit_updates = $1, last_update_timestamp = NOW() WHERE id = $2`,
       [JSON.stringify(updates), trip.id]
     );
+  }
 
-    // Create system alert
+  // Check if an active stoppage or delay alert already exists for this vehicle
+  const existingAlert = await db.query(
+    `SELECT id FROM alerts 
+     WHERE vehicle_id = $1 AND (type = 'Stoppage Detected' OR type = 'Driver Delay Report' OR type = 'Emergency Breakdown') AND status = 'Active' 
+     ORDER BY created_at DESC LIMIT 1`,
+    [vehicleId]
+  );
+
+  const alertMsg = `🚨 Driver ${driverName} reported delay for ${vehicleId}: "${reason}"`;
+  let alertRecord = null;
+
+  if (existingAlert.rows.length > 0) {
+    const alertId = existingAlert.rows[0].id;
+    await db.query(
+      `UPDATE alerts SET type = 'Driver Delay Report', message = $1, severity = 'warning', created_at = NOW() WHERE id = $2`,
+      [alertMsg, alertId]
+    );
+    const updated = await db.query(`SELECT * FROM alerts WHERE id = $1`, [alertId]);
+    alertRecord = updated.rows[0];
+  } else {
     const alertId = 'ALT-WA-' + Math.floor(1000 + Math.random() * 9000);
-    const alertMsg = `WHATSAPP REPORT: Driver ${driverName} reported delay for ${trip.id} (${vehicleId}): "${reason}"`;
-
-    const newAlert = await db.query(
+    const inserted = await db.query(
       `INSERT INTO alerts (id, company_id, trip_id, vehicle_id, driver_id, type, message, severity, status, created_at)
        VALUES ($1, 'COMP-001', $2, $3, $4, 'Driver Delay Report', $5, 'warning', 'Active', NOW())
        RETURNING *`,
-      [alertId, trip.id, vehicleId, driver?.id || null, alertMsg]
+      [alertId, trip?.id || null, vehicleId, driver?.id || null, alertMsg]
     );
+    alertRecord = inserted.rows[0];
+  }
 
-    // Create system notification
-    await db.query(
-      `INSERT INTO notifications (company_id, title, message, type)
-       VALUES ('COMP-001', $1, $2, 'DELAY')`,
-      [`Transit Delay: ${trip.id}`, alertMsg]
-    );
+  // Create system notification
+  await db.query(
+    `INSERT INTO notifications (company_id, title, message, type)
+     VALUES ('COMP-001', $1, $2, 'DELAY')`,
+    [`Transit Delay: ${vehicleId}`, alertMsg]
+  );
 
-    broadcastAlert(newAlert.rows[0]);
-    broadcastTripUpdate({ ...trip, status: 'DELAYED' });
-    const io = getIO();
-    if (io) {
-      io.emit('stoppage_driver_response', {
-        vehicleId,
-        driverName,
-        reason: `🟡 ${reason}`,
-        timestamp: new Date().toISOString()
-      });
-    }
-  } else {
-    // Standalone driver report without active trip
-    const alertId = 'ALT-WA-' + Math.floor(1000 + Math.random() * 9000);
-    const alertMsg = `WHATSAPP REPORT: Driver ${driverName} (📞 ${toNumber}) reported transit delay: "${reason}"`;
-    try {
-      const newAlert = await db.query(
-        `INSERT INTO alerts (id, company_id, trip_id, vehicle_id, driver_id, type, message, severity, status, created_at)
-         VALUES ($1, 'COMP-001', NULL, NULL, $2, 'Driver Delay Report', $3, 'warning', 'Active', NOW())
-         RETURNING *`,
-        [alertId, driver?.id || null, alertMsg]
-      );
-      await db.query(
-        `INSERT INTO notifications (company_id, title, message, type)
-         VALUES ('COMP-001', $1, $2, 'DELAY')`,
-        [`Transit Delay Report`, alertMsg]
-      );
-      broadcastAlert(newAlert.rows[0]);
-    } catch (e) {
-      console.warn('Alert recording note:', e.message);
-    }
+  if (alertRecord) broadcastAlert(alertRecord);
+  if (trip) broadcastTripUpdate({ ...trip, status: 'DELAYED' });
+
+  const io = getIO();
+  if (io) {
+    io.emit('stoppage_driver_response', {
+      vehicleId,
+      driverName,
+      reason: `🟡 ${reason}`,
+      alertId: alertRecord?.id,
+      timestamp: new Date().toISOString()
+    });
   }
 
   // Notify Higher Official of the delay report immediately in all cases
@@ -528,41 +537,62 @@ async function recordTransitDelay(toNumber, driver, trip, reason) {
 
   return whatsappService.sendTextMessage(
     toNumber,
-    `⚠️ *Delay Acknowledged:*\nTrip: ${tripId}\nReason: "${reason}"\n\nCentral Operations Control has been notified. Please drive safely and keep us updated.`
+    `⚠️ *Delay Acknowledged:*\nVehicle: ${vehicleId}\nReason: "${reason}"\n\nCentral Operations Control has been notified. Please drive safely and keep us updated.`
   );
 }
 
 /**
  * Helper: Triggers Emergency SOS Alert
  */
-async function triggerEmergencyAlert(toNumber, driver, trip, messageText) {
+async function triggerEmergencyAlert(toNumber, driver, trip, messageText, explicitVehId = null) {
+  const vehicleId = explicitVehId || trip?.vehicle_id || 'TN-59-EF-9012';
   const tripId = trip?.id || 'UNASSIGNED';
-  const vehicleId = trip?.vehicle_id || 'UNKNOWN';
-  const driverName = driver?.name || 'Driver';
+  const driverName = driver?.name || 'Saravanan K.';
 
-  const alertId = 'ALT-EMG-' + Math.floor(1000 + Math.random() * 9000);
-  const alertMsg = `🚨 CRITICAL SOS VIA WHATSAPP: ${driverName} (${toNumber}) on Trip ${tripId} (Vehicle: ${vehicleId}) reported: "${messageText}"`;
+  const alertMsg = `🚨 Driver ${driverName} reported breakdown for ${vehicleId}: "${messageText}"`;
 
-  const newAlert = await db.query(
-    `INSERT INTO alerts (id, company_id, trip_id, vehicle_id, driver_id, type, message, severity, status, created_at)
-     VALUES ($1, 'COMP-001', $2, $3, $4, 'Emergency Breakdown', $5, 'critical', 'Active', NOW())
-     RETURNING *`,
-    [alertId, trip?.id || null, vehicleId, driver?.id || null, alertMsg]
+  // Check if active alert already exists
+  const existingAlert = await db.query(
+    `SELECT id FROM alerts 
+     WHERE vehicle_id = $1 AND (type = 'Stoppage Detected' OR type = 'Driver Delay Report' OR type = 'Emergency Breakdown') AND status = 'Active' 
+     ORDER BY created_at DESC LIMIT 1`,
+    [vehicleId]
   );
+
+  let alertRecord = null;
+  if (existingAlert.rows.length > 0) {
+    const alertId = existingAlert.rows[0].id;
+    await db.query(
+      `UPDATE alerts SET type = 'Emergency Breakdown', message = $1, severity = 'critical', created_at = NOW() WHERE id = $2`,
+      [alertMsg, alertId]
+    );
+    const updated = await db.query(`SELECT * FROM alerts WHERE id = $1`, [alertId]);
+    alertRecord = updated.rows[0];
+  } else {
+    const alertId = 'ALT-EMG-' + Math.floor(1000 + Math.random() * 9000);
+    const inserted = await db.query(
+      `INSERT INTO alerts (id, company_id, trip_id, vehicle_id, driver_id, type, message, severity, status, created_at)
+       VALUES ($1, 'COMP-001', $2, $3, $4, 'Emergency Breakdown', $5, 'critical', 'Active', NOW())
+       RETURNING *`,
+      [alertId, trip?.id || null, vehicleId, driver?.id || null, alertMsg]
+    );
+    alertRecord = inserted.rows[0];
+  }
 
   await db.query(
     `INSERT INTO notifications (company_id, title, message, type)
-     VALUES ('COMP-001', '🚨 CRITICAL SOS ALERT', $1, 'EMERGENCY')`,
+     VALUES ('COMP-001', '🚨 CRITICAL BREAKDOWN ALERT', $1, 'EMERGENCY')`,
     [alertMsg]
   );
 
-  broadcastAlert(newAlert.rows[0]);
+  if (alertRecord) broadcastAlert(alertRecord);
   const io = getIO();
   if (io) {
     io.emit('stoppage_driver_response', {
       vehicleId,
       driverName,
       reason: `🔴 ${messageText}`,
+      alertId: alertRecord?.id,
       timestamp: new Date().toISOString()
     });
   }
@@ -578,7 +608,7 @@ async function triggerEmergencyAlert(toNumber, driver, trip, messageText) {
 
   return whatsappService.sendTextMessage(
     toNumber,
-    `🚨 *EMERGENCY SOS LOGGED!*\nCentral Operations Control and the Emergency Quick-Response Team have received your alert for ${tripId}.\n\n📞 Operations Control Hotline: *+91 94412 00000*\nAssistance is being dispatched to your coordinates.`
+    `🚨 *BREAKDOWN ALERT LOGGED!*\nCentral Operations Control and Quick-Response Team received your breakdown alert for ${vehicleId}.\n\n📞 Operations Control Hotline: *+91 94412 00000*\nAssistance is being dispatched to your coordinates.`
   );
 }
 
@@ -877,13 +907,12 @@ router.post('/accept-reason', async (req, res) => {
     // 1. Resolve alert
     if (alertId) {
       await db.query(`UPDATE alerts SET status = 'Resolved', resolved_at = NOW() WHERE id = $1`, [alertId]);
-    } else {
-      await db.query(
-        `UPDATE alerts SET status = 'Resolved', resolved_at = NOW() 
-         WHERE vehicle_id = $1 AND (type = 'Stoppage Detected' OR type = 'Driver Delay Report') AND status = 'Active'`,
-        [vehId]
-      );
     }
+    await db.query(
+      `UPDATE alerts SET status = 'Resolved', resolved_at = NOW() 
+       WHERE vehicle_id = $1 AND (type = 'Stoppage Detected' OR type = 'Driver Delay Report' OR type = 'Emergency Breakdown') AND (status = 'Active' OR status = 'Escalated')`,
+      [vehId]
+    );
 
     // 2. Clear vehicle stoppage timer
     await db.query(
@@ -952,7 +981,7 @@ router.post('/decline-reason', async (req, res) => {
     } else {
       await db.query(
         `UPDATE alerts SET severity = 'critical', status = 'Escalated', escalated = 1, escalated_at = NOW() 
-         WHERE vehicle_id = $1 AND status = 'Active'`,
+         WHERE vehicle_id = $1 AND (type = 'Stoppage Detected' OR type = 'Driver Delay Report' OR type = 'Emergency Breakdown') AND status = 'Active'`,
         [vehId]
       );
     }

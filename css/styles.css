@@ -503,14 +503,15 @@ header.top-header {
 /* Alert Ticker */
 .alerts-banner-container {
     border-radius: 12px;
-    background: var(--bg-glass);
-    border: 1px solid var(--border-glass);
+    background: linear-gradient(90deg, rgba(239, 68, 68, 0.12) 0%, rgba(30, 41, 59, 0.95) 100%);
+    border: 1px solid rgba(239, 68, 68, 0.35);
     padding: 0.75rem 1.25rem;
     display: flex;
     align-items: center;
     gap: 1rem;
     margin-bottom: 1.5rem;
     overflow: hidden;
+    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.15);
 }
 
 .alert-label {
@@ -523,31 +524,32 @@ header.top-header {
     text-transform: uppercase;
     letter-spacing: 0.5px;
     animation: flash-bg 1.5s infinite;
+    flex-shrink: 0;
 }
 
 .alerts-ticker-wrap {
     flex-grow: 1;
     overflow: hidden;
     position: relative;
-    height: 24px;
+    min-height: 28px;
+    display: flex;
+    align-items: center;
 }
 
 .alerts-ticker {
     display: flex;
     flex-direction: column;
-    position: absolute;
     width: 100%;
-    animation: scroll-alerts 12s infinite;
 }
 
 .ticker-item {
     font-size: 0.9rem;
-    font-weight: 500;
+    font-weight: 600;
     color: #fda4af;
     white-space: nowrap;
     text-overflow: ellipsis;
     overflow: hidden;
-    height: 24px;
+    min-height: 28px;
     display: flex;
     align-items: center;
     gap: 0.5rem;

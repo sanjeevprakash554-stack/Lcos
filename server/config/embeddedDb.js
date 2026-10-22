@@ -12,6 +12,7 @@ function initEmbeddedDb() {
     const isNew = !fs.existsSync(dbFilePath);
 
     sqlite = new DatabaseSync(dbFilePath);
+    sqlite.exec("PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;");
 
     // Register PostgreSQL compatibility functions
     sqlite.function('now', () => new Date().toISOString());

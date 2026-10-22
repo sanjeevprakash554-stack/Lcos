@@ -821,16 +821,21 @@ const app = {
         }
 
         alertsContainer.innerHTML = filtered.map(a => {
-            let badgeClass = a.severity === 'danger' ? 'badge-delayed' : 'badge-pending';
+            let badgeClass = a.severity === 'danger' || a.severity === 'critical' ? 'badge-delayed' : 'badge-pending';
             let actionBtn = '';
             const role = LCOS_State.getCurrentRole();
 
-            if (role === 'owner') {
+            if (a.type === 'Driver Delay Report' || a.type === 'Stoppage Detected' || a.type === 'Emergency Breakdown' || (a.message && a.message.toLowerCase().includes('stoppage'))) {
+                const phone = a.driverPhone || a.driver_phone || '916382897998';
+                const vehId = a.vehicleId || a.vehicle_id || 'TN-59-EF-9012';
+                actionBtn = `
+                    <button class="btn btn-success" style="padding:0.35rem 0.75rem; font-size:0.8rem; background:#10b981; border-color:#059669; font-weight:700; color:#fff;" onclick="app.acceptCurrentStoppageReason('${vehId}', '${a.id}')">✅ Accept</button>
+                    <button class="btn btn-danger" style="padding:0.35rem 0.75rem; font-size:0.8rem; background:#ef4444; border-color:#dc2626; font-weight:700; color:#fff;" onclick="app.declineAndCallDriver('${vehId}', '${phone}', '${a.id}')">📞 Decline & Call</button>
+                `;
+            } else if (role === 'owner') {
                 actionBtn = `<span class="badge badge-draft" style="font-size:0.75rem; padding:0.25rem 0.5rem;">OWNER MONITORING</span>`;
             } else if (a.type === 'Incoming Call') {
                 actionBtn = `<button class="btn btn-primary" style="padding:0.35rem 0.75rem; font-size:0.8rem;" onclick="app.answerSimulatedCall('${a.id}')">Answer Call</button>`;
-            } else if (a.type === 'Driver Delay Report' || a.type === 'Stoppage Detected') {
-                actionBtn = `<button class="btn btn-success" style="padding:0.35rem 0.75rem; font-size:0.8rem; background:#10b981; border-color:#059669; font-weight:600;" onclick="app.acceptCurrentStoppageReason('${a.vehicleId || a.vehicle_id || 'TN-59-EF-9012'}', '${a.id}')">✅ Accept Reason</button>`;
             } else if (a.type === 'No Update' || a.type === 'Unreachable' || a.type === 'Breakdown') {
                 if (role === 'tracking_team') {
                     if (a.escalated) {
@@ -1160,229 +1165,82 @@ const app = {
         }
     },
 
+    async refreshAlertsAndDashboard() {
+        try {
+            await LCOS_State.loadFromBackend();
+            this.renderDashboard();
+            if (typeof this.renderAlertsView === 'function') this.renderAlertsView();
+            this.renderWhatsAppLogs();
+        } catch (e) {
+            console.error('Error refreshing alerts and dashboard:', e);
+        }
+    },
+
+    loadActiveStoppage() {
+        return this.refreshAlertsAndDashboard();
+    },
+
+    loadAlerts() {
+        return this.refreshAlertsAndDashboard();
+    },
+
     async acceptCurrentStoppageReason(vehicleId = 'TN-59-EF-9012', alertId = null) {
         try {
-            const btn = document.getElementById('btn-accept-driver-reason');
-            if (btn) {
-                btn.disabled = true;
-                btn.innerHTML = '⏳ Accepting...';
-            }
             const res = await window.LCOS_API.acceptStoppageReason({ vehicleId, alertId });
             if (res.success) {
-                this.showToast('✅ Delay reason ACCEPTED! Lorry approved to proceed & driver notified on WhatsApp.', 'success');
+                this.showToast('✅ Delay reason ACCEPTED! Lorry approved to proceed & confirmation sent to driver WhatsApp.', 'success');
                 
-                const reasonEl = document.getElementById('wa-stoppage-reason-text');
-                const statusBadge = document.getElementById('wa-decision-status-badge');
-                const box = document.getElementById('wa-reason-highlight-box');
-                const feedbackEl = document.getElementById('wa-decision-feedback');
+                await this.refreshAlertsAndDashboard();
 
-                if (reasonEl) reasonEl.innerHTML = '<span style="color:#10b981; font-weight:800;">✅ APPROVED: Delay reason accepted by Operations Manager.</span>';
-                if (statusBadge) {
-                    statusBadge.style.background = 'rgba(16, 185, 129, 0.2)';
-                    statusBadge.style.color = '#10b981';
-                    statusBadge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
-                    statusBadge.textContent = '✅ REASON ACCEPTED (APPROVED)';
+                const remaining = (LCOS_State.getAlerts() || []).filter(a => (a.status === 'Active' || a.status === 'Escalated') && a.type !== 'Incoming Call');
+                if (remaining.length === 0) {
+                    const alertsBanner = document.getElementById('alerts-banner');
+                    if (alertsBanner) alertsBanner.style.display = 'none';
                 }
-                if (box) {
-                    box.style.borderColor = '#10b981';
-                    box.style.boxShadow = '0 0 15px rgba(16, 185, 129, 0.25)';
-                }
-                if (feedbackEl) {
-                    feedbackEl.style.display = 'block';
-                    feedbackEl.style.background = 'rgba(16, 185, 129, 0.15)';
-                    feedbackEl.style.color = '#34d399';
-                    feedbackEl.style.border = '1px solid rgba(16, 185, 129, 0.3)';
-                    feedbackEl.innerHTML = '✅ <strong>Decision Recorded:</strong> Delay reason approved. Vehicle status set to MOVING. Confirmation sent to driver WhatsApp.';
-                }
-
-                setTimeout(() => {
-                    this.renderWhatsAppLogs();
-            this.loadActiveStoppage();
-                    if (typeof this.loadAlerts === 'function') this.loadAlerts();
-                }, 800);
             } else {
                 this.showToast('Error: ' + (res.message || 'Could not accept reason'), 'warning');
             }
         } catch (err) {
             this.showToast('Failed to accept stoppage reason: ' + err.message, 'danger');
-        } finally {
-            const btn = document.getElementById('btn-accept-driver-reason');
-            if (btn) {
-                btn.disabled = false;
-                btn.innerHTML = '<span>✅</span> ACCEPT REASON (Approve)';
-            }
         }
     },
 
-    async declineCurrentStoppageReason(vehicleId = 'TN-59-EF-9012', alertId = null) {
+    async declineAndCallDriver(vehicleId = 'TN-59-EF-9012', phone = '916382897998', alertId = null) {
         try {
-            const btn = document.getElementById('btn-decline-driver-reason');
-            if (btn) {
-                btn.disabled = true;
-                btn.innerHTML = '⏳ Declining...';
-            }
-            const res = await window.LCOS_API.declineStoppageReason({ vehicleId, alertId });
-            if (res.success) {
-                this.showToast('❌ Delay reason DECLINED! Escalated to Critical & urgent move order sent to driver WhatsApp.', 'danger');
-                
-                const reasonEl = document.getElementById('wa-stoppage-reason-text');
-                const statusBadge = document.getElementById('wa-decision-status-badge');
-                const box = document.getElementById('wa-reason-highlight-box');
-                const feedbackEl = document.getElementById('wa-decision-feedback');
+            // 1. Post decline to backend so driver receives WhatsApp rejection notification & alert is marked Escalated
+            window.LCOS_API.declineStoppageReason({ vehicleId, alertId }).catch(console.error);
 
-                if (reasonEl) reasonEl.innerHTML = '<span style="color:#ef4444; font-weight:800;">❌ DECLINED: Delay reason rejected by Operations Manager.</span>';
-                if (statusBadge) {
-                    statusBadge.style.background = 'rgba(239, 68, 68, 0.2)';
-                    statusBadge.style.color = '#f87171';
-                    statusBadge.style.borderColor = 'rgba(239, 68, 68, 0.4)';
-                    statusBadge.textContent = '❌ REASON DECLINED (REJECTED)';
-                }
-                if (box) {
-                    box.style.borderColor = '#ef4444';
-                    box.style.boxShadow = '0 0 15px rgba(239, 68, 68, 0.25)';
-                }
-                if (feedbackEl) {
-                    feedbackEl.style.display = 'block';
-                    feedbackEl.style.background = 'rgba(239, 68, 68, 0.15)';
-                    feedbackEl.style.color = '#f87171';
-                    feedbackEl.style.border = '1px solid rgba(239, 68, 68, 0.3)';
-                    feedbackEl.innerHTML = '❌ <strong>Decision Recorded:</strong> Delay reason rejected. Incident escalated to Critical. Driver instructed via WhatsApp to resume transit immediately.';
-                }
+            // 2. Open call dialog with driver's details prefilled
+            this.openModal('modal-log-call');
+            const refInput = document.getElementById('call-trip-ref');
+            const catSelect = document.getElementById('call-category');
+            const notes = document.getElementById('call-notes');
+            const locationInput = document.getElementById('call-location');
 
-                setTimeout(() => {
-                    this.renderWhatsAppLogs();
-            this.loadActiveStoppage();
-                    if (typeof this.loadAlerts === 'function') this.loadAlerts();
-                }, 800);
-            } else {
-                this.showToast('Error: ' + (res.message || 'Could not decline reason'), 'warning');
+            if (refInput) refInput.value = `TRIP / ${vehicleId}`;
+            if (catSelect) catSelect.value = 'Delay Check';
+            if (notes) notes.value = `Manager declined reported stoppage delay for ${vehicleId}. Calling driver directly at ${phone}.`;
+            if (locationInput) locationInput.value = 'Salem NH Highway Stoppage';
+
+            // 3. Directly trigger phone dialer protocol
+            const cleanDigits = String(phone).replace(/[^0-9+]/g, '');
+            try {
+                window.location.href = `tel:${cleanDigits}`;
+            } catch (e) {
+                console.warn('Direct tel protocol notice:', e);
             }
+
+            this.showToast(`❌ Reason declined. Directly calling driver at ${phone}...`, 'warning');
+
+            await this.refreshAlertsAndDashboard();
         } catch (err) {
-            this.showToast('Failed to decline stoppage reason: ' + err.message, 'danger');
-        } finally {
-            const btn = document.getElementById('btn-decline-driver-reason');
-            if (btn) {
-                btn.disabled = false;
-                btn.innerHTML = '<span>❌</span> DECLINE REASON (Reject)';
-            }
+            console.error('Error in declineAndCallDriver:', err);
         }
     },
-
-    async simulateDriverReply(reasonText = 'Traffic / Toll Delay') {
-        try {
-            this.showToast(`Simulating driver tapping "${reasonText}" on WhatsApp...`, 'info');
-            const testPhone = document.getElementById('wa-send-phone')?.value?.trim() || '916382897998';
-            
-            let buttonId = 'stp_traffic_TN-59-EF-9012';
-            if (reasonText.includes('Breakdown') || reasonText.includes('Puncture')) buttonId = 'stp_breakdown_TN-59-EF-9012';
-            if (reasonText.includes('Moving') || reasonText.includes('Resuming')) buttonId = 'stp_moving_TN-59-EF-9012';
-
-            await window.LCOS_API.simulateIncomingWhatsApp({
-                from: testPhone,
-                buttonId: buttonId,
-                text: reasonText
-            });
-
-            // Instant UI update
-            const reasonEl = document.getElementById('wa-stoppage-reason-text');
-            const timeEl = document.getElementById('wa-stoppage-reply-time');
-            const statusBadge = document.getElementById('wa-decision-status-badge');
-            const box = document.getElementById('wa-reason-highlight-box');
-            const feedbackEl = document.getElementById('wa-decision-feedback');
-
-            if (reasonEl) reasonEl.innerHTML = `<span style="color:#fbbf24; font-size:1.15rem; font-weight:800;">🟡 ${reasonText}</span>`;
-            if (timeEl) timeEl.textContent = 'Received just now (WhatsApp)';
-            if (statusBadge) {
-                statusBadge.style.background = 'rgba(245, 158, 11, 0.25)';
-                statusBadge.style.color = '#fbbf24';
-                statusBadge.style.borderColor = '#f59e0b';
-                statusBadge.textContent = '🚨 DRIVER REPLIED - ACTION REQUIRED';
-            }
-            if (box) {
-                box.style.borderColor = '#fbbf24';
-                box.style.boxShadow = '0 0 20px rgba(245, 158, 11, 0.35)';
-            }
-            if (feedbackEl) feedbackEl.style.display = 'none';
-
-            this.showToast(`Driver WhatsApp reason received: "${reasonText}". Please choose Accept or Decline!`, 'success');
-            setTimeout(() => {
                 this.renderWhatsAppLogs();
-            this.loadActiveStoppage();
-                if (typeof this.loadAlerts === 'function') this.loadAlerts();
             }, 600);
-        } catch (e) {
-            this.showToast('Simulation error: ' + e.message, 'danger');
-        }
-    },
-
-    async loadActiveStoppage() {
-        try {
-            const res = await window.LCOS_API.getActiveStoppage();
-            if (!res || !res.success) return;
-
-            const reasonEl = document.getElementById('wa-stoppage-reason-text');
-            const timeEl = document.getElementById('wa-stoppage-reply-time');
-            const statusBadge = document.getElementById('wa-decision-status-badge');
-            const box = document.getElementById('wa-reason-highlight-box');
-            const vehIdEl = document.getElementById('wa-stoppage-vehicle-id');
-            const drvNameEl = document.getElementById('wa-stoppage-driver-name');
-
-            const alert = res.alert;
-            const reply = res.latestReply;
-
-            if (alert && alert.vehicle_id && vehIdEl) {
-                vehIdEl.textContent = alert.vehicle_id;
-            }
-            if (alert && alert.driver_name && drvNameEl) {
-                drvNameEl.textContent = alert.driver_name;
-            }
-
-            if (reply && reply.content && (reply.content.includes('Traffic') || reply.content.includes('Breakdown') || reply.content.includes('Puncture') || reply.content.includes('Moving') || reply.content.includes('Resuming') || reply.content.includes('Delay'))) {
-                const repTime = new Date(reply.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                if (timeEl) timeEl.textContent = `Received at ${repTime}`;
-
-                if (alert && alert.status === 'Resolved') {
-                    if (reasonEl) reasonEl.innerHTML = `<span style="color:#10b981; font-weight:800;">✅ Approved & Resolved: "${reply.content}"</span>`;
-                    if (statusBadge) {
-                        statusBadge.style.background = 'rgba(16, 185, 129, 0.2)';
-                        statusBadge.style.color = '#10b981';
-                        statusBadge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
-                        statusBadge.textContent = '✅ REASON ACCEPTED';
-                    }
-                    if (box) box.style.borderColor = '#10b981';
-                } else if (alert && alert.status === 'Escalated') {
-                    if (reasonEl) reasonEl.innerHTML = `<span style="color:#ef4444; font-weight:800;">❌ Declined / Rejected: "${reply.content}"</span>`;
-                    if (statusBadge) {
-                        statusBadge.style.background = 'rgba(239, 68, 68, 0.2)';
-                        statusBadge.style.color = '#ef4444';
-                        statusBadge.style.borderColor = 'rgba(239, 68, 68, 0.4)';
-                        statusBadge.textContent = '❌ REASON DECLINED';
-                    }
-                    if (box) box.style.borderColor = '#ef4444';
-                } else {
-                    if (reasonEl) reasonEl.innerHTML = `<span style="color:#fbbf24; font-size:1.15rem; font-weight:800;">🟡 ${reply.content}</span>`;
-                    if (statusBadge) {
-                        statusBadge.style.background = 'rgba(245, 158, 11, 0.25)';
-                        statusBadge.style.color = '#fbbf24';
-                        statusBadge.style.borderColor = '#f59e0b';
-                        statusBadge.textContent = '🚨 DRIVER REPLIED - ACTION REQUIRED';
-                    }
-                    if (box) {
-                        box.style.borderColor = '#fbbf24';
-                        box.style.boxShadow = '0 0 15px rgba(245, 158, 11, 0.25)';
-                    }
-                }
-            } else if (alert) {
-                if (reasonEl) reasonEl.innerHTML = `<span style="color:#94a3b8;">⏳ Stoppage alert sent. Awaiting driver button reply from WhatsApp...</span>`;
-                if (statusBadge) {
-                    statusBadge.style.background = 'rgba(239, 68, 68, 0.2)';
-                    statusBadge.style.color = '#f87171';
-                    statusBadge.style.borderColor = 'rgba(239, 68, 68, 0.4)';
-                    statusBadge.textContent = '⏱️ VEHICLE HALTED >20M';
-                }
-            }
-        } catch (e) {
-            console.error('Error loading active stoppage:', e);
+        } catch (err) {
+            this.showToast('Decline action error: ' + err.message, 'danger');
         }
     },
 
@@ -1434,7 +1292,7 @@ const app = {
     renderDashboard() {
         // 1. Calculate and update stats
         const trips = LCOS_State.getTrips();
-        const alerts = LCOS_State.getAlerts().filter(a => a.status === 'Active' && a.type !== 'Incoming Call');
+        const alerts = (LCOS_State.getAlerts() || []).filter(a => (a.status === 'Active' || a.status === 'Escalated') && a.type !== 'Incoming Call');
         
         const inTransitCount = trips.filter(t => t.status === 'IN_TRANSIT').length;
         const delayedCount = trips.filter(t => t.status === 'DELAYED').length;
@@ -1456,18 +1314,79 @@ const app = {
         const alertsBanner = document.getElementById('alerts-banner');
         const ticker = document.getElementById('alerts-ticker-content');
         const alertsFeed = document.getElementById('alerts-feed-content');
+        const bannerBadge = document.getElementById('alert-banner-badge');
+        const bannerActions = document.getElementById('alerts-banner-actions');
         
         if (alertsCount > 0) {
             if (alertsBanner) alertsBanner.style.display = 'flex';
-            if (ticker) ticker.innerHTML = alerts.map(a => `<div class="ticker-item">⚠️ ${a.message}</div>`).join('');
+
+            // Find stoppage, driver delay, or emergency breakdown alert
+            const stoppageAlert = alerts.find(a => (
+                a.type === 'Stoppage Detected' || 
+                a.type === 'Driver Delay Report' || 
+                a.type === 'Emergency Breakdown' ||
+                (a.message && (
+                    a.message.toLowerCase().includes('halted >20') || 
+                    a.message.toLowerCase().includes('whatsapp report') || 
+                    a.message.toLowerCase().includes('stoppage') ||
+                    a.message.toLowerCase().includes('breakdown') ||
+                    a.message.toLowerCase().includes('transit delay')
+                ))
+            ));
+
+            if (stoppageAlert) {
+                if (bannerBadge) {
+                    bannerBadge.textContent = '🚨 STOPPAGE';
+                    bannerBadge.style.background = '#ef4444';
+                }
+                if (ticker) {
+                    ticker.style.animation = 'none';
+                    ticker.style.position = 'static';
+                    ticker.innerHTML = `<div class="ticker-item" style="color:#fef08a; font-weight:700; font-size:0.92rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">🚨 ${stoppageAlert.message}</div>`;
+                }
+                if (bannerActions) {
+                    const phone = stoppageAlert.driverPhone || stoppageAlert.driver_phone || '916382897998';
+                    const vehId = stoppageAlert.vehicleId || stoppageAlert.vehicle_id || 'TN-59-EF-9012';
+                    bannerActions.innerHTML = `
+                        <button class="btn btn-success" style="padding:0.3rem 0.75rem; font-size:0.8rem; background:#10b981; border:1px solid #059669; font-weight:700; color:#fff; border-radius:6px; cursor:pointer;" onclick="app.acceptCurrentStoppageReason('${vehId}', '${stoppageAlert.id}')">✅ Accept</button>
+                        <button class="btn btn-danger" style="padding:0.3rem 0.75rem; font-size:0.8rem; background:#ef4444; border:1px solid #dc2626; font-weight:700; color:#fff; border-radius:6px; cursor:pointer;" onclick="app.declineAndCallDriver('${vehId}', '${phone}', '${stoppageAlert.id}')">📞 Decline & Call</button>
+                        <button class="btn btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="app.showDashboardAlerts()">View All</button>
+                    `;
+                }
+            } else {
+                if (bannerBadge) {
+                    bannerBadge.textContent = 'Alert';
+                    bannerBadge.style.background = 'var(--color-danger)';
+                }
+                if (ticker) {
+                    if (alerts.length <= 1) {
+                        ticker.style.animation = 'none';
+                        ticker.style.position = 'static';
+                    } else {
+                        ticker.style.animation = 'scroll-alerts 12s infinite';
+                        ticker.style.position = 'absolute';
+                    }
+                    ticker.innerHTML = alerts.map(a => `<div class="ticker-item">⚠️ ${a.message}</div>`).join('');
+                }
+                if (bannerActions) {
+                    bannerActions.innerHTML = `<button class="btn btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem;" onclick="app.showDashboardAlerts()">View Alerts</button>`;
+                }
+            }
             
             if (alertsFeed) {
                 alertsFeed.innerHTML = alerts.map(a => {
-                    let badgeClass = a.severity === 'danger' ? 'badge-delayed' : 'badge-pending';
+                    let badgeClass = a.severity === 'danger' || a.severity === 'critical' ? 'badge-delayed' : 'badge-pending';
                     let actionBtn = '';
                     const role = LCOS_State.getCurrentRole();
 
-                    if (role === 'owner') {
+                    if (a.type === 'Stoppage Detected' || a.type === 'Driver Delay Report' || a.type === 'Emergency Breakdown' || (a.message && a.message.toLowerCase().includes('stoppage'))) {
+                        const phone = a.driverPhone || a.driver_phone || '916382897998';
+                        const vehId = a.vehicleId || a.vehicle_id || 'TN-59-EF-9012';
+                        actionBtn = `
+                            <button class="btn btn-success" style="padding:0.25rem 0.6rem; font-size:0.75rem; background:#10b981; border:1px solid #059669; font-weight:700; color:#fff; border-radius:4px; cursor:pointer;" onclick="app.acceptCurrentStoppageReason('${vehId}', '${a.id}')">✅ Accept</button>
+                            <button class="btn btn-danger" style="padding:0.25rem 0.6rem; font-size:0.75rem; background:#ef4444; border:1px solid #dc2626; font-weight:700; color:#fff; border-radius:4px; cursor:pointer;" onclick="app.declineAndCallDriver('${vehId}', '${phone}', '${a.id}')">📞 Decline & Call</button>
+                        `;
+                    } else if (role === 'owner') {
                         actionBtn = `<span class="badge badge-draft" style="font-size:0.7rem; padding:0.15rem 0.35rem;">Owner Monitoring</span>`;
                     } else if (a.type === 'Incoming Call') {
                         actionBtn = `<button class="btn btn-primary" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="app.answerSimulatedCall('${a.id}')">Answer</button>`;
@@ -1479,7 +1398,6 @@ const app = {
                                 actionBtn = `<button class="btn btn-warning" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="app.escalateAlertToManager('${a.id}')">Escalate to Manager</button>`;
                             }
                         } else {
-                            // Manager view handles action
                             if (a.type === 'Breakdown') {
                                 actionBtn = `<button class="btn btn-danger" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="app.resolveBreakdownAlert('${a.id}')">Resolve Breakdown</button>`;
                             } else {
@@ -3810,31 +3728,35 @@ const app = {
                 }
             });
 
-            this.socket.on('stoppage_driver_response', (data) => {
+            this.socket.on('stoppage_driver_response', async (data) => {
                 if (!data) return;
-                const reasonText = document.getElementById('wa-stoppage-reason-text');
-                const timeEl = document.getElementById('wa-stoppage-reply-time');
-                if (reasonText && data.reason) {
-                    reasonText.innerHTML = `<span style="color:#38bdf8;">${data.reason}</span>`;
-                }
-                if (timeEl) {
-                    timeEl.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                }
-                this.renderWhatsAppLogs();
-            this.loadActiveStoppage();
-                if (typeof this.loadAlerts === 'function') this.loadAlerts();
+                try {
+                    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                    audio.volume = 0.5;
+                    audio.play().catch(() => {});
+                } catch (e) {}
+                await this.refreshAlertsAndDashboard();
+                this.showToast(`🚨 Driver WhatsApp Reply: ${data.driverName || 'Driver'} reported "${data.reason || 'Delay'}"`, 'warning');
             });
 
-            this.socket.on('stoppage_reason_accepted', (data) => {
-                this.loadActiveStoppage();
-                this.renderWhatsAppLogs();
-                if (typeof this.loadAlerts === 'function') this.loadAlerts();
+            this.socket.on('alert_created', async (data) => {
+                try {
+                    const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                    audio.volume = 0.5;
+                    audio.play().catch(() => {});
+                } catch (e) {}
+                await this.refreshAlertsAndDashboard();
+                this.showToast(`⚠️ Stoppage Alert: ${data?.message || 'New operations alert'}`, 'danger');
             });
 
-            this.socket.on('stoppage_reason_declined', (data) => {
-                this.loadActiveStoppage();
-                this.renderWhatsAppLogs();
-                if (typeof this.loadAlerts === 'function') this.loadAlerts();
+            this.socket.on('stoppage_reason_accepted', async (data) => {
+                await this.refreshAlertsAndDashboard();
+                this.showToast(`✅ Delay reason approved for ${data?.vehicleId || 'vehicle'}. Vehicle moving forward!`, 'success');
+            });
+
+            this.socket.on('stoppage_reason_declined', async (data) => {
+                await this.refreshAlertsAndDashboard();
+                this.showToast(`📞 Delay reason declined for ${data?.vehicleId || 'vehicle'}. Calling driver...`, 'warning');
             });
 
             console.log('[LCOS Telemetry] Auto-Sync WebSocket listener initialized.');
