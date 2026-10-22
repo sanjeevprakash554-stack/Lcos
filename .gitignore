@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build & Dist output
+dist/
+
+# Environment Variables & Secrets (NEVER COMMIT SENSITIVE API TOKENS)
+.env
+.env.local
+.env.*.local
+
+# Binary Executables
+cloudflared.exe
+*.exe
+
+# Local PostgreSQL Data Directory & SQLite Databases
+pgdata/
+*.sqlite
+*.sqlite3
+*.db
+server/db/lcos_embedded.sqlite*
+
+# Logs & Debugging
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# System & OS Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

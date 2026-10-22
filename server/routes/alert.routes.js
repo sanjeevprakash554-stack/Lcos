@@ -1,0 +1,242 @@
+const express = require('express');
+const router = express.Router();
+const db = require('../config/db');
+const { authenticateToken, authorizeRoles } = require('../middleware/auth');
+const { broadcastAlert } = require('../services/socketService');
+const whatsappService = require('../services/whatsappService');
+
+// GET /api/alerts (List active / historical alerts)
+router.get('/', authenticateToken, async (req, res) => {
+  try {
+    const companyId = req.user.companyId || 'COMP-001';
+    const statusFilter = req.query.status || 'Active';
+
+    let query = `SELECT * FROM alerts WHERE company_id = $1 OR company_id = 'COMP-001' OR company_id IS NULL`;
+    const params = [companyId];
+
+    if (statusFilter !== 'ALL') {
+      params.push(statusFilter);
+      query += ` AND status = $${params.length}`;
+    }
+
+    query += ` ORDER BY created_at DESC`;
+
+    const result = await db.query(query, params);
+    res.json({ success: true, alerts: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/alerts (Create Alert)
+router.post('/', authenticateToken, async (req, res) => {
+  try {
+    const { tripId, vehicleId, driverId, type, message, severity } = req.body;
+    const companyId = req.user.companyId || 'COMP-001';
+
+    const countRes = await db.query(`SELECT COUNT(*) FROM alerts`);
+    const alertId = 'ALT-' + (parseInt(countRes.rows[0].count, 10) + 101);
+
+    const result = await db.query(
+      `INSERT INTO alerts (id, company_id, trip_id, vehicle_id, driver_id, type, message, severity, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'Active')
+       RETURNING *`,
+      [alertId, companyId, tripId || null, vehicleId || null, driverId || null, type || 'Incident', message, severity || 'warning']
+    );
+
+    broadcastAlert(result.rows[0]);
+
+    // Asynchronously dispatch WhatsApp alert to Driver and Higher Official
+    (async () => {
+      try {
+        let driverPhone = null;
+        let driverName = null;
+        if (driverId) {
+          const dRes = await db.query(`SELECT name, phone FROM drivers WHERE id = $1`, [driverId]);
+          if (dRes.rows.length > 0) {
+            driverName = dRes.rows[0].name;
+            driverPhone = dRes.rows[0].phone;
+          }
+        } else if (tripId) {
+          const tRes = await db.query(
+            `SELECT d.name, d.phone FROM trips t JOIN drivers d ON d.id = t.driver_id WHERE t.id = $1`,
+            [tripId]
+          );
+          if (tRes.rows.length > 0) {
+            driverName = tRes.rows[0].name;
+            driverPhone = tRes.rows[0].phone;
+          }
+        }
+
+        // 1. Notify Driver
+        if (driverPhone) {
+          await whatsappService.sendTextMessage(
+            driverPhone,
+            `⚠️ *OPERATIONS ALERT: ${type || 'Incident'}*\n------------------------\n${message}\nTrip ID: ${tripId || 'N/A'} | Vehicle: ${vehicleId || 'Assigned'}\n------------------------\nPlease check in with Operations Control immediately.`
+          );
+        }
+
+        // 2. Notify Higher Official
+        const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE;
+        if (higherOfficial) {
+          await whatsappService.sendTextMessage(
+            higherOfficial,
+            `🚨 *OPERATIONS INCIDENT ALERT*\n------------------------\nType: ${type || 'Incident'} (Severity: ${severity || 'Warning'})\nDetails: ${message}\nVehicle: ${vehicleId || 'N/A'} | Driver: ${driverName || 'N/A'} (📞 ${driverPhone || 'N/A'})\nTrip ID: ${tripId || 'N/A'}\n------------------------\nOperations Control has logged this incident.`
+          );
+        }
+      } catch (waErr) {
+        console.warn('⚠️ [WhatsApp Alert Dispatch Error]:', waErr.message);
+      }
+    })();
+
+    res.status(201).json({ success: true, alert: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/alerts/:id/call-attempt (Execute driver call attempt - 3 strikes flow)
+router.post('/:id/call-attempt', authenticateToken, async (req, res) => {
+  try {
+    const alertId = req.params.id;
+    const alertRes = await db.query(`SELECT * FROM alerts WHERE id = $1`, [alertId]);
+    if (alertRes.rows.length === 0) return res.status(404).json({ success: false, message: 'Alert not found' });
+    const alert = alertRes.rows[0];
+
+    // Fetch call responses count to find attempt number
+    const attemptsRes = await db.query(`SELECT COUNT(*) FROM alert_responses WHERE alert_id = $1`, [alertId]);
+    const attemptNumber = parseInt(attemptsRes.rows[0].count, 10) + 1;
+
+    // Simulate driver answer logic (or driver input)
+    const isUnreachable = alert.type === 'Unreachable';
+    let answered = false;
+    if (!isUnreachable) {
+      if (attemptNumber === 1 && Math.random() > 0.5) answered = true;
+      else if (attemptNumber === 2 && Math.random() > 0.3) answered = true;
+      else if (attemptNumber >= 3) answered = true;
+    } else {
+      if (Math.random() > 0.75) answered = true;
+    }
+
+    let message = '';
+    let strikesExceeded = false;
+    let blacklistRecommend = false;
+
+    if (answered) {
+      // Alert Resolved
+      await db.query(`UPDATE alerts SET status = 'Resolved', resolved_at = NOW() WHERE id = $1`, [alertId]);
+      if (alert.trip_id) {
+        await db.query(`UPDATE trips SET status = 'IN_TRANSIT', last_update_timestamp = NOW() WHERE id = $1`, [alert.trip_id]);
+      }
+      message = `Attempt ${attemptNumber}/3: Call Answered by driver! Status updated to IN_TRANSIT, alert resolved.`;
+    } else {
+      if (attemptNumber >= 3) {
+        strikesExceeded = true;
+        await db.query(`UPDATE alerts SET status = 'Escalated', escalated = true, escalated_to_role = 'OWNER', escalated_at = NOW() WHERE id = $1`, [alertId]);
+
+        if (alert.driver_id) {
+          await db.query(
+            `UPDATE drivers 
+             SET warnings_count = warnings_count + 1, 
+                 performance_score = GREATEST(0, performance_score - 15),
+                 status = CASE WHEN warnings_count + 1 >= 3 THEN 'Suspended' ELSE status END
+             WHERE id = $1`,
+            [alert.driver_id]
+          );
+        }
+        message = `Attempt ${attemptNumber}/3: No Answer. 3 strikes exceeded! Alert escalated to Owner, driver warning issued.`;
+      } else {
+        message = `Attempt ${attemptNumber}/3: No Answer from driver. Registered attempt.`;
+      }
+    }
+
+    // Record escalation response log
+    await db.query(
+      `INSERT INTO alert_responses (alert_id, responder_user_id, action_taken, notes, driver_response, escalation_level)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [alertId, req.user.id, answered ? 'Call Answered' : 'No Answer', message, answered ? 'Driver confirmed safety' : 'Unreachable', attemptNumber]
+    );
+
+    // Record Call log
+    const callLogId = 'CL-' + Math.floor(1000 + Math.random() * 9000);
+    await db.query(
+      `INSERT INTO call_logs (id, company_id, trip_id, call_category, caller, recipient, conversation_notes)
+       VALUES ($1, $2, $3, 'Escalation Call', 'Admin Office', $4, $5)`,
+      [callLogId, req.user.companyId || 'COMP-001', alert.trip_id, `Driver (Attempt ${attemptNumber}/3)`, message]
+    );
+
+    res.json({
+      success: true,
+      answered,
+      strikesExceeded,
+      attemptNumber,
+      message,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/alerts/:id/escalate (Escalate to Owner)
+router.post('/:id/escalate', authenticateToken, async (req, res) => {
+  try {
+    const alertId = req.params.id;
+    const result = await db.query(
+      `UPDATE alerts 
+       SET escalated = true, escalated_to_role = 'OWNER', escalated_at = NOW(), status = 'Escalated'
+       WHERE id = $1
+       RETURNING *`,
+      [alertId]
+    );
+
+    if (result.rows.length === 0) return res.status(404).json({ success: false, message: 'Alert not found' });
+
+    // Record response
+    await db.query(
+      `INSERT INTO alert_responses (alert_id, responder_user_id, action_taken, notes, escalation_level)
+       VALUES ($1, $2, 'Escalated to Owner', 'Tracking team escalated alert to Owner for executive action.', 2)`,
+      [alertId, req.user.id]
+    );
+
+    res.json({ success: true, alert: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/alerts/:id/resolve
+router.post('/:id/resolve', authenticateToken, async (req, res) => {
+  try {
+    const alertId = req.params.id;
+    const { actionNotes } = req.body;
+
+    const result = await db.query(
+      `UPDATE alerts SET status = 'Resolved', resolved_at = NOW() WHERE id = $1 RETURNING *`,
+      [alertId]
+    );
+
+    if (result.rows.length === 0) return res.status(404).json({ success: false, message: 'Alert not found' });
+
+    await db.query(
+      `INSERT INTO alert_responses (alert_id, responder_user_id, action_taken, notes)
+       VALUES ($1, $2, 'Alert Resolved', $3)`,
+      [alertId, req.user.id, actionNotes || 'Alert resolved by user']
+    );
+
+    res.json({ success: true, alert: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/alerts/:id/dismiss
+router.post('/:id/dismiss', authenticateToken, async (req, res) => {
+  try {
+    const result = await db.query(`UPDATE alerts SET status = 'Dismissed' WHERE id = $1 RETURNING *`, [req.params.id]);
+    res.json({ success: true, alert: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+module.exports = router;

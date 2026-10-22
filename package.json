@@ -1,0 +1,28 @@
+{
+  "name": "logistics-operations-control-system",
+  "version": "1.0.0",
+  "description": "Logistics Operations Control System (LCOS) - Centralized Commodity Movement Tracking",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vite",
+    "server": "node server/index.js",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "node server/index.js"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.5",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "leaflet": "^1.9.4",
+    "node-cron": "^4.6.0",
+    "pg": "^8.23.1",
+    "razorpay": "^2.9.8",
+    "socket.io": "^4.8.4"
+  }
+}

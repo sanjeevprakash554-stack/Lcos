@@ -1,0 +1,1980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logistics Operations Control System (LCOS)</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+    <div id="app-container" style="display: none;">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="logo-container">
+                <div class="logo-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                        <line x1="8" y1="21" x2="16" y2="21"></line>
+                        <line x1="12" y1="17" x2="12" y2="21"></line>
+                    </svg>
+                </div>
+                <div class="logo-text">
+                    <h1>LCOS</h1>
+                    <span>Admin Operations</span>
+                </div>
+            </div>
+            
+            <nav style="flex-grow: 1;">
+                <ul class="nav-links">
+                    <li class="nav-item active" data-tab="dashboard">
+                        <a href="#">
+                            <svg><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                            Dashboard
+                        </a>
+                    </li>
+                    <li class="nav-item" data-tab="operations">
+                        <a href="#">
+                            <svg><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                            Operations Console
+                        </a>
+                    </li>
+                    <li class="nav-item" data-tab="trips">
+                        <a href="#">
+                            <svg><rect x="1" y="3" width="15" height="13" rx="2" ry="2"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                            Trips Tracker
+                        </a>
+                    </li>
+                    <li class="nav-item" data-tab="inventory">
+                        <a href="#">
+                            <svg><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                            Inventory & Stock
+                        </a>
+                    </li>
+                    <li class="nav-item" data-tab="directory">
+                        <a href="#">
+                            <svg><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                            LCOS Directory
+                        </a>
+                    </li>
+                    <li class="nav-item" data-tab="calllogs">
+                        <a href="#">
+                            <svg><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                            Call Logs
+                        </a>
+                    </li>
+                    <li class="nav-item" data-tab="notifications" id="nav-item-notifications">
+                        <a href="#">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                            Notifications
+                        </a>
+                    </li>
+                    <li class="nav-item" data-tab="whatsapp" id="nav-item-whatsapp">
+                        <a href="#">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #25D366;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                            WhatsApp Hub
+                            <span class="badge" style="margin-left: auto; background: rgba(37, 211, 102, 0.2); color: #25D366; font-size: 0.65rem; padding: 2px 6px; border-radius: 10px; border: 1px solid rgba(37, 211, 102, 0.4);">Meta</span>
+                        </a>
+                    </li>
+                    <li class="nav-item" data-tab="billing" id="nav-item-billing" style="display:none;">
+                        <a href="#">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                            Billing & SaaS Plans
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="admin-profile">
+                    <div class="admin-avatar">ADM</div>
+                    <div class="admin-info">
+                        <h4>Admin Control</h4>
+                        <p>Operations HQ</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Panel -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="top-header">
+                <div class="header-title">
+                    <h2 id="view-title">Dashboard</h2>
+                </div>
+                <div class="header-actions">
+                    <div id="active-role-indicator">
+                        <!-- Dynamic active role badge loaded here -->
+                    </div>
+                    <button class="btn-logout" id="btn-logout-action" title="Log Out from active session">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                        Logout
+                    </button>
+                    <div class="system-clock">
+                        <svg class="clock-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        <span id="sim-clock-display">04 Aug 2026, 08:00 AM</span>
+                    </div>
+                    <button class="btn btn-secondary" id="btn-backload-mgmt" style="background:rgba(245, 158, 11, 0.15); border:1px solid rgba(245, 158, 11, 0.4); color:#fbbf24;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                        Return Load Hub
+                    </button>
+                    <button class="btn btn-primary" id="btn-quick-trip">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        New Trip Dispatch
+                    </button>
+                </div>
+
+            </header>
+
+            <!-- Alerts Banner Ticker -->
+            <div class="alerts-banner-container" id="alerts-banner" style="display: none;">
+                <div class="alert-label">Alert</div>
+                <div class="alerts-ticker-wrap">
+                    <div class="alerts-ticker" id="alerts-ticker-content">
+                        <!-- Ticker items inject here -->
+                    </div>
+                </div>
+                <button class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="app.showDashboardAlerts()">View Alerts</button>
+            </div>
+
+            <!-- TABS CONTAINER -->
+            <div id="tabs-container">
+                
+                <!-- 1. DASHBOARD VIEW -->
+                <div class="tab-content active" id="tab-dashboard">
+                    <!-- Stats Grid -->
+                    <div class="stats-grid">
+                        <div class="glass-card stat-card" style="--accent-color: var(--color-transit)">
+                            <div class="stat-header">
+                                <span>In Transit</span>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18.5" cy="18.5" r="2.5"></circle><circle cx="5.5" cy="18.5" r="2.5"></circle><path d="M16 18.5H7.5"></path><path d="M16 8.5H12"></path><path d="M16 13.5H9.5"></path></svg>
+                            </div>
+                            <div class="stat-value" id="stat-transit">0</div>
+                            <div class="stat-desc">Active trucks on highway</div>
+                        </div>
+                        <div class="glass-card stat-card" style="--accent-color: var(--color-warning)">
+                            <div class="stat-header">
+                                <span>Delayed / Stopped</span>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                            </div>
+                            <div class="stat-value text-warning" id="stat-delayed">0</div>
+                            <div class="stat-desc">Awaiting check-in update</div>
+                        </div>
+                        <div class="glass-card stat-card" style="--accent-color: var(--color-danger)">
+                            <div class="stat-header">
+                                <span>Active Alerts</span>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                            </div>
+                            <div class="stat-value text-danger" id="stat-alerts">0</div>
+                            <div class="stat-desc">Require immediate action</div>
+                        </div>
+                        <div class="glass-card stat-card" style="--accent-color: var(--color-success)">
+                            <div class="stat-header">
+                                <span>Delivered Today</span>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            </div>
+                            <div class="stat-value text-success" id="stat-delivered">0</div>
+                            <div class="stat-desc">Closed trip receipts logged</div>
+                        </div>
+                    </div>
+
+                    <!-- Map and Side Panels -->
+                    <div class="analytics-grid">
+                        <!-- Left Panel: Regional Map -->
+                        <div class="glass-card map-panel-card" style="display:flex; flex-direction:column; min-width:0; overflow:hidden; height:100%; flex:1;">
+                            <div class="card-title" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+                                <span>Tamil Nadu - Logistics Network Map</span>
+                                <span style="font-size: 0.78rem; display:inline-flex; align-items:center; gap:0.5rem;">
+                                    <span style="color: var(--color-primary); font-weight: 600;">38 District Hubs</span>
+                                </span>
+                            </div>
+                            
+                            <!-- Map Filters Header -->
+                            <div class="map-filters-header" style="display:flex; align-items:center; justify-content:flex-start; gap:1rem; padding:0.6rem 0.75rem; border-bottom:1px solid var(--border-glass); background:rgba(255,255,255,0.02); flex-wrap:nowrap; overflow-x:auto; margin-bottom: 0.75rem;">
+                                <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
+                                    <label class="form-label" style="margin:0; font-size:0.75rem; color:var(--text-muted); white-space:nowrap;">Timeframe:</label>
+                                    <select class="form-control" id="map-filter-timeframe" style="width:115px; font-size:0.75rem; padding:0.25rem 0.4rem; height:auto; background:var(--bg-glass);">
+                                        <option value="today" selected>Today</option>
+                                        <option value="weekly">Weekly (7 Days)</option>
+                                        <option value="monthly">Monthly (30 Days)</option>
+                                        <option value="yearly">Yearly (365 Days)</option>
+                                        <option value="custom">Custom Range</option>
+                                    </select>
+                                    
+                                    <!-- Custom Date Picker Wrappers -->
+                                    <div id="map-custom-dates-wrap" style="display:none; align-items:center; gap:0.2rem;">
+                                        <input type="date" class="form-control" id="map-date-start" style="font-size:0.75rem; padding:0.2rem 0.3rem; height:auto; width:105px; background:var(--bg-glass);">
+                                        <span style="color:var(--text-muted); font-size:0.75rem;">to</span>
+                                        <input type="date" class="form-control" id="map-date-end" style="font-size:0.75rem; padding:0.2rem 0.3rem; height:auto; width:105px; background:var(--bg-glass);">
+                                    </div>
+                                </div>
+                                
+                                <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
+                                    <label class="form-label" style="margin:0; font-size:0.75rem; color:var(--text-muted); white-space:nowrap;">District Wise:</label>
+                                    <select class="form-control" id="map-filter-district" style="width:135px; font-size:0.75rem; padding:0.25rem 0.4rem; height:auto; background:var(--bg-glass);">
+                                        <option value="">-- All Districts --</option>
+                                    </select>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
+                                    <label class="form-label" style="margin:0; font-size:0.75rem; color:var(--text-muted); white-space:nowrap;">Running Truck:</label>
+                                    <select class="form-control" id="map-filter-vehicle" style="width:150px; font-size:0.75rem; padding:0.25rem 0.4rem; height:auto; background:var(--bg-glass);">
+                                        <option value="">-- All Running Trucks --</option>
+                                    </select>
+                                </div>
+                                <div style="margin-left:auto; display:flex; align-items:center; gap:0.5rem; flex-shrink:0;">
+                                    <button type="button" class="btn btn-secondary" id="btn-reset-tn-map" style="font-size:0.75rem; padding:0.25rem 0.65rem; height:auto; display:inline-flex; align-items:center; gap:0.35rem;" title="Reset Map to Full Tamil Nadu Regional Structure">
+                                        🗺️ Reset TN View
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="map-visualizer" style="position:relative; width:100%; flex:1; min-height:clamp(540px, 62vh, 780px); height:100%; overflow:hidden; border-radius:12px; display:flex; flex-direction:column;">
+                                <div id="tn-real-map" style="width:100%; height:100%; min-height:clamp(540px, 62vh, 780px); flex:1; border-radius:12px; position:relative; z-index:1;"></div>
+                            </div>
+                        </div>
+
+                        <!-- Right Panel: Interactive Telemetry & Route Simulator Cockpit -->
+                        <div style="display:flex; flex-direction:column; gap: 1.25rem;">
+                            <div class="glass-card interactive-sim-panel" style="flex:1; display:flex; flex-direction:column; min-height: 540px;">
+                                <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
+                                    <span style="display:flex; align-items:center; gap:0.5rem;">
+                                        <span>⚡</span> Live Telemetry & Route Simulator
+                                    </span>
+                                    <span class="badge badge-sim-live">Interactive Cockpit</span>
+                                </div>
+                                
+                                <div class="sim-cockpit-content">
+                                    <!-- Route & Vehicle Selection -->
+                                    <div class="sim-route-box">
+                                        <!-- Active Live Vehicle & Trip ID Selector -->
+                                        <div class="sim-tracker-card">
+                                            <div class="sim-tracker-header">
+                                                <label class="sim-tracker-title">
+                                                    <span>🚚</span> Live Running Vehicle & Trip Tracker
+                                                </label>
+                                                <span class="badge sim-count-badge" id="sim-running-count-badge">
+                                                    Live Vehicles
+                                                </span>
+                                            </div>
+                                            <select id="sim-live-trip-select" class="form-control sim-control">
+                                                <option value="">-- Choose Live Running Vehicle (or use manual simulator below) --</option>
+                                            </select>
+
+                                            <!-- Live Running Trip Identification Card (Tracking #, Trip ID, Log ID, Driver & Emp ID) -->
+                                            <div id="sim-trip-meta-card" class="sim-trip-meta-box" style="display:none;">
+                                                <div class="sim-trip-meta-top">
+                                                    <div class="sim-meta-tags">
+                                                        <span class="badge sim-meta-id-badge" id="sim-badge-trip-id">TRIP-1002</span>
+                                                        <span class="sim-meta-log-text" id="sim-badge-dispatch-id">Log ID: DISP-2002</span>
+                                                    </div>
+                                                    <span class="badge sim-meta-status-badge" id="sim-badge-trip-status" style="background:rgba(16,185,129,0.14); color:#059669; border:1px solid rgba(16,185,129,0.3);">IN_TRANSIT</span>
+                                                </div>
+                                                <div class="sim-meta-details-grid">
+                                                    <div class="sim-meta-cell">
+                                                        <span class="sim-meta-cell-label">Vehicle Reg</span>
+                                                        <strong id="sim-meta-veh" class="sim-meta-cell-val" style="color:var(--color-primary);">TN-59-EF-9012</strong>
+                                                    </div>
+                                                    <div class="sim-meta-cell">
+                                                        <span class="sim-meta-cell-label">Cargo</span>
+                                                        <strong id="sim-meta-cargo" class="sim-meta-cell-val">Cement (300 Bags)</strong>
+                                                    </div>
+                                                    <div class="sim-meta-cell">
+                                                        <span class="sim-meta-cell-label">Assigned Driver</span>
+                                                        <strong id="sim-meta-driver" class="sim-meta-cell-val">Saravanan K.</strong>
+                                                    </div>
+                                                    <div class="sim-meta-cell">
+                                                        <span class="sim-meta-cell-label">Driver / Emp ID</span>
+                                                        <strong id="sim-meta-emp" class="sim-meta-cell-val" style="color:var(--color-warning); font-family:monospace;">DRV-105</strong>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="sim-section-header">
+                                            🛣️ Corridor & Toll Estimator
+                                        </div>
+                                        <div class="sim-grid-inputs">
+                                            <div>
+                                                <label class="sim-form-label">Origin Hub</label>
+                                                <select id="sim-origin-district" class="form-control sim-control">
+                                                    <!-- Filled dynamically with 38 districts -->
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="sim-form-label">Destination Hub</label>
+                                                <select id="sim-dest-district" class="form-control sim-control">
+                                                    <!-- Filled dynamically with 38 districts -->
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div style="margin-bottom: 0.5rem;">
+                                            <label class="sim-form-label">Fleet Vehicle Type</label>
+                                            <select id="sim-vehicle-type" class="form-control sim-control">
+                                                <option value="lorry-16t">16-Ton Express Lorry (Dry Cargo)</option>
+                                                <option value="multi-24t">24-Ton Multi-Axle Carrier (Heavy)</option>
+                                                <option value="trailer-40t">40-Ton Highway Trailer (Container)</option>
+                                                <option value="reefer-12t">12-Ton Cold-Chain Reefer (Temp Controlled)</option>
+                                            </select>
+                                        </div>
+
+                                        <!-- Dynamic Route Metrics Chips -->
+                                        <div class="sim-metrics-grid">
+                                            <div class="sim-metric-chip">
+                                                <div class="chip-label">Est. Distance</div>
+                                                <div class="chip-val" id="sim-val-distance">498 km</div>
+                                            </div>
+                                            <div class="sim-metric-chip">
+                                                <div class="chip-label">Transit Time</div>
+                                                <div class="chip-val" id="sim-val-duration">8h 45m</div>
+                                            </div>
+                                            <div class="sim-metric-chip">
+                                                <div class="chip-label">Diesel Needed</div>
+                                                <div class="chip-val" id="sim-val-fuel">124 L • ₹11,470</div>
+                                            </div>
+                                            <div class="sim-metric-chip">
+                                                <div class="chip-label">FASTag Tolls</div>
+                                                <div class="chip-val" id="sim-val-toll">6 Tolls • ₹1,620</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Interactive Simulation Actions -->
+                                    <div class="sim-actions-box">
+                                        <div class="sim-section-header">
+                                            🎮 Real-Time Simulation Actions
+                                        </div>
+                                        <div class="sim-actions-container">
+                                            <button type="button" class="btn btn-primary sim-action-btn sim-action-btn-main" id="btn-sim-dispatch">
+                                                🚀 Simulate Live Dispatch on Map
+                                            </button>
+                                            <div class="sim-action-row">
+                                                <button type="button" class="btn btn-warning sim-action-btn sim-action-btn-sub" id="btn-sim-stoppage">
+                                                    ⚠️ >20m Stoppage Alert
+                                                </button>
+                                                <button type="button" class="btn btn-secondary sim-action-btn sim-action-btn-sub" id="btn-sim-ping">
+                                                    📞 Ping Driver Telemetry
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Live Telemetry HUD & Diagnostics -->
+                                    <div class="sim-hud-box">
+                                        <div class="sim-section-header">
+                                            <span>📊 Vehicle Speed & OBD-II Telemetry</span>
+                                            <span class="badge" id="sim-speed-badge" style="font-size:0.72rem; padding:0.2rem 0.55rem; background:rgba(16,185,129,0.15); color:#059669; border:1px solid rgba(16,185,129,0.3); border-radius:6px; font-weight:700;">
+                                                🟢 Cruising Normal
+                                            </span>
+                                        </div>
+
+                                        <div class="sim-speed-hud-panel">
+                                            <div class="sim-speed-readout">
+                                                <span id="sim-speed-display" class="sim-speed-num">58</span>
+                                                <span class="sim-speed-unit">km/h</span>
+                                            </div>
+                                            <div class="sim-slider-wrap">
+                                                <input type="range" id="sim-speed-slider" min="0" max="110" value="58" style="width:100%; accent-color:var(--color-primary); cursor:pointer;" title="Adjust truck cruising speed">
+                                                <div class="sim-slider-scale">
+                                                    <span>0 (Halt)</span>
+                                                    <span>60 (Cruising)</span>
+                                                    <span>110 (Max)</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Diagnostic Indicators -->
+                                        <div class="sim-diag-grid">
+                                            <div class="sim-diag-item">
+                                                <span class="diag-name">🌡️ Engine:</span>
+                                                <span id="sim-engine-temp" class="diag-value">86°C OK</span>
+                                            </div>
+                                            <div class="sim-diag-item">
+                                                <span class="diag-name">⛽ Fuel Tank:</span>
+                                                <span id="sim-fuel-level" class="diag-value" style="color:var(--color-primary);">74% (185L)</span>
+                                            </div>
+                                            <div class="sim-diag-item">
+                                                <span class="diag-name">🛞 Tyre Pressure:</span>
+                                                <span class="diag-value" style="color:var(--color-transit);">108 PSI OK</span>
+                                            </div>
+                                            <div class="sim-diag-item">
+                                                <span class="diag-name">🛰️ GPS Lock:</span>
+                                                <span class="diag-value" style="color:var(--color-transit);">4G-LTE ±1.5m</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Analytics row -->
+                    <div class="analytics-grid">
+                        <div class="glass-card">
+                            <div class="card-title">📈 Branch Distribution Trip Volumes</div>
+                            <div id="branch-chart-container" style="height: 200px;"></div>
+                        </div>
+                        <div class="glass-card">
+                            <div class="card-title">⚠️ Transit Incident Delay Reasons</div>
+                            <div id="delay-chart-container" style="height: 200px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. OPERATIONS CONSOLE -->
+                <div class="tab-content" id="tab-operations">
+                    <div class="glass-card">
+                        <div class="card-title">
+                            <span>Admin Dispatch & Transit Control Center</span>
+                            <div class="form-group" style="margin-bottom:0; width:220px;">
+                                <select class="form-control" id="console-trip-select">
+                                    <option value="">-- Choose Active Trip --</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="console-no-trip" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:1rem; opacity:0.5;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                            <p>No trip selected. Select an active trip from the dropdown above or dispatch a new one.</p>
+                            <button class="btn btn-primary margin-top-1" id="btn-create-trip-from-console">Create & Dispatch New Trip</button>
+                        </div>
+
+                        <div id="console-active-trip" style="display:none;">
+                            <div class="flex justify-between align-center" style="border-bottom:1px solid var(--border-glass); padding-bottom:1rem;">
+                                <div>
+                                    <h3 id="c-trip-id" style="font-family:var(--font-heading); font-size:1.25rem;">TRIP-1002</h3>
+                                    <p id="c-trip-route" style="color:var(--text-secondary); font-size:0.85rem;">Chennai to Madurai</p>
+                                </div>
+                                <div class="text-right">
+                                    <span class="badge badge-transit" id="c-trip-status">In Transit</span>
+                                    <p id="c-dispatch-id" style="color:var(--text-muted); font-size:0.75rem; margin-top:0.25rem;">DISP-2002</p>
+                                </div>
+                            </div>
+
+                            <!-- 12-Step Progress Stepper -->
+                            <div class="timeline-stepper" id="timeline-stepper-console">
+                                <!-- 12 steps inject dynamically -->
+                            </div>
+
+                            <div class="console-split">
+                                <!-- Left side details & history -->
+                                <div>
+                                    <h4 style="font-family:var(--font-heading); margin-bottom:0.75rem; color:var(--color-secondary);">Trip Details</h4>
+                                    <div class="glass-card" style="padding: 1rem; background:rgba(0,0,0,0.2); margin-bottom:1rem;">
+                                        <div class="form-row margin-bottom-1">
+                                            <div>
+                                                <span style="font-size:0.75rem; color:var(--text-muted); display:block;">COMMODITY</span>
+                                                <span id="c-detail-commodity" style="font-weight:700;">Rice (200 Bags)</span>
+                                            </div>
+                                            <div>
+                                                <span style="font-size:0.75rem; color:var(--text-muted); display:block;">VEHICLE</span>
+                                                <span id="c-detail-vehicle" style="font-weight:700;">TN-01-AB-1234 (Lorry)</span>
+                                            </div>
+                                        </div>
+                                        <div class="form-row margin-bottom-1">
+                                            <div>
+                                                <span style="font-size:0.75rem; color:var(--text-muted); display:block;">DRIVER ASSIGNED</span>
+                                                <span id="c-detail-driver" style="font-weight:700;">Selvam R. (+91 98840 12345)</span>
+                                            </div>
+                                            <div>
+                                                <span style="font-size:0.75rem; color:var(--text-muted); display:block;">HELPER ASSIGNED</span>
+                                                <span id="c-detail-helper" style="font-weight:700;">Mani G. (Senior Helper)</span>
+                                            </div>
+                                        </div>
+                                        <div class="form-row margin-bottom-1">
+                                            <div>
+                                                <span style="font-size:0.75rem; color:var(--text-muted); display:block;">CREATED BY (OPERATOR EMP ID)</span>
+                                                <span id="c-detail-creator" style="font-weight:700; color:var(--color-secondary);">--</span>
+                                            </div>
+                                        </div>
+                                        <div class="form-row">
+                                            <div>
+                                                <span style="font-size:0.75rem; color:var(--text-muted); display:block;">DISPATCH TIME</span>
+                                                <span id="c-detail-dispatch-date" style="font-weight:700;">04 Aug 2026, 09:30 AM</span>
+                                            </div>
+                                            <div>
+                                                <span style="font-size:0.75rem; color:var(--text-muted); display:block;">EXPECTED DELIVERY</span>
+                                                <span id="c-detail-eta" style="font-weight:700;">04 Aug 2026, 05:30 PM</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <h4 style="font-family:var(--font-heading); margin-bottom:0.75rem;">Recent Logs & Updates</h4>
+                                    <div id="c-transit-logs" style="max-height:160px; overflow-y:auto; display:flex; flex-direction:column; gap:0.5rem; padding-right:0.5rem;">
+                                        <!-- Updates dynamically injected -->
+                                    </div>
+                                </div>
+
+                                <!-- Right side checklist & Call Action interface -->
+                                <div class="console-actions-panel">
+                                    <h4 style="font-family:var(--font-heading); margin-bottom:0.5rem; color:var(--color-primary);">Operator Actions</h4>
+                                    
+                                    <!-- Step-specific layouts render dynamically in app.js -->
+                                    <div id="console-action-area" class="glass-card" style="padding:1.25rem; border-color:var(--color-primary-glow)">
+                                        <!-- Actions HTML injected here -->
+                                    </div>
+
+                                    <!-- Call Helper log quick trigger -->
+                                    <button class="btn btn-secondary w-100" id="btn-manual-call-driver">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                                        Log Call to Driver / Manager
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. TRIPS TRACKER VIEW -->
+                <div class="tab-content" id="tab-trips">
+                    <div class="glass-card">
+                        <div class="flex justify-between align-center margin-bottom-1">
+                            <h3 style="font-family:var(--font-heading);">All Commodity Shipments</h3>
+                            <div class="flex gap-2">
+                                <input type="text" class="form-control" id="trip-search" placeholder="Search Trip / Vehicle / Driver..." style="width:240px;">
+                                <select class="form-control" id="trip-filter-status" style="width:140px;">
+                                    <option value="">All Statuses</option>
+                                    <option value="CREATED">Draft</option>
+                                    <option value="IN_TRANSIT">In Transit</option>
+                                    <option value="DELAYED">Delayed</option>
+                                    <option value="CLOSED">Delivered / Closed</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="table-container">
+                            <table class="lcos-table" id="trips-table">
+                                <thead>
+                                    <tr>
+                                        <th>Trip ID</th>
+                                        <th>Route (Src → Dest)</th>
+                                        <th>Commodity</th>
+                                        <th>Quantity</th>
+                                        <th>Driver / Vehicle</th>
+                                        <th>Status</th>
+                                        <th>Last Update</th>
+                                        <th>Updated By</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Injected dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. INVENTORY & STOCK VIEW -->
+                <div class="tab-content" id="tab-inventory">
+                    <div class="glass-card">
+                        <div class="flex justify-between align-center margin-bottom-1">
+                            <h3 style="font-family:var(--font-heading);">Branch Stock Distribution</h3>
+                            <div class="flex gap-2 align-center">
+                                <button class="btn btn-primary" id="btn-inventory-action" style="padding: 0.5rem 1rem; font-size: 0.8rem;">Refill Stock</button>
+                                <div class="form-group" style="margin-bottom:0; width:200px;">
+                                    <select class="form-control" id="inventory-commodity-select">
+                                        <!-- Commodities injected -->
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-container">
+                            <table class="lcos-table" id="inventory-table">
+                                <thead>
+                                    <tr>
+                                        <th>Branch Name</th>
+                                        <th>District Code</th>
+                                        <th>Branch Manager</th>
+                                        <th>Available Stock</th>
+                                        <th>In-Transit Stock (Arriving)</th>
+                                        <th>Delivered (Total)</th>
+                                        <th>Pending (Scheduled)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Stock levels inject dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. DIRECTORY VIEW -->
+                <div class="tab-content" id="tab-directory">
+                    <div class="directory-tabs">
+                        <button class="dir-tab-btn active" data-dir-sub="drivers">Drivers</button>
+                        <button class="dir-tab-btn" data-dir-sub="vehicles">Vehicles</button>
+                        <button class="dir-tab-btn" data-dir-sub="branches">Branches</button>
+                        <button class="dir-tab-btn" data-dir-sub="helpers">Helpers</button>
+                        <button class="dir-tab-btn" data-dir-sub="commodities">Commodities</button>
+                    </div>
+
+                    <!-- 5a. Drivers Directory Subtab -->
+                    <div class="dir-sub-content active" id="dir-drivers">
+                        <div class="console-split">
+                            <div class="glass-card">
+                                <h4 style="font-family:var(--font-heading); margin-bottom:1rem;">Add Driver</h4>
+                                <form id="form-add-driver">
+                                    <div class="form-group">
+                                        <label class="form-label">Driver Name</label>
+                                        <input type="text" class="form-control" id="drv-name" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">License Number</label>
+                                        <input type="text" class="form-control" id="drv-license" required>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label class="form-label">Phone Number</label>
+                                            <input type="text" class="form-control" id="drv-phone" required>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="form-label">Experience (Years)</label>
+                                            <input type="number" class="form-control" id="drv-exp" min="1" max="40" required>
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-primary w-100" type="submit">Register Driver</button>
+                                </form>
+                            </div>
+                            
+                            <div class="glass-card" style="overflow-x:auto;">
+                                <h4 style="font-family:var(--font-heading); margin-bottom:1rem;">Drivers List</h4>
+                                <table class="lcos-table" id="table-drivers">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>License</th>
+                                            <th>Phone</th>
+                                            <th>Experience</th>
+                                            <th>Performance</th>
+                                            <th>Warnings</th>
+                                            <th>Status</th>
+                                            <th>WhatsApp</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Injected dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 5b. Vehicles Directory Subtab -->
+                    <div class="dir-sub-content" id="dir-vehicles" style="display:none;">
+                        <div class="console-split">
+                            <div class="glass-card">
+                                <h4 style="font-family:var(--font-heading); margin-bottom:1rem;">Add Vehicle</h4>
+                                <form id="form-add-vehicle">
+                                    <div class="form-group">
+                                        <label class="form-label">Vehicle Registration Number</label>
+                                        <input type="text" class="form-control" id="veh-id" placeholder="TN-XX-XX-XXXX" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Vehicle Type</label>
+                                        <select class="form-control" id="veh-type">
+                                            <option value="Lorry">Lorry</option>
+                                            <option value="Container">Container</option>
+                                            <option value="Mini Truck">Mini Truck</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label class="form-label">Capacity (Metric Tons)</label>
+                                            <input type="number" class="form-control" id="veh-capacity" min="1" max="100" required>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="form-label">Ownership</label>
+                                            <select class="form-control" id="veh-owner">
+                                                <option value="Self Owned">Self Owned</option>
+                                                <option value="Logistics Partners">Logistics Partners</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-primary w-100" type="submit">Register Vehicle</button>
+                                </form>
+                            </div>
+                            
+                            <div class="glass-card" style="overflow-x:auto;">
+                                <h4 style="font-family:var(--font-heading); margin-bottom:1rem;">Vehicles List</h4>
+                                <table class="lcos-table" id="table-vehicles">
+                                    <thead>
+                                        <tr>
+                                            <th>Reg No</th>
+                                            <th>Type</th>
+                                            <th>Capacity</th>
+                                            <th>Ownership</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Injected dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 5c. Branches Directory Subtab -->
+                    <div class="dir-sub-content" id="dir-branches" style="display:none;">
+                        <div class="console-split">
+                            <div class="glass-card">
+                                <h4 style="font-family:var(--font-heading); margin-bottom:1rem;">Add Branch District</h4>
+                                <form id="form-add-branch">
+                                    <div class="form-group">
+                                        <label class="form-label">District Name</label>
+                                        <input type="text" class="form-control" id="br-name" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Branch Manager</label>
+                                        <input type="text" class="form-control" id="br-manager" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Contact Number</label>
+                                        <input type="text" class="form-control" id="br-phone" required>
+                                    </div>
+                                    <button class="btn btn-primary w-100" type="submit">Create Branch</button>
+                                </form>
+                            </div>
+                            
+                            <div class="glass-card" style="overflow-x:auto;">
+                                <h4 style="font-family:var(--font-heading); margin-bottom:1rem;">Branches List</h4>
+                                <table class="lcos-table" id="table-branches">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Branch District</th>
+                                            <th>Manager</th>
+                                            <th>Contact Phone</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Injected dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 5d. Helpers Directory Subtab -->
+                    <div class="dir-sub-content" id="dir-helpers" style="display:none;">
+                        <div class="glass-card">
+                            <h4 style="font-family:var(--font-heading); margin-bottom:1rem;">Helpers Directory</h4>
+                            <table class="lcos-table" id="table-helpers">
+                                <thead>
+                                    <tr>
+                                        <th>Helper Name</th>
+                                        <th>Contact Number</th>
+                                        <th>Role Type</th>
+                                        <th>Availability</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Injected dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 5e. Commodities Directory Subtab -->
+                    <div class="dir-sub-content" id="dir-commodities" style="display:none;">
+                        <div class="console-split">
+                            <div class="glass-card">
+                                <h4 style="font-family:var(--font-heading); margin-bottom:1rem;">Add Commodity</h4>
+                                <form id="form-add-commodity">
+                                    <div class="form-group">
+                                        <label class="form-label">Commodity Name</label>
+                                        <input type="text" class="form-control" id="com-name" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label">Measurement Unit</label>
+                                        <input type="text" class="form-control" id="com-unit" placeholder="e.g. Bags, Tons, Boxes" required>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label class="form-label">Unit Weight (kg)</label>
+                                            <input type="number" class="form-control" id="com-weight" required>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="form-label">Estimated Value (₹ / unit)</label>
+                                            <input type="number" class="form-control" id="com-value" required>
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-primary w-100" type="submit">Create Commodity</button>
+                                </form>
+                            </div>
+                            <div class="glass-card">
+                                <h4 style="font-family:var(--font-heading); margin-bottom:1rem;">Commodity Directory</h4>
+                                <table class="lcos-table" id="table-commodities">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Commodity</th>
+                                            <th>Unit</th>
+                                            <th>Weight</th>
+                                            <th>Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Injected dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 6. CALL LOGS VIEW -->
+                <div class="tab-content" id="tab-calllogs">
+                    <div class="glass-card">
+                        <div class="flex justify-between align-center margin-bottom-1">
+                            <h3 style="font-family:var(--font-heading);">LCOS Operator Call Records</h3>
+                            <div class="flex gap-2">
+                                <input type="text" class="form-control" id="call-search" placeholder="Search Calls (Trip, Notes)..." style="width:240px;">
+                                <select class="form-control" id="call-filter-type" style="width:180px;">
+                                    <option value="">All Call Types</option>
+                                    <option value="Dispatch Confirmation">Dispatch Confirmation</option>
+                                    <option value="Transit Update">Transit Update</option>
+                                    <option value="Delay Check">Delay Check</option>
+                                    <option value="Escalation Call">Escalation Call</option>
+                                    <option value="Arrival Update">Arrival Update</option>
+                                    <option value="Delivery Confirmation">Delivery Confirmation</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="table-container">
+                            <table class="lcos-table" id="calllogs-table">
+                                <thead>
+                                    <tr>
+                                        <th>Log ID</th>
+                                        <th>Timestamp (Sim)</th>
+                                        <th>Trip ID</th>
+                                        <th>Call Category</th>
+                                        <th>Caller</th>
+                                        <th>Recipient</th>
+                                        <th>Conversation Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Injected dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 7. SAAS BILLING & SUBSCRIPTIONS VIEW -->
+                <div class="tab-content" id="tab-billing">
+                    <!-- Active Subscription Summary Header -->
+                    <div class="glass-card margin-bottom-1" style="border-left: 4px solid var(--color-success);">
+                        <div class="flex justify-between align-center" style="flex-wrap:wrap; gap:1rem;">
+                            <div>
+                                <span class="badge badge-success" style="font-size:0.75rem;">ACTIVE SUBSCRIPTION</span>
+                                <h2 style="font-family:var(--font-heading); margin-top:0.4rem; color:var(--text-bright);" id="billing-current-plan-name">Professional SaaS Plan</h2>
+                                <p style="color:var(--text-muted); font-size:0.85rem;" id="billing-current-plan-desc">₹2,999 / month • Max 50 Vehicles • 20-Min Stoppage & Escalation Enabled</p>
+                            </div>
+                            <div style="text-align:right;">
+                                <div style="font-size:0.8rem; color:var(--text-muted);">Renewal Date</div>
+                                <div style="font-size:1.1rem; font-weight:bold; color:var(--text-bright);" id="billing-expiry-date">Auto-renews Aug 2027</div>
+                                <button class="btn btn-primary margin-top-1" id="btn-renew-subscription" style="padding:0.4rem 1rem; font-size:0.8rem;">Renew Active Plan</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SaaS Plans Comparison Grid -->
+                    <div class="analytics-grid margin-bottom-1" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+                        <!-- Basic Plan -->
+                        <div class="glass-card" style="border: 1px solid var(--border-glass); display:flex; flex-direction:column; justify-content:space-between;">
+                            <div>
+                                <div class="badge badge-secondary" style="font-size:0.7rem; margin-bottom:0.5rem;">STARTER FLEET</div>
+                                <h3 style="font-family:var(--font-heading); color:var(--text-bright);">Basic Plan</h3>
+                                <div style="font-size:1.6rem; font-weight:bold; color:var(--text-bright); margin:0.5rem 0;">₹999 <span style="font-size:0.8rem; font-weight:normal; color:var(--text-muted);">/ month</span></div>
+                                <ul style="list-style:none; padding:0; margin:1rem 0; font-size:0.85rem; color:var(--text-muted); display:flex; flex-direction:column; gap:0.4rem;">
+                                    <li>✓ Max 10 Vehicles</li>
+                                    <li>✓ Max 5 User Accounts</li>
+                                    <li>✓ Real-time GPS Tracking</li>
+                                    <li>✓ Basic Stoppage Alerts</li>
+                                </ul>
+                            </div>
+                            <button class="btn btn-secondary w-100 btn-select-plan" data-plan-id="PLAN-BASIC">Select Basic Plan</button>
+                        </div>
+
+                        <!-- Professional Plan -->
+                        <div class="glass-card" style="border: 2px solid var(--cyan-accent); background: rgba(56, 189, 248, 0.05); display:flex; flex-direction:column; justify-content:space-between;">
+                            <div>
+                                <div class="badge badge-success" style="font-size:0.7rem; margin-bottom:0.5rem;">RECOMMENDED</div>
+                                <h3 style="font-family:var(--font-heading); color:var(--cyan-accent);">Professional Plan</h3>
+                                <div style="font-size:1.6rem; font-weight:bold; color:var(--cyan-accent); margin:0.5rem 0;">₹2,999 <span style="font-size:0.8rem; font-weight:normal; color:var(--text-muted);">/ month</span></div>
+                                <ul style="list-style:none; padding:0; margin:1rem 0; font-size:0.85rem; color:var(--text-muted); display:flex; flex-direction:column; gap:0.4rem;">
+                                    <li>✓ Max 50 Vehicles</li>
+                                    <li>✓ Max 20 User Accounts</li>
+                                    <li>✓ 20-Min Stoppage & 3-Strike Escalation</li>
+                                    <li>✓ Inventory & Stock Control</li>
+                                    <li>✓ 24/7 Priority Support</li>
+                                </ul>
+                            </div>
+                            <button class="btn btn-primary w-100 btn-select-plan" data-plan-id="PLAN-PRO">Select Professional Plan</button>
+                        </div>
+
+                        <!-- Enterprise Plan -->
+                        <div class="glass-card" style="border: 1px solid var(--border-glass); display:flex; flex-direction:column; justify-content:space-between;">
+                            <div>
+                                <div class="badge badge-warning" style="font-size:0.7rem; margin-bottom:0.5rem;">ANNUAL ENTERPRISE</div>
+                                <h3 style="font-family:var(--font-heading); color:var(--text-bright);">Enterprise Plan</h3>
+                                <div style="font-size:1.6rem; font-weight:bold; color:var(--text-bright); margin:0.5rem 0;">₹19,999 <span style="font-size:0.8rem; font-weight:normal; color:var(--text-muted);">/ year</span></div>
+                                <ul style="list-style:none; padding:0; margin:1rem 0; font-size:0.85rem; color:var(--text-muted); display:flex; flex-direction:column; gap:0.4rem;">
+                                    <li>✓ Max 500 Vehicles</li>
+                                    <li>✓ Max 100 User Accounts</li>
+                                    <li>✓ Dedicated Account Manager</li>
+                                    <li>✓ Custom Payment Gateway Webhooks</li>
+                                    <li>✓ Unlimited Audit History Storage</li>
+                                </ul>
+                            </div>
+                            <button class="btn btn-secondary w-100 btn-select-plan" data-plan-id="PLAN-ENT">Select Enterprise Plan</button>
+                        </div>
+                    </div>
+
+                    <!-- Payment History & GST Invoices Table -->
+                    <div class="glass-card">
+                        <div class="flex justify-between align-center margin-bottom-1">
+                            <h3 style="font-family:var(--font-heading);">SaaS Subscription Payments & GST Invoices</h3>
+                            <button class="btn btn-secondary" id="btn-refresh-billing" style="padding:0.3rem 0.8rem; font-size:0.8rem;">Refresh Billing</button>
+                        </div>
+
+                        <div class="table-container">
+                            <table class="lcos-table" id="table-billing-invoices">
+                                <thead>
+                                    <tr>
+                                        <th>Invoice #</th>
+                                        <th>Payment ID</th>
+                                        <th>Plan</th>
+                                        <th>Base Amount</th>
+                                        <th>18% GST</th>
+                                        <th>Total Paid</th>
+                                        <th>Gateway</th>
+                                        <th>Status</th>
+                                        <th>Date</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Injected dynamically in app.js -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 8. NOTIFICATIONS VIEW -->
+                <div class="tab-content" id="tab-notifications">
+                    <div class="glass-card">
+                        <!-- Sub-tab Bar -->
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-glass); padding-bottom:1rem; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
+                            <div style="display:flex; gap:0.75rem;">
+                                <button class="btn notif-subtab-btn btn-primary" data-notif-sub="alerts" id="btn-notif-sub-alerts" style="padding:0.45rem 1rem; font-size:0.85rem; border-radius:8px;">
+                                    🚨 Operations Alerts <span class="badge badge-delayed" id="notif-count-alerts" style="margin-left:0.35rem; font-size:0.7rem; padding:0.1rem 0.35rem;">0</span>
+                                </button>
+                                <button class="btn notif-subtab-btn btn-secondary" data-notif-sub="requests" id="btn-notif-sub-requests" style="padding:0.45rem 1rem; font-size:0.85rem; border-radius:8px;">
+                                    📋 Supervisor Requests <span class="badge badge-pending" id="notif-count-requests" style="margin-left:0.35rem; font-size:0.7rem; padding:0.1rem 0.35rem;">0</span>
+                                </button>
+                            </div>
+                            
+                            <!-- Filters -->
+                            <div id="notif-alerts-filter-wrap" style="display:flex; gap:0.5rem;">
+                                <select class="form-control" id="alerts-filter-type" style="width:180px; font-size:0.75rem; padding:0.25rem 0.5rem;">
+                                    <option value="">All Alert Types</option>
+                                    <option value="Stoppage">Stoppages & Delays</option>
+                                    <option value="Breakdown">Breakdowns</option>
+                                    <option value="Unreachable">Unreachable / No Update</option>
+                                    <option value="Incoming Call">Incoming Call</option>
+                                </select>
+                            </div>
+                            <div id="notif-requests-filter-wrap" style="display:none; gap:0.5rem;">
+                                <select class="form-control" id="requests-filter-status" style="width:160px; font-size:0.75rem; padding:0.25rem 0.5rem;">
+                                    <option value="">All Statuses</option>
+                                    <option value="Pending">Pending Approval</option>
+                                    <option value="Approved">Approved</option>
+                                </select>
+                                <button class="btn btn-primary" style="padding:0.3rem 0.75rem; font-size:0.75rem;" onclick="app.openRequestModal('Add Stock')">+ New Request</button>
+                            </div>
+                        </div>
+
+                        <!-- Sub-tab 1: Operations Alerts Content -->
+                        <div class="notif-sub-content" id="notif-sub-alerts" style="display:block;">
+                            <div id="full-alerts-feed-content" style="display:flex; flex-direction:column; gap:0.75rem; min-height:250px;">
+                                <!-- Full alerts list renders here -->
+                            </div>
+                        </div>
+
+                        <!-- Sub-tab 2: Supervisor Requests Content -->
+                        <div class="notif-sub-content" id="notif-sub-requests" style="display:none;">
+                            <div id="full-requests-feed-content" style="display:flex; flex-direction:column; gap:0.75rem; min-height:250px;">
+                                <!-- Full requests list renders here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 9. WHATSAPP META FOR DEVELOPERS HUB -->
+                <div class="tab-content" id="tab-whatsapp">
+                    <div style="display:flex; flex-direction:column; gap:1.5rem;">
+                        
+                        <!-- Top Header Status Banner -->
+                        <div class="glass-card" style="background: linear-gradient(135deg, rgba(37, 211, 102, 0.08) 0%, rgba(18, 140, 126, 0.05) 100%); border: 1px solid rgba(37, 211, 102, 0.25);">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+                                <div style="display:flex; align-items:center; gap:1rem;">
+                                    <div style="width:48px; height:48px; border-radius:12px; background:rgba(37, 211, 102, 0.15); display:flex; align-items:center; justify-content:center; border:1px solid rgba(37, 211, 102, 0.3);">
+                                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#25D366" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                                    </div>
+                                    <div>
+                                        <div style="display:flex; align-items:center; gap:0.5rem;">
+                                            <h3 style="margin:0; font-size:1.25rem; font-weight:700; color:var(--text-main);">Meta WhatsApp Cloud API Integration</h3>
+                                            <span id="wa-status-badge" class="badge" style="background:rgba(245, 158, 11, 0.15); color:#fbbf24; border:1px solid rgba(245, 158, 11, 0.3); font-size:0.75rem;">CHECKING STATUS...</span>
+                                        </div>
+                                        <p style="margin:0.25rem 0 0; font-size:0.85rem; color:var(--text-muted);">
+                                            Bi-directional WhatsApp automation: Trip dispatches, GPS sync, Driver stoppage warnings, and Interactive Bot.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div style="display:flex; gap:0.75rem; align-items:center;">
+                                    <button type="button" class="btn btn-secondary" id="btn-wa-credentials-modal" style="font-size:0.8rem; padding:0.4rem 0.8rem; display:inline-flex; align-items:center; gap:0.4rem;" onclick="document.getElementById('modal-wa-credentials').style.display='flex';">
+                                        ⚙️ API Credentials
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" id="btn-wa-guide-modal" style="font-size:0.8rem; padding:0.4rem 0.8rem; display:inline-flex; align-items:center; gap:0.4rem;">
+                                        📖 Setup Guide & Docs
+                                    </button>
+                                    <button type="button" class="btn btn-primary" id="btn-wa-refresh-logs" style="font-size:0.8rem; padding:0.4rem 0.8rem; background:#25D366; border-color:#20ba5a; display:inline-flex; align-items:center; gap:0.4rem;">
+                                        🔄 Refresh Activity
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2-Column Grid: Dispatcher & Automated Stoppage Bot -->
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap:1.5rem;">
+                            
+                            <!-- Card 1: Driver WhatsApp Dispatcher -->
+                            <div class="glass-card">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid var(--border-glass); padding-bottom:0.75rem;">
+                                    <h4 style="margin:0; font-size:1rem; font-weight:600; display:flex; align-items:center; gap:0.5rem;">
+                                        <span>📤</span> Driver WhatsApp Dispatcher
+                                    </h4>
+                                    <span class="badge" style="background:rgba(37, 211, 102, 0.15); color:#25D366; font-size:0.7rem;">Outbound API</span>
+                                </div>
+
+                                <form id="form-whatsapp-send" style="display:flex; flex-direction:column; gap:0.9rem;">
+                                    <div class="form-group" style="margin:0;">
+                                        <label style="font-size:0.8rem; font-weight:600;">Select Driver or Enter Phone</label>
+                                        <div style="display:flex; gap:0.5rem;">
+                                            <select class="form-control" id="wa-send-driver-picker" style="font-size:0.8rem; flex:1;">
+                                                <option value="">-- Choose Registered Driver --</option>
+                                            </select>
+                                            <input type="text" class="form-control" id="wa-send-phone" placeholder="916382897998" required style="font-size:0.8rem; flex:1;">
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group" style="margin:0;">
+                                        <label style="font-size:0.8rem; font-weight:600;">Message Template / Mode</label>
+                                        <select class="form-control" id="wa-send-type" style="font-size:0.8rem;">
+                                            <option value="template">⭐ Official Meta Template (hello_world - Initiates 24h Chat Window)</option>
+                                            <option value="text">Custom Text Message</option>
+                                            <option value="trip_dispatch">Trip Dispatch Assignment (Interactive Buttons)</option>
+                                            <option value="stoppage_inquiry">Stoppage Alert Inquiry (Interactive Buttons)</option>
+                                            <option value="delivery_confirm">Shipment Delivery Receipt Confirmation</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="form-group" id="wa-send-trip-group" style="margin:0; display:none;">
+                                        <label style="font-size:0.8rem; font-weight:600;">Link Active Trip</label>
+                                        <select class="form-control" id="wa-send-trip-picker" style="font-size:0.8rem;">
+                                            <option value="">-- Choose Trip --</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="form-group" id="wa-send-message-group" style="margin:0;">
+                                        <label style="font-size:0.8rem; font-weight:600;">Message Body</label>
+                                        <textarea class="form-control" id="wa-send-text" rows="3" placeholder="Enter message to send via WhatsApp..." style="font-size:0.8rem; resize:vertical;"></textarea>
+                                    </div>
+
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.25rem;">
+                                        <span style="font-size:0.7rem; color:var(--text-muted);">
+                                            Delivers via Meta Cloud API
+                                        </span>
+                                        <button type="submit" class="btn btn-primary" id="btn-submit-wa-send" style="background:#25D366; border-color:#20ba5a; font-weight:600; padding:0.45rem 1.25rem;">
+                                            🚀 Send WhatsApp Message
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <!-- Card 2: Inbound Bot Simulator & Automated 20-Min Stoppage Trigger -->
+                            <div class="glass-card">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid var(--border-glass); padding-bottom:0.75rem;">
+                                    <h4 style="margin:0; font-size:1rem; font-weight:600; display:flex; align-items:center; gap:0.5rem;">
+                                        <span>🤖</span> Inbound Bot & Automated Stoppage Trigger
+                                    </h4>
+                                    <span class="badge" style="background:rgba(59, 130, 246, 0.15); color:#60a5fa; font-size:0.7rem;">Automated Testing</span>
+                                </div>
+
+                                <div style="background:rgba(0,0,0,0.2); border-radius:8px; padding:0.75rem; margin-bottom:0.75rem; font-size:0.75rem; color:#cbd5e1;">
+                                    💡 Test how the automated WhatsApp Bot replies to drivers and updates vehicle tracking in real-time!
+                                </div>
+
+                                <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.5rem;">
+                                        <button type="button" class="btn btn-secondary" style="font-size:0.75rem; padding:0.45rem;" onclick="window.app && window.app.simulateWaInbound('TRACK')">
+                                            🔍 Test "TRACK"
+                                        </button>
+                                        <button type="button" class="btn btn-secondary" style="font-size:0.75rem; padding:0.45rem;" onclick="window.app && window.app.simulateWaInbound('DELAY Flat tyre near Salem')">
+                                            ⚠️ Test "DELAY Report"
+                                        </button>
+                                        <button type="button" class="btn btn-secondary" style="font-size:0.75rem; padding:0.45rem;" onclick="window.app && window.app.simulateWaInbound('LOCATION')">
+                                            📍 Test "Share GPS Pin"
+                                        </button>
+                                        <button type="button" class="btn btn-secondary" style="font-size:0.75rem; padding:0.45rem; color:#f87171;" onclick="window.app && window.app.simulateWaInbound('SOS')">
+                                            🚨 Test "SOS Emergency"
+                                        </button>
+                                    </div>
+                                    <div style="display:flex; gap:0.5rem;">
+                                        <input type="text" class="form-control" id="wa-sim-custom-text" placeholder="Type custom message, e.g. HELP" style="font-size:0.8rem; flex:1;">
+                                        <button type="button" class="btn btn-primary" style="font-size:0.8rem; padding:0.4rem 0.8rem;" onclick="window.app && window.app.simulateWaInbound(document.getElementById('wa-sim-custom-text').value)">
+                                            Send Inbound
+                                        </button>
+                                    </div>
+
+                                    <!-- 1-Click Automated 20-Min Stoppage Trigger -->
+                                    <div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px dashed var(--border-glass);">
+                                        <div style="font-size:0.78rem; font-weight:700; color:#fbbf24; margin-bottom:0.35rem; display:flex; align-items:center; gap:0.4rem;">
+                                            <span>⏱️</span> 1-Click Automated 20-Min Stoppage Trigger (Live Test)
+                                        </div>
+                                        <p style="font-size:0.72rem; color:var(--text-muted); margin:0 0 0.6rem 0; line-height:1.4;">
+                                            Simulates active lorry <strong style="color:#67e8f9;">TN-59-EF-9012</strong> remaining stationary for <strong>25+ minutes</strong>. The background cron detector triggers immediately and dispatches official WhatsApp alerts to <strong>both Driver and Higher Official (<span id="wa-display-official-phone">916382897998</span>)</strong>.
+                                        </p>
+                                        <button type="button" class="btn w-100" id="btn-trigger-test-stoppage" style="font-size:0.8rem; font-weight:700; padding:0.5rem; background:rgba(245, 158, 11, 0.2); border:1px solid #f59e0b; color:#fbbf24; cursor:pointer;" onclick="window.app && window.app.triggerTestStoppage()">
+                                            ⚡ Run 20-Min Lorry Stoppage & Send WhatsApp Alerts
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 3: Live WhatsApp Communication Stream & Audit Logs -->
+                        <div class="glass-card">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid var(--border-glass); padding-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
+                                <div>
+                                    <h4 style="margin:0; font-size:1rem; font-weight:600; display:flex; align-items:center; gap:0.5rem;">
+                                        <span>📋</span> WhatsApp Communication History & Webhook Activity
+                                    </h4>
+                                    <span style="font-size:0.75rem; color:var(--text-muted);">Real-time log of automated dispatches, status receipts, and driver interactions.</span>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:0.5rem;">
+                                    <span id="wa-logs-counter" class="badge" style="background:rgba(59, 130, 246, 0.15); color:#60a5fa; font-size:0.75rem;">0 Logs</span>
+                                </div>
+                            </div>
+
+                            <div class="table-container" style="max-height:360px; overflow-y:auto;">
+                                <table class="lcos-table" id="table-whatsapp-logs">
+                                    <thead>
+                                        <tr>
+                                            <th style="width:130px;">Timestamp</th>
+                                            <th style="width:100px;">Direction</th>
+                                            <th style="width:130px;">Sender / Target</th>
+                                            <th style="width:90px;">Type</th>
+                                            <th>Message Content</th>
+                                            <th style="width:110px;">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="wa-logs-table-body">
+                                        <tr>
+                                            <td colspan="6" style="text-align:center; padding:2rem; color:var(--text-muted);">
+                                                Loading WhatsApp communication activity...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </main>
+
+
+    </div>
+
+    <!-- TOASTS CONTAINER -->
+    <div class="toast-container" id="toasts-wrapper"></div>
+
+    <!-- MODAL OVERLAY: CREATE TRIP -->
+    <div class="modal-overlay" id="modal-create-trip">
+        <div class="glass-card modal-container" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 style="font-family:var(--font-heading);">Schedule & Dispatch New Trip</h3>
+                <button class="modal-close" onclick="app.closeModal('modal-create-trip')">×</button>
+            </div>
+            <form id="form-create-trip">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Source Branch</label>
+                        <select class="form-control" id="t-source" required>
+                            <!-- Branches inject -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Destination Branch</label>
+                        <select class="form-control" id="t-dest" required>
+                            <!-- Branches inject -->
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Commodity Details</label>
+                        <select class="form-control" id="t-commodity" required>
+                            <!-- Commodities inject -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Quantity</label>
+                        <input type="number" class="form-control" id="t-qty" min="1" required>
+                        <span id="t-qty-label" style="font-size: 0.75rem; color:var(--text-muted);">Available weight: --</span>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Vehicle Assigned</label>
+                        <select class="form-control" id="t-vehicle" required>
+                            <!-- Vehicles inject -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Driver Assigned</label>
+                        <select class="form-control" id="t-driver" required>
+                            <!-- Drivers inject -->
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Helper Assigned (Optional)</label>
+                    <select class="form-control" id="t-helper">
+                        <option value="">No Helper assigned</option>
+                        <!-- Helpers inject -->
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Operator Employee ID (Emp ID) <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="t-emp-id" placeholder="e.g. EMP-101" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Expected Hours in Transit</label>
+                        <input type="number" class="form-control" id="t-hours" min="1" max="72" value="8" required>
+                    </div>
+                </div>
+                
+                <button class="btn btn-primary w-100 margin-top-1" type="submit">Schedule Dispatch</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL OVERLAY: LOG MANUAL CALL -->
+    <div class="modal-overlay" id="modal-log-call">
+        <div class="glass-card modal-container" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3 style="font-family:var(--font-heading);">Log Phone Call Conversation</h3>
+                <button class="modal-close" onclick="app.closeModal('modal-log-call')">×</button>
+            </div>
+            <form id="form-log-call">
+                <input type="hidden" id="call-trip-id">
+                <div class="form-group">
+                    <label class="form-label">Trip Reference ID</label>
+                    <input type="text" class="form-control" id="call-trip-ref" readonly>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Call Category</label>
+                        <select class="form-control" id="call-category" required>
+                            <option value="Transit Update">Transit Update</option>
+                            <option value="Delay Check">Delay Check</option>
+                            <option value="Arrival Update">Arrival Update</option>
+                            <option value="Dispatch Confirmation">Dispatch Confirmation</option>
+                            <option value="Delivery Confirmation">Delivery Confirmation</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Caller Party</label>
+                        <select class="form-control" id="call-caller" required>
+                            <option value="Driver">Driver (Incoming Call)</option>
+                            <option value="Admin Office">Admin Office (Outgoing Call)</option>
+                            <option value="Branch Manager">Branch Manager</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Operator Employee ID (Emp ID) <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="call-emp-id" placeholder="e.g. EMP-101" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Transit Location Check-in</label>
+                    <input type="text" class="form-control" id="call-location" placeholder="e.g. bypass road, toll booth">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Conversation / Verification Notes</label>
+                    <textarea class="form-control" id="call-notes" rows="3" placeholder="Enter what the driver/manager confirmed..." required></textarea>
+                </div>
+                <button class="btn btn-primary w-100" type="submit">Record Call Log</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL OVERLAY: DIGITAL RECEIPT -->
+    <div class="modal-overlay" id="modal-receipt">
+        <div class="modal-container" style="max-width: 500px;">
+            <div style="background:var(--bg-glass); border-radius:16px; padding:1.5rem; margin-bottom:1rem; border: 1px solid var(--border-glass);" class="flex justify-between align-center">
+                <h3 style="font-family:var(--font-heading); font-size:1.1rem;">Digital Receipt Viewer</h3>
+                <div class="flex gap-2">
+                    <button class="btn btn-secondary" onclick="window.print()">Print/Download</button>
+                    <button class="btn btn-primary" onclick="app.closeModal('modal-receipt')">Close</button>
+                </div>
+            </div>
+            
+            <div id="receipt-modal-content">
+                <!-- Receipt Paper template injects here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL OVERLAY: GST TAX INVOICE VIEWER -->
+    <div class="modal-overlay" id="modal-invoice">
+        <div class="modal-container" style="max-width: 650px; width: 95%;">
+            <div style="background:var(--bg-glass); border-radius:16px; padding:1.25rem 1.5rem; margin-bottom:1rem; border: 1px solid var(--border-glass);" class="flex justify-between align-center">
+                <h3 style="font-family:var(--font-heading); font-size:1.1rem; display:flex; align-items:center; gap:0.5rem;">
+                    🧾 Official GST Tax Invoice
+                </h3>
+                <div class="flex gap-2">
+                    <button class="btn btn-secondary" onclick="window.print()">Print / Save PDF</button>
+                    <button class="btn btn-primary" onclick="app.closeModal('modal-invoice')">Close</button>
+                </div>
+            </div>
+            
+            <div id="invoice-modal-content">
+                <!-- GST Invoice template injects dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL OVERLAY: SUBMIT SUPERVISOR REQUEST -->
+    <div class="modal-overlay" id="modal-request-resource">
+        <div class="glass-card modal-container" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 style="font-family:var(--font-heading);">Submit Operations Request to Supervisor</h3>
+                <button class="modal-close" onclick="app.closeModal('modal-request-resource')">×</button>
+            </div>
+            <form id="form-submit-request">
+                <div class="form-group">
+                    <label class="form-label">Request Category</label>
+                    <select class="form-control" id="req-resource-type" required>
+                        <option value="Add Driver">Request New Driver Registration</option>
+                        <option value="Add Vehicle">Request New Vehicle Registration</option>
+                        <option value="Add Stock">Request Warehouse Stock Refill</option>
+                    </select>
+                </div>
+                
+                <div id="req-fields-container">
+                    <!-- Loaded dynamically in app.js -->
+                </div>
+                
+                <button class="btn btn-primary w-100 margin-top-1" type="submit">Submit Request</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL OVERLAY: MANAGER MANUALLY ADD STOCK -->
+    <div class="modal-overlay" id="modal-manager-add-stock">
+        <div class="glass-card modal-container" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3 style="font-family:var(--font-heading);">Supervisor Stock Replenishment</h3>
+                <button class="modal-close" onclick="app.closeModal('modal-manager-add-stock')">×</button>
+            </div>
+            <form id="form-manager-add-stock">
+                <div class="form-group">
+                    <label class="form-label">Target Branch</label>
+                    <select class="form-control" id="mas-branch" required></select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Commodity</label>
+                    <select class="form-control" id="mas-commodity" required></select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Quantity to Add</label>
+                    <input type="number" class="form-control" id="mas-quantity" min="1" required>
+                </div>
+                <button class="btn btn-success w-100 margin-top-1" type="submit">Replenish Stock Directly</button>
+            </form>
+        </div>
+    </div>
+    <!-- MODAL OVERLAY: RETURN LOAD / BACKLOAD MANAGEMENT HUB -->
+    <div class="modal-overlay" id="modal-backload-mgmt">
+        <div class="glass-card modal-container" style="max-width: 850px; width: 95%;">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-glass); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                <div>
+                    <h3 style="font-family:var(--font-heading); display:flex; align-items:center; gap:0.5rem; margin:0;">
+                        <span style="font-size:1.4rem;">🔄</span> Return Load & Backload Management Hub
+                    </h3>
+                    <p style="font-size:0.8rem; color:var(--text-muted); margin:0.25rem 0 0 0;">
+                        Match idle returning lorries with pending branch return shipments to eliminate empty deadhead runs.
+                    </p>
+                </div>
+                <button class="modal-close" onclick="app.closeModal('modal-backload-mgmt')">×</button>
+            </div>
+
+            <!-- Stats Bar -->
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:0.75rem; margin-bottom:1.25rem;">
+                <div style="background:rgba(245, 158, 11, 0.1); border:1px solid rgba(245, 158, 11, 0.3); padding:0.75rem; border-radius:8px;">
+                    <div style="font-size:0.75rem; color:var(--text-muted);">Idle Returning Lorries</div>
+                    <div style="font-size:1.5rem; font-weight:700; color:#fbbf24;" id="backload-stat-idle-trucks">0</div>
+                    <div style="font-size:0.7rem; color:var(--text-muted);">Stationed at Destination Branches</div>
+                </div>
+                <div style="background:rgba(59, 130, 246, 0.1); border:1px solid rgba(59, 130, 246, 0.3); padding:0.75rem; border-radius:8px;">
+                    <div style="font-size:0.75rem; color:var(--text-muted);">Pending Outbound Cargo</div>
+                    <div style="font-size:1.5rem; font-weight:700; color:#60a5fa;" id="backload-stat-pending-cargo">0</div>
+                    <div style="font-size:0.7rem; color:var(--text-muted);">Available across all branches</div>
+                </div>
+                <div style="background:rgba(16, 185, 129, 0.1); border:1px solid rgba(16, 185, 129, 0.3); padding:0.75rem; border-radius:8px;">
+                    <div style="font-size:0.75rem; color:var(--text-muted);">Matched Backload Trips</div>
+                    <div style="font-size:1.5rem; font-weight:700; color:#34d399;" id="backload-stat-matched-trips">0</div>
+                    <div style="font-size:0.7rem; color:var(--text-muted);">Revenue legs activated</div>
+                </div>
+            </div>
+
+            <!-- Clean Table View -->
+            <div class="table-container" style="max-height: 280px; overflow-y: auto;">
+                <table class="lcos-table" id="table-backload-hub">
+                    <thead>
+                        <tr>
+                            <th>Vehicle & Driver</th>
+                            <th>Stationed Branch</th>
+                            <th>Home Origin</th>
+                            <th>Available Backload Cargo</th>
+                            <th>Dispatch Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="backload-hub-table-body">
+                        <!-- Injected dynamically in app.js -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Active Matched Return Trips Section -->
+            <div style="margin-top:1.25rem; border-top:1px solid var(--border-glass); padding-top:1rem;">
+                <h4 style="font-size:0.9rem; margin-bottom:0.75rem; color:#34d399; display:flex; align-items:center; gap:0.4rem;">
+                    🔄 Active & Dispatched Matched Return Cargo Legs
+                </h4>
+                <div class="table-container" style="max-height: 200px; overflow-y: auto;">
+                    <table class="lcos-table">
+                        <thead>
+                            <tr>
+                                <th>Return Trip ID</th>
+                                <th>Vehicle & Driver</th>
+                                <th>Return Route</th>
+                                <th>Commodity & Quantity</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="matched-backload-table-body">
+                            <!-- Injected dynamically in app.js -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+
+            <div style="margin-top:1rem; padding-top:0.75rem; border-top:1px solid var(--border-glass); text-align:right;">
+                <button class="btn btn-secondary" onclick="app.closeModal('modal-backload-mgmt')">Close Hub</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: META API CREDENTIALS & WEBHOOK SETTINGS -->
+    <div class="modal-overlay" id="modal-wa-credentials" style="display:none;">
+        <div class="modal-card" style="max-width: 580px; max-height: 85vh; overflow-y: auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-glass); padding-bottom:0.75rem; margin-bottom:1rem;">
+                <h3 style="margin:0; font-size:1.15rem; font-weight:700; color:var(--text-main); display:flex; align-items:center; gap:0.5rem;">
+                    <span>⚙️</span> Meta WhatsApp API Credentials & Webhook
+                </h3>
+                <button type="button" class="btn-close-modal" style="background:transparent; border:none; color:var(--text-muted); font-size:1.25rem; cursor:pointer;" onclick="document.getElementById('modal-wa-credentials').style.display='none';">&times;</button>
+            </div>
+
+            <!-- Webhook Callback Info Box -->
+            <div style="background:rgba(15, 23, 42, 0.6); border:1px solid var(--border-glass); border-radius:8px; padding:0.85rem; margin-bottom:1.25rem;">
+                <div style="font-size:0.75rem; font-weight:600; color:var(--color-primary); margin-bottom:0.4rem; text-transform:uppercase; letter-spacing:0.05em;">
+                    Meta Webhook Configuration (Callback Endpoint)
+                </div>
+                <div style="display:flex; flex-direction:column; gap:0.5rem; font-size:0.8rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.25); padding:0.35rem 0.6rem; border-radius:4px;">
+                        <span style="color:var(--text-muted);">Callback URL:</span>
+                        <div style="display:flex; align-items:center; gap:0.4rem;">
+                            <code id="wa-webhook-url-display" style="color:#67e8f9; font-size:0.75rem;">/api/whatsapp/webhook</code>
+                            <button type="button" class="btn btn-secondary" style="padding:0.15rem 0.4rem; font-size:0.7rem;" onclick="navigator.clipboard.writeText(document.getElementById('wa-webhook-url-display').textContent); alert('Webhook URL copied!');">Copy</button>
+                        </div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.25); padding:0.35rem 0.6rem; border-radius:4px;">
+                        <span style="color:var(--text-muted);">Verify Token:</span>
+                        <div style="display:flex; align-items:center; gap:0.4rem;">
+                            <code id="wa-verify-token-display" style="color:#a7f3d0; font-size:0.75rem;">lcos_meta_verify_token_2026</code>
+                            <button type="button" class="btn btn-secondary" style="padding:0.15rem 0.4rem; font-size:0.7rem;" onclick="navigator.clipboard.writeText(document.getElementById('wa-verify-token-display').textContent); alert('Verify token copied!');">Copy</button>
+                        </div>
+                    </div>
+                    <div style="font-size:0.72rem; color:#94a3b8;">
+                        Subscribe to the <strong>messages</strong> webhook field under WhatsApp in Meta Developers Dashboard.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Credentials Form -->
+            <form id="form-whatsapp-config" style="display:flex; flex-direction:column; gap:0.9rem;">
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:0.8rem; font-weight:600;">Phone Number ID</label>
+                    <input type="text" class="form-control" id="wa-cfg-phone-id" placeholder="e.g. 104928374829102" required style="font-size:0.85rem;">
+                    <small style="color:var(--text-muted); font-size:0.7rem;">From Meta Developers &gt; WhatsApp &gt; API Setup</small>
+                </div>
+
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:0.8rem; font-weight:600;">System User / User Access Token</label>
+                    <input type="password" class="form-control" id="wa-cfg-access-token" placeholder="EAABw..." required style="font-size:0.85rem;">
+                    <small style="color:var(--text-muted); font-size:0.7rem;">Temporary Token (24h) or Permanent System User Token with whatsapp_business_messaging</small>
+                </div>
+
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:0.8rem; font-weight:600;">WhatsApp Business Account ID (WABA ID)</label>
+                    <input type="text" class="form-control" id="wa-cfg-waba-id" placeholder="e.g. 1092837461928" style="font-size:0.85rem;">
+                </div>
+
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:0.8rem; font-weight:600;">Custom Verify Token</label>
+                    <input type="text" class="form-control" id="wa-cfg-verify-token" value="lcos_meta_verify_token_2026" required style="font-size:0.85rem;">
+                </div>
+
+                <div class="form-group" style="margin:0;">
+                    <label style="font-size:0.8rem; font-weight:600;">Higher Official / Operations Head WhatsApp Phone</label>
+                    <input type="text" class="form-control" id="wa-cfg-official-phone" placeholder="e.g. 916382897998" style="font-size:0.85rem;">
+                    <small style="color:var(--text-muted); font-size:0.7rem;">Receives instant WhatsApp alerts whenever any lorry halts &gt; 20 minutes</small>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:0.5rem;">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-wa-credentials').style.display='none';">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="background:#25D366; border-color:#20ba5a; font-weight:600; padding:0.45rem 1.25rem;">
+                        💾 Save Credentials
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: META FOR DEVELOPERS SETUP GUIDE -->
+    <div class="modal-overlay" id="modal-wa-guide" style="display:none;">
+        <div class="modal-card" style="max-width: 680px; max-height: 85vh; overflow-y: auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-glass); padding-bottom:0.75rem; margin-bottom:1rem;">
+                <h3 style="margin:0; font-size:1.15rem; font-weight:700; color:var(--text-main); display:flex; align-items:center; gap:0.5rem;">
+                    <span>📖</span> Meta for Developers WhatsApp Cloud API Setup Guide
+                </h3>
+                <button type="button" class="btn-close-modal" id="btn-close-wa-guide" style="background:transparent; border:none; color:var(--text-muted); font-size:1.25rem; cursor:pointer;" onclick="document.getElementById('modal-wa-guide').style.display='none';">&times;</button>
+            </div>
+            
+            <div style="display:flex; flex-direction:column; gap:1.25rem; font-size:0.85rem; color:var(--text-main); line-height:1.6;">
+                <div style="background:rgba(37, 211, 102, 0.08); border-left:4px solid #25D366; padding:0.75rem 1rem; border-radius:0 8px 8px 0;">
+                    <strong>Quick Start:</strong> Follow these 4 steps in your Meta for Developers dashboard to connect your WhatsApp Business number to LCOS.
+                </div>
+
+                <div style="border:1px solid var(--border-glass); border-radius:8px; padding:1rem; background:rgba(0,0,0,0.2);">
+                    <h4 style="margin:0 0 0.5rem; color:#67e8f9; font-size:0.95rem;">Step 1: Create Meta Developer App</h4>
+                    <ol style="margin:0; padding-left:1.25rem; display:flex; flex-direction:column; gap:0.35rem;">
+                        <li>Go to <a href="https://developers.facebook.com" target="_blank" style="color:var(--color-primary); text-decoration:underline;">developers.facebook.com</a> and sign in.</li>
+                        <li>Click <strong>My Apps</strong> &gt; <strong>Create App</strong>.</li>
+                        <li>Choose <strong>Other</strong> &gt; Select <strong>Business</strong> as the app type.</li>
+                        <li>Fill in your App Name (e.g. <em>LCOS Logistics</em>) and complete app creation.</li>
+                    </ol>
+                </div>
+
+                <div style="border:1px solid var(--border-glass); border-radius:8px; padding:1rem; background:rgba(0,0,0,0.2);">
+                    <h4 style="margin:0 0 0.5rem; color:#a7f3d0; font-size:0.95rem;">Step 2: Add WhatsApp & Copy Credentials</h4>
+                    <ol style="margin:0; padding-left:1.25rem; display:flex; flex-direction:column; gap:0.35rem;">
+                        <li>On the App Dashboard, find <strong>WhatsApp</strong> and click <strong>Set up</strong>.</li>
+                        <li>Navigate to <strong>WhatsApp &gt; API Setup</strong> on the left sidebar.</li>
+                        <li>Copy the <strong>Phone Number ID</strong> and paste it into LCOS.</li>
+                        <li>Copy the <strong>WhatsApp Business Account ID</strong> and paste it into LCOS.</li>
+                        <li>Copy the <strong>Temporary Access Token</strong> (or create a permanent System User Token under Business Settings with <code>whatsapp_business_messaging</code> permission).</li>
+                    </ol>
+                </div>
+
+                <div style="border:1px solid var(--border-glass); border-radius:8px; padding:1rem; background:rgba(0,0,0,0.2);">
+                    <h4 style="margin:0 0 0.5rem; color:#fde047; font-size:0.95rem;">Step 3: Configure Inbound Webhooks</h4>
+                    <ol style="margin:0; padding-left:1.25rem; display:flex; flex-direction:column; gap:0.35rem;">
+                        <li>In Meta Dashboard, go to <strong>WhatsApp &gt; Configuration</strong>.</li>
+                        <li>Under <strong>Webhook</strong>, click <strong>Edit</strong>.</li>
+                        <li><strong>Callback URL:</strong> <code>https://&lt;your-domain&gt;/api/whatsapp/webhook</code> (use ngrok for local testing, e.g. <code>https://xxx.ngrok-free.app/api/whatsapp/webhook</code>).</li>
+                        <li><strong>Verify Token:</strong> <code>lcos_meta_verify_token_2026</code> (matches LCOS setting).</li>
+                        <li>Click <strong>Verify and Save</strong>.</li>
+                        <li>Under <strong>Webhook fields</strong>, click <strong>Manage</strong> and click <strong>Subscribe</strong> next to <strong>messages</strong>.</li>
+                    </ol>
+                </div>
+
+                <div style="border:1px solid var(--border-glass); border-radius:8px; padding:1rem; background:rgba(0,0,0,0.2);">
+                    <h4 style="margin:0 0 0.5rem; color:#c084fc; font-size:0.95rem;">Step 4: Test Real Messages</h4>
+                    <ol style="margin:0; padding-left:1.25rem; display:flex; flex-direction:column; gap:0.35rem;">
+                        <li>In <strong>API Setup</strong>, add your own WhatsApp phone number to the <strong>"To" recipient list</strong> to receive test messages.</li>
+                        <li>Send a test message from the LCOS WhatsApp Hub console!</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; margin-top:1.25rem; border-top:1px solid var(--border-glass); padding-top:0.75rem;">
+                <button type="button" class="btn btn-primary" onclick="document.getElementById('modal-wa-guide').style.display='none';">Got It!</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Home / Login Screen Overlay matching the attached design -->
+
+    <div id="login-page">
+        <!-- Top Navigation Bar -->
+        <header class="home-navbar">
+            <div class="home-brand">
+                <div class="home-brand-icon">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z" fill="#3b82f6" fill-opacity="0.9"/>
+                        <path d="M2 17l10 5 10-5M2 12l10 5 10-5" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M12 22V12" stroke="#93c5fd" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M2 7v10l10 5V12L2 7z" fill="#2563eb" fill-opacity="0.6"/>
+                        <path d="M22 7v10l-10 5V12l10-5z" fill="#1d4ed8" fill-opacity="0.75"/>
+                    </svg>
+                </div>
+                <div class="home-brand-text">
+                    <span class="brand-title">LCOS PORTAL</span>
+                    <span class="brand-subtitle">Logistics Operations Control System</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Background Ambient Elements & Flowing Waves -->
+        <div class="home-bg-elements">
+            <!-- Left Flowing Wave Lines SVG -->
+            <svg class="wave-lines-left" viewBox="0 0 600 500" preserveAspectRatio="none" fill="none">
+                <path class="wave-path path-1" d="M-100,280 C120,180 180,440 380,310 C480,240 520,290 620,260" stroke="url(#cyanGradLeft)" stroke-width="1.4" stroke-opacity="0.35"/>
+                <path class="wave-path path-2" d="M-100,260 C100,160 160,410 350,290 C450,220 500,270 600,240" stroke="url(#cyanGradLeft)" stroke-width="1.1" stroke-opacity="0.25"/>
+                <path class="wave-path path-3" d="M-100,300 C140,200 200,470 410,330 C510,260 540,310 640,280" stroke="url(#cyanGradLeft)" stroke-width="0.9" stroke-opacity="0.2"/>
+                <path class="wave-path path-4" d="M-100,320 C160,220 220,490 430,350 C530,280 560,330 660,300" stroke="url(#cyanGradLeft)" stroke-width="0.7" stroke-opacity="0.15"/>
+                <defs>
+                    <linearGradient id="cyanGradLeft" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#38bdf8" stop-opacity="0"/>
+                        <stop offset="50%" stop-color="#38bdf8" stop-opacity="0.8"/>
+                        <stop offset="100%" stop-color="#6366f1" stop-opacity="0.1"/>
+                    </linearGradient>
+                </defs>
+            </svg>
+
+            <!-- Right Flowing Wave Lines SVG -->
+            <svg class="wave-lines-right" viewBox="0 0 600 500" preserveAspectRatio="none" fill="none">
+                <path class="wave-path path-5" d="M-20,400 C140,310 260,160 420,230 C490,260 540,210 620,180" stroke="url(#cyanGradRight)" stroke-width="1.4" stroke-opacity="0.35"/>
+                <path class="wave-path path-6" d="M-40,420 C120,330 240,180 400,250 C470,280 520,230 600,200" stroke="url(#cyanGradRight)" stroke-width="1.1" stroke-opacity="0.25"/>
+                <path class="wave-path path-7" d="M0,380 C160,290 280,140 440,210 C510,240 560,190 640,160" stroke="url(#cyanGradRight)" stroke-width="0.8" stroke-opacity="0.2"/>
+                <defs>
+                    <linearGradient id="cyanGradRight" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#6366f1" stop-opacity="0.1"/>
+                        <stop offset="60%" stop-color="#38bdf8" stop-opacity="0.8"/>
+                        <stop offset="100%" stop-color="#0284c7" stop-opacity="0"/>
+                    </linearGradient>
+                </defs>
+            </svg>
+
+            <!-- Left Organic Pebble Blob -->
+            <div class="home-blob blob-left">
+                <div class="blob-text">
+                    <span>TRACK</span>
+                    <span>MANAGE</span>
+                    <span>CONTROL</span>
+                </div>
+            </div>
+
+            <!-- Right Organic Pebble Blob -->
+            <div class="home-blob blob-right">
+                <div class="blob-text">
+                    <span>PEOPLE</span>
+                    <span>PROCESS</span>
+                    <span>PERFORMANCE</span>
+                </div>
+            </div>
+
+            <!-- Bottom Left Dot Matrix Grid -->
+            <div class="dot-matrix-grid"></div>
+        </div>
+
+        <div class="login-box">
+            <!-- Hero Title & Central Glow Icon -->
+            <div class="login-title-container">
+                <div class="login-logo">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                        <line x1="8" y1="21" x2="16" y2="21"></line>
+                        <line x1="12" y1="17" x2="12" y2="21"></line>
+                    </svg>
+                </div>
+
+                <!-- Callout Badge: "Smarter Logistics Together" with curved arrow -->
+                <div class="hero-callout-note">
+                    <span class="callout-text">Smarter<br>Logistics<br>Together</span>
+                    <svg class="callout-arrow" width="36" height="36" viewBox="0 0 40 40" fill="none">
+                        <path d="M8 8 C 8 26, 26 28, 28 32" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+                        <path d="M22 33 L28 32 L26 25" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+
+                <h1 class="hero-main-title">LCOS <span class="text-cyan-accent">PORTAL</span></h1>
+                <p class="hero-main-subtitle">Logistics Operations Control System</p>
+                
+                <div class="hero-tagline-bullets">
+                    <span>Streamline Operations</span>
+                    <span class="bullet-dot">•</span>
+                    <span>Enhance Visibility</span>
+                    <span class="bullet-dot">•</span>
+                    <span>Drive Efficiency</span>
+                </div>
+            </div>
+
+            <!-- Subscription Requirement & Live Status Banner -->
+            <div class="landing-sub-status-bar" id="landing-sub-status-bar">
+                <div class="sub-status-indicator">
+                    <span class="status-pulse-dot" id="status-pulse-dot"></span>
+                    <span class="status-text-headline" id="status-text-headline">Checking Subscription Status...</span>
+                    <span class="status-pill-badge" id="status-pill-badge">VERIFYING</span>
+                </div>
+                <div class="sub-status-desc" id="sub-status-desc">
+                    Mandatory SaaS Policy: An active subscription plan via Razorpay is required to access Tamil Nadu logistics operations.
+                </div>
+                <div class="sub-demo-controls">
+                    <button type="button" class="btn-demo-sub-toggle" id="btn-toggle-demo-expired" title="Test Gating by Simulating Expired Status" onclick="window.app && window.app.simulateSubscriptionStatus('EXPIRED')">
+                        🔒 Test Inactive/Expired Gate
+                    </button>
+                    <button type="button" class="btn-demo-sub-toggle btn-demo-active" id="btn-toggle-demo-active" title="Restore Active Plan" onclick="window.app && window.app.simulateSubscriptionStatus('ACTIVE')">
+                        🟢 Restore Active Plan
+                    </button>
+                </div>
+            </div>
+
+            <!-- SaaS Subscription Plans Section directly on Landing Page -->
+            <div class="landing-pricing-section" id="landing-pricing-section">
+                <div class="pricing-header">
+                    <div class="pricing-badge">STEP 1: BUY SUBSCRIPTION VIA RAZORPAY</div>
+                    <h2 class="pricing-section-title">Select a Plan to Unlock Operations</h2>
+                    <p class="pricing-section-subtitle">Customers must subscribe before using the app. Instant activation with Razorpay UPI, Cards, NetBanking & official GST Tax Invoicing.</p>
+                </div>
+
+                <div class="landing-pricing-grid">
+                    <!-- Plan 1: Basic -->
+                    <div class="landing-plan-card" id="landing-plan-basic" data-plan="PLAN-BASIC">
+                        <div class="plan-card-header">
+                            <span class="plan-tag">STARTER FLEET</span>
+                            <h3 class="plan-title">Basic</h3>
+                            <div class="plan-price">
+                                <span class="currency">₹</span>
+                                <span class="amount">999</span>
+                                <span class="period">/ month</span>
+                            </div>
+                            <p class="plan-caption">Core fleet tracking for small regional logistics operations in Tamil Nadu.</p>
+                        </div>
+                        <ul class="plan-features">
+                            <li><span class="check">✓</span> Up to 15 Active Vehicles</li>
+                            <li><span class="check">✓</span> 3 Operator Team Accounts</li>
+                            <li><span class="check">✓</span> Tamil Nadu Hub Consignments</li>
+                            <li><span class="check">✓</span> Consignment & Trip Dispatch</li>
+                            <li><span class="check">✓</span> Digital GST Invoicing</li>
+                        </ul>
+                        <button class="landing-pay-btn" id="btn-landing-pay-basic" data-plan-id="PLAN-BASIC" onclick="window.handleLandingPayment ? window.handleLandingPayment('PLAN-BASIC') : (window.app && window.app.handleLandingPayment('PLAN-BASIC'))">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                            <span>Pay ₹999 with Razorpay</span>
+                        </button>
+                    </div>
+
+                    <!-- Plan 2: Professional (Popular / Recommended) -->
+                    <div class="landing-plan-card popular-plan" id="landing-plan-pro" data-plan="PLAN-PRO">
+                        <div class="popular-ribbon">⭐ RECOMMENDED</div>
+                        <div class="plan-card-header">
+                            <span class="plan-tag tag-cyan">EXPANDING FLEET</span>
+                            <h3 class="plan-title">Professional</h3>
+                            <div class="plan-price">
+                                <span class="currency">₹</span>
+                                <span class="amount">2,999</span>
+                                <span class="period">/ month</span>
+                            </div>
+                            <p class="plan-caption">End-to-end telemetry across Tamil Nadu highways with stoppage detection.</p>
+                        </div>
+                        <ul class="plan-features">
+                            <li><span class="check">✓</span> Up to 100 Active Vehicles</li>
+                            <li><span class="check">✓</span> 15 Operator & Manager Logins</li>
+                            <li><span class="check">✓</span> Live Real-Time GPS & Stoppage Telemetry</li>
+                            <li><span class="check">✓</span> 38-District Highway Network Map</li>
+                            <li><span class="check">✓</span> Multi-Branch Stock & Approvals</li>
+                            <li><span class="check">✓</span> Instant GST Tax Invoices (18% GST)</li>
+                            <li><span class="check">✓</span> Priority 24/7 Support Hotline</li>
+                        </ul>
+                        <button class="landing-pay-btn btn-recommended" id="btn-landing-pay-pro" data-plan-id="PLAN-PRO" onclick="window.handleLandingPayment ? window.handleLandingPayment('PLAN-PRO') : (window.app && window.app.handleLandingPayment('PLAN-PRO'))">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                            <span>Subscribe & Pay ₹2,999 with Razorpay</span>
+                        </button>
+                    </div>
+
+                    <!-- Plan 3: Enterprise -->
+                    <div class="landing-plan-card" id="landing-plan-ent" data-plan="PLAN-ENT">
+                        <div class="plan-card-header">
+                            <span class="plan-tag tag-amber">CORPORATE LOGISTICS</span>
+                            <h3 class="plan-title">Enterprise</h3>
+                            <div class="plan-price">
+                                <span class="currency">₹</span>
+                                <span class="amount">19,999</span>
+                                <span class="period">/ year</span>
+                            </div>
+                            <p class="plan-caption">Full statewide logistics enterprise solution with unlimited scale.</p>
+                        </div>
+                        <ul class="plan-features">
+                            <li><span class="check">✓</span> Unlimited Vehicles & Fleets</li>
+                            <li><span class="check">✓</span> Unlimited Users & 2 Owners Executive Mode</li>
+                            <li><span class="check">✓</span> Unlimited Tamil Nadu Warehouses & Hubs</li>
+                            <li><span class="check">✓</span> Stoppage Escalation & 3-Strike Audit</li>
+                            <li><span class="check">✓</span> Comprehensive Tax & Financial Audits</li>
+                            <li><span class="check">✓</span> Dedicated Logistics Account Manager</li>
+                        </ul>
+                        <button class="landing-pay-btn" id="btn-landing-pay-ent" data-plan-id="PLAN-ENT" onclick="window.handleLandingPayment ? window.handleLandingPayment('PLAN-ENT') : (window.app && window.app.handleLandingPayment('PLAN-ENT'))">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                            <span>Pay ₹19,999 with Razorpay</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="payment-guarantee-bar">
+                    <span>🔒 Secured by Razorpay Payment Gateway (PCI-DSS)</span>
+                    <span class="sep">•</span>
+                    <span>⚡ Instant UPI / Cards / NetBanking</span>
+                    <span class="sep">•</span>
+                    <span>📑 Automated GST Invoices</span>
+                </div>
+            </div>
+
+            <!-- Role Portals Section (Gated by Subscription) -->
+            <div class="landing-roles-section" id="landing-roles-section">
+                <div class="roles-section-header">
+                    <div class="pricing-badge" id="step2-badge">STEP 2: ACCESS OPERATIONS PORTAL</div>
+                    <h2 class="roles-section-title">Select Role to Enter</h2>
+                    <p class="roles-section-subtitle" id="role-access-hint">Active subscription required. Click your designated role to launch the operational workspace.</p>
+                </div>
+
+                <!-- The 3 Cards -->
+                <div class="login-card-container">
+                    <!-- Role Card 1: Tracking Team -->
+                    <div class="login-card card-tracking" id="card-login-tracking">
+                        <div class="role-gate-badge" id="gate-badge-tracking">
+                            <span class="gate-icon">🔒</span> <span class="gate-text">Subscription Required</span>
+                        </div>
+                        <div class="login-card-icon icon-tracking">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                            </svg>
+                        </div>
+                        <h3>Tracking Team</h3>
+                        <p>Operator View. Create shipments, log check-in calls, and verify unloading and delivery.</p>
+                        
+                        <div class="card-action-link">
+                            <span>Access Tracking</span>
+                            <span class="arrow">→</span>
+                        </div>
+                    </div>
+
+                    <!-- Role Card 2: Branch Manager -->
+                    <div class="login-card card-manager" id="card-login-manager">
+                        <div class="role-gate-badge" id="gate-badge-manager">
+                            <span class="gate-icon">🔒</span> <span class="gate-text">Subscription Required</span>
+                        </div>
+                        <div class="login-card-icon icon-manager">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                            </svg>
+                        </div>
+                        <h3>Branch Manager</h3>
+                        <p>Supervisor View. Manage directories, add base stocks directly, and approve operator requests.</p>
+                        <div class="card-action-link">
+                            <span>Access Manager</span>
+                            <span class="arrow">→</span>
+                        </div>
+                    </div>
+
+                    <!-- Role Card 3: 2 Owners -->
+                    <div class="login-card card-owner" id="card-login-owner">
+                        <div class="role-gate-badge" id="gate-badge-owner">
+                            <span class="gate-icon">🔒</span> <span class="gate-text">Subscription Required</span>
+                        </div>
+                        <div class="login-card-icon icon-owner">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14v2H5z"></path>
+                            </svg>
+                        </div>
+                        <h3>2 Owners Login</h3>
+                        <p>Executive Monitoring Mode. Global read-only reports, audit call history, and oversee operations.</p>
+                        <div class="card-action-link">
+                            <span>Access Dashboard</span>
+                            <span class="arrow">→</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Tagline -->
+            <div class="home-footer-tagline">
+                <span class="tagline-line"></span>
+                <span class="tagline-text">ONE PORTAL. ENDLESS POSSIBILITIES.</span>
+                <span class="tagline-line"></span>
+            </div>
+        </div>
+    <!-- Subscription Required Alert Modal -->
+    <div id="sub-gate-modal" class="modal-backdrop" style="display: none; z-index: 99999;">
+        <div class="modal-container" style="max-width: 480px; text-align: center; background: #0b1329; border: 1px solid rgba(244,63,94,0.4); box-shadow: 0 25px 60px rgba(0,0,0,0.8), 0 0 40px rgba(244,63,94,0.25);">
+            <div style="font-size: 2.8rem; margin-bottom: 0.5rem; animation: pulse 2s infinite;">🔒</div>
+            <h3 style="color: #f43f5e; font-size: 1.45rem; font-weight: 700; margin-bottom: 0.5rem;">Subscription Required</h3>
+            <p style="color: #94a3b8; font-size: 0.92rem; line-height: 1.5; margin-bottom: 1.25rem;">
+                Customers must purchase an active SaaS subscription before accessing the Logistics Operations Control System.
+            </p>
+            <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem; text-align: left;">
+                <div style="color: #38bdf8; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem;">Subscription Unlocks:</div>
+                <div style="color: #cbd5e1; font-size: 0.82rem; line-height: 1.5;">
+                    • 🗺️ Real-Time Tamil Nadu GPS Highway Telemetry<br>
+                    • 🚚 Fleet Operations & 38-District Tracking<br>
+                    • ⚡ 20-Min Stoppage Detection & Approvals<br>
+                    • 🧾 Automated 18% GST Compliance Invoicing
+                </div>
+            </div>
+            <div style="display: flex; gap: 0.75rem; justify-content: center;">
+                <button type="button" id="btn-close-sub-modal" class="btn btn-secondary" style="background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1;">Dismiss</button>
+                <button type="button" id="btn-goto-pricing" class="btn btn-primary" style="background: linear-gradient(135deg, #0284c7, #2563eb); color: #ffffff; font-weight: 600;">
+                    Choose Plan & Pay with Razorpay →
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPTS -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module" src="/js/api.js?v=2.1"></script>
+    <script type="module" src="/js/state.js?v=2.1"></script>
+    <script type="module" src="/js/charts.js?v=2.1"></script>
+    <script type="module" src="/js/app.js?v=2.1"></script>
+</body>
+</html>
