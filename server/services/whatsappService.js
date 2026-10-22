@@ -327,26 +327,23 @@ Send a 📍 Location pin anytime to sync your vehicle GPS.`;
     if (!recipientPhone) return null;
 
     const bodyText =
-`⚠️ *UNSCHEDULED STOPPAGE DETECTED*
+`🚨🔊 *URGENT STOPPAGE ALERT (>20 MINS)*
 ────────────────────────────
 🚛 *Vehicle:* ${vehicle.vehicle_id || vehicle.id}
-⏱️ *Stopped Duration:* ${alertData.stoppage_duration_minutes || 20}+ minutes
+⏱️ *Stationary Time:* ${alertData.stoppage_duration_minutes || 20}+ minutes
 📍 *Current Coordinates:* ${vehicle.current_lat || 'Unknown'}, ${vehicle.current_lng || 'Unknown'}
 ────────────────────────────
-Operations Control has flagged this halt (>20 minutes without movement).
-Please reply with your status:
-• Reply *MOVING* if resuming transit
-• Reply *STOP <reason>* (e.g. STOP Puncture / Heavy Traffic)
-• Reply *SOS* for emergency breakdown assistance`;
+Central Operations flagged an unscheduled halt (>20 minutes without movement).
+⚠️ *Tap your current reason below to update Central Operations immediately:*`;
 
     const buttons = [
-      { id: `stp_moving_${vehicle.id}`, title: 'Resuming Transit' },
-      { id: `stp_delay_${vehicle.id}`, title: 'Report Delay' },
-      { id: `stp_sos_${vehicle.id}`, title: 'Need Assistance' },
+      { id: `stp_traffic_${vehicle.id || vehicle.vehicle_id}`, title: 'Traffic / Toll Delay' },
+      { id: `stp_breakdown_${vehicle.id || vehicle.vehicle_id}`, title: 'Puncture / Breakdown' },
+      { id: `stp_moving_${vehicle.id || vehicle.vehicle_id}`, title: 'Resuming Movement' },
     ];
 
     try {
-      const btnRes = await this.sendInteractiveButtons(recipientPhone, '⚠️ Vehicle Stoppage Warning', bodyText, buttons, 'LCOS Monitoring Unit');
+      const btnRes = await this.sendInteractiveButtons(recipientPhone, '🚨 Unscheduled Halt Warning', bodyText, buttons, 'LCOS Monitoring Unit');
       if (!btnRes.success) {
         // Fallback to text message if interactive is rejected
         return await this.sendTextMessage(recipientPhone, bodyText);

@@ -5,7 +5,7 @@ const path = require('path');
 const db = require('../config/db');
 const whatsappService = require('../services/whatsappService');
 const stoppageDetector = require('../services/stoppageDetector');
-const { broadcastAlert, broadcastTripUpdate, broadcastGpsUpdate } = require('../services/socketService');
+const { broadcastAlert, broadcastTripUpdate, broadcastGpsUpdate, getIO } = require('../services/socketService');
 
 /**
  * Normalizes phone numbers for matching (last 10 digits)
@@ -206,26 +206,89 @@ async function handleIncomingMessage(msg, contact = null) {
 
   // Handle Interactive Buttons
   if (interactiveButtonId) {
-    if (interactiveButtonId.startsWith('trk_')) {
+    if (interactiveButtonId.startsWith('trk_') || interactiveButtonId === 'btn_track_active') {
       const tripId = interactiveButtonId.replace('trk_', '');
-      await sendTripStatusReply(senderNumber, tripId);
+      await sendTripStatusReply(senderNumber, tripId === 'btn_track_active' ? null : tripId, driver);
       return;
     }
-    if (interactiveButtonId.startsWith('loc_')) {
+    if (interactiveButtonId.startsWith('loc_') || interactiveButtonId === 'btn_help_loc') {
       await whatsappService.sendTextMessage(
         senderNumber,
         `📍 *To share your live location:*\nTap the 📎 (Paperclip / +) icon in WhatsApp, choose *Location*, and select *Send Your Current Location* or *Share Live Location*.`
       );
       return;
     }
-    if (interactiveButtonId.startsWith('sos_')) {
+    if (interactiveButtonId.startsWith('sos_') || interactiveButtonId === 'btn_sos' || interactiveButtonId.startsWith('stp_sos_')) {
       await triggerEmergencyAlert(senderNumber, driver, activeTrip, 'Emergency SOS button pressed on WhatsApp');
+      return;
+    }
+    // Logistics Reason Button 1: Traffic / Toll Delay
+    if (interactiveButtonId.startsWith('stp_traffic_')) {
+      await recordTransitDelay(senderNumber, driver, activeTrip, 'Heavy Traffic / Toll Plaza Congestion');
+      return;
+    }
+    // Logistics Reason Button 2: Puncture / Breakdown
+    if (interactiveButtonId.startsWith('stp_breakdown_')) {
+      await triggerEmergencyAlert(senderNumber, driver, activeTrip, 'Tyre Puncture / Vehicle Mechanical Breakdown');
+      return;
+    }
+    // Logistics Reason Button 3: Resuming Movement
+    if (interactiveButtonId.startsWith('stp_moving_') || interactiveButtonId === 'btn_resuming') {
+      const vehId = activeTrip?.vehicle_id || (driver ? 'Assigned Vehicle' : 'Vehicle');
+      if (activeTrip && activeTrip.vehicle_id) {
+        await db.query(
+          `UPDATE vehicles 
+           SET movement_status = 'MOVING', speed_kmh = 45, stoppage_start_time = NULL, updated_at = NOW() 
+           WHERE id = $1`,
+          [activeTrip.vehicle_id]
+        );
+        await db.query(
+          `UPDATE alerts SET status = 'Resolved', resolved_at = NOW() 
+           WHERE vehicle_id = $1 AND type = 'Stoppage Detected' AND status = 'Active'`,
+          [activeTrip.vehicle_id]
+        );
+      }
+      await whatsappService.sendTextMessage(
+        senderNumber,
+        `🟢 *Transit Resumed!* Vehicle *${vehId}* marked as MOVING on Central Operations Map. Stoppage alert resolved. Drive safely!`
+      );
+      const io = getIO();
+      if (io) {
+        io.emit('stoppage_driver_response', {
+          vehicleId: vehId,
+          reason: '🟢 Resuming Movement (Transit Resumed)',
+          timestamp: new Date().toISOString()
+        });
+      }
+      return;
+    }
+    if (interactiveButtonId.startsWith('stp_delay_') || interactiveButtonId === 'btn_delay' || interactiveButtonId === 'btn_report_delay') {
+      await recordTransitDelay(senderNumber, driver, activeTrip, 'Transit delay reported via quick button');
       return;
     }
   }
 
   // Process Text Commands
   const upperText = textContent.toUpperCase();
+
+  // Handle Text Button Echoes
+  if (upperText.includes('TRAFFIC') || upperText.includes('TOLL')) {
+    await recordTransitDelay(senderNumber, driver, activeTrip, 'Heavy Traffic / Toll Plaza Congestion');
+    return;
+  }
+  if (upperText.includes('PUNCTURE') || upperText.includes('BREAKDOWN')) {
+    await triggerEmergencyAlert(senderNumber, driver, activeTrip, 'Tyre Puncture / Vehicle Mechanical Breakdown');
+    return;
+  }
+  if (upperText.includes('RESUMING') || upperText.includes('RESUME')) {
+    const vehId = activeTrip?.vehicle_id || 'Vehicle';
+    if (activeTrip && activeTrip.vehicle_id) {
+      await db.query(`UPDATE vehicles SET movement_status = 'MOVING', speed_kmh = 45, stoppage_start_time = NULL, updated_at = NOW() WHERE id = $1`, [activeTrip.vehicle_id]);
+      await db.query(`UPDATE alerts SET status = 'Resolved', resolved_at = NOW() WHERE vehicle_id = $1 AND type = 'Stoppage Detected' AND status = 'Active'`, [activeTrip.vehicle_id]);
+    }
+    await whatsappService.sendTextMessage(senderNumber, `🟢 *Transit Resumed!* Vehicle *${vehId}* marked as MOVING on Central Operations Map. Stoppage alert resolved. Drive safely!`);
+    return;
+  }
 
   // 1. TRIP STATUS / TRACKING
   if (upperText.startsWith('TRACK') || upperText === 'STATUS' || upperText === 'TRIP') {
@@ -394,6 +457,15 @@ async function recordTransitDelay(toNumber, driver, trip, reason) {
 
     broadcastAlert(newAlert.rows[0]);
     broadcastTripUpdate({ ...trip, status: 'DELAYED' });
+    const io = getIO();
+    if (io) {
+      io.emit('stoppage_driver_response', {
+        vehicleId,
+        driverName,
+        reason: `🟡 ${reason}`,
+        timestamp: new Date().toISOString()
+      });
+    }
   } else {
     // Standalone driver report without active trip
     const alertId = 'ALT-WA-' + Math.floor(1000 + Math.random() * 9000);
@@ -456,6 +528,15 @@ async function triggerEmergencyAlert(toNumber, driver, trip, messageText) {
   );
 
   broadcastAlert(newAlert.rows[0]);
+  const io = getIO();
+  if (io) {
+    io.emit('stoppage_driver_response', {
+      vehicleId,
+      driverName,
+      reason: `🔴 ${messageText}`,
+      timestamp: new Date().toISOString()
+    });
+  }
 
   // Notify Higher Official of Emergency SOS immediately
   const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE;
@@ -750,6 +831,78 @@ router.post('/test-stoppage-alert', async (req, res) => {
     });
   } catch (err) {
     console.error('Test stoppage alert error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * POST /api/whatsapp/accept-reason
+ * Allows Higher Official / Operations Manager to accept driver stoppage reason and clear alert
+ */
+router.post('/accept-reason', async (req, res) => {
+  try {
+    const { vehicleId, alertId, tripId, reason } = req.body || {};
+    const vehId = vehicleId || 'TN-59-EF-9012';
+
+    // 1. Resolve alert
+    if (alertId) {
+      await db.query(`UPDATE alerts SET status = 'Resolved', resolved_at = NOW() WHERE id = $1`, [alertId]);
+    } else {
+      await db.query(
+        `UPDATE alerts SET status = 'Resolved', resolved_at = NOW() 
+         WHERE vehicle_id = $1 AND (type = 'Stoppage Detected' OR type = 'Driver Delay Report') AND status = 'Active'`,
+        [vehId]
+      );
+    }
+
+    // 2. Clear vehicle stoppage timer
+    await db.query(
+      `UPDATE vehicles SET stoppage_start_time = NULL, movement_status = 'MOVING', speed_kmh = 45, updated_at = NOW() WHERE id = $1`,
+      [vehId]
+    );
+
+    // 3. Send confirmation WhatsApp message to driver & higher official
+    let driverPhone = null;
+    const vehRes = await db.query(
+      `SELECT d.phone, d.name AS driver_name, t.id AS trip_id 
+       FROM vehicles v 
+       LEFT JOIN trips t ON t.vehicle_id = v.id 
+       LEFT JOIN drivers d ON d.id = t.driver_id 
+       WHERE v.id = $1 LIMIT 1`,
+      [vehId]
+    );
+    if (vehRes.rows.length > 0 && vehRes.rows[0].phone) {
+      driverPhone = vehRes.rows[0].phone;
+    }
+
+    const officialPhone = process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
+    const targetPhone = driverPhone || officialPhone;
+
+    const acceptMessage = `✅ *DELAY REASON ACCEPTED*\n\nCentral Operations Manager reviewed and approved your delay reason for Vehicle *${vehId}*.\n\nStatus: *APPROVED*. Drive safely and keep tracking active!`;
+
+    whatsappService.sendTextMessage(targetPhone, acceptMessage)
+      .catch(e => console.warn('Accept reason WhatsApp notification note:', e.message));
+
+    // 4. Broadcast resolution via socket
+    const io = getIO();
+    if (io) {
+      io.emit('stoppage_reason_accepted', {
+        vehicleId: vehId,
+        alertId,
+        status: 'Resolved',
+        message: 'Reason accepted by Operations Manager',
+        timestamp: new Date().toISOString()
+      });
+      io.emit('alert_resolved', { vehicle_id: vehId, id: alertId });
+    }
+
+    res.json({
+      success: true,
+      message: `Delay reason for vehicle ${vehId} accepted and alert cleared successfully!`,
+      vehicleId: vehId
+    });
+  } catch (err) {
+    console.error('Accept reason error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });

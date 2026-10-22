@@ -428,12 +428,12 @@ const app = {
                     res = await window.LCOS_API.sendWhatsAppMessage({
                         to,
                         type: 'interactive',
-                        header: '⚠️ Stoppage Alert Inquiry',
-                        message: message || 'Unscheduled vehicle halt detected by LCOS. Please confirm your status and current delay reason.',
+                        header: '🚨 Unscheduled Halt Warning',
+                        message: message || 'Unscheduled vehicle halt detected by LCOS (>20 mins). Please tap your reason below to update Central Operations immediately.',
                         buttons: [
-                            { id: 'btn_resuming', title: 'Resuming Transit' },
-                            { id: 'btn_delay', title: 'Report Delay' },
-                            { id: 'btn_sos', title: 'Need Assistance' }
+                            { id: 'stp_traffic_manual', title: 'Traffic / Toll Delay' },
+                            { id: 'stp_breakdown_manual', title: 'Puncture / Breakdown' },
+                            { id: 'stp_moving_manual', title: 'Resuming Movement' }
                         ]
                     });
                 } else if (type === 'delivery_confirm') {
@@ -827,6 +827,8 @@ const app = {
                 actionBtn = `<span class="badge badge-draft" style="font-size:0.75rem; padding:0.25rem 0.5rem;">OWNER MONITORING</span>`;
             } else if (a.type === 'Incoming Call') {
                 actionBtn = `<button class="btn btn-primary" style="padding:0.35rem 0.75rem; font-size:0.8rem;" onclick="app.answerSimulatedCall('${a.id}')">Answer Call</button>`;
+            } else if (a.type === 'Driver Delay Report' || a.type === 'Stoppage Detected') {
+                actionBtn = `<button class="btn btn-success" style="padding:0.35rem 0.75rem; font-size:0.8rem; background:#10b981; border-color:#059669; font-weight:600;" onclick="app.acceptCurrentStoppageReason('${a.vehicleId || a.vehicle_id || 'TN-59-EF-9012'}', '${a.id}')">✅ Accept Reason</button>`;
             } else if (a.type === 'No Update' || a.type === 'Unreachable' || a.type === 'Breakdown') {
                 if (role === 'tracking_team') {
                     if (a.escalated) {
@@ -1049,6 +1051,18 @@ const app = {
                     </tr>
                 `;
             }).join('');
+
+            // Update live stoppage monitor box with latest driver reply if available
+            const latestDriverReply = (res.logs || []).find(l => l.direction === 'INBOUND' && (
+                l.content?.includes('Traffic') || l.content?.includes('Breakdown') || l.content?.includes('Puncture') || l.content?.includes('Moving') || l.content?.includes('Resuming') || l.content?.includes('Delay')
+            ));
+            const reasonEl = document.getElementById('wa-stoppage-reason-text');
+            const timeEl = document.getElementById('wa-stoppage-reply-time');
+            if (reasonEl && latestDriverReply) {
+                const repTime = new Date(latestDriverReply.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                reasonEl.innerHTML = `<span style="color:#38bdf8;">🟡 <strong>${latestDriverReply.content}</strong> (Driver ${latestDriverReply.from_number})</span>`;
+                if (timeEl) timeEl.textContent = `Received at ${repTime}`;
+            }
         } catch (err) {
             console.error('Error fetching WhatsApp logs:', err);
         }
@@ -1103,7 +1117,7 @@ const app = {
                 btn.disabled = true;
                 btn.textContent = '⏳ Running Stoppage Detection...';
             }
-            this.showToast('Simulating vehicle stoppage (>20 mins) & running detection...', 'info');
+            this.showToast('Checking vehicle stoppage (>20 mins) & dispatching WhatsApp alert with sound...', 'info');
 
             const testPhone = document.getElementById('wa-send-phone')?.value?.trim() || '916382897998';
             const res = await window.LCOS_API.triggerTestStoppage({
@@ -1113,7 +1127,17 @@ const app = {
             });
 
             if (res.success) {
-                this.showToast(`🚨 Stoppage alert triggered! Check WhatsApp on ${res.higherOfficialPhone || 'your phone'}!`, 'success');
+                this.showToast(`🚨 Stoppage alert sent! Audio alert dispatched to WhatsApp (${res.higherOfficialPhone || testPhone})`, 'success');
+                const reasonText = document.getElementById('wa-stoppage-reason-text');
+                const badge = document.getElementById('wa-stoppage-vehicle-badge');
+                if (reasonText) {
+                    reasonText.innerHTML = '<span style="color:#fbbf24;">⚡ Alert sent to WhatsApp. Waiting for driver button reply...</span>';
+                }
+                if (badge) {
+                    badge.style.background = 'rgba(239, 68, 68, 0.15)';
+                    badge.style.color = '#f87171';
+                    badge.textContent = `${res.vehicleId || 'TN-59-EF-9012'} (Halted >20m)`;
+                }
                 setTimeout(() => {
                     this.renderWhatsAppLogs();
                     if (typeof this.loadAlerts === 'function') this.loadAlerts();
@@ -1127,8 +1151,61 @@ const app = {
             const btn = document.getElementById('btn-trigger-test-stoppage');
             if (btn) {
                 btn.disabled = false;
-                btn.textContent = '⚡ Run 20-Min Lorry Stoppage & Send WhatsApp Alerts';
+                btn.textContent = '⚡ Run Stoppage Check & Send WhatsApp Alerts';
             }
+        }
+    },
+
+    async acceptCurrentStoppageReason(vehicleId = 'TN-59-EF-9012', alertId = null) {
+        try {
+            const btn = document.getElementById('btn-accept-driver-reason');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '⏳ Accepting...';
+            }
+            const res = await window.LCOS_API.acceptStoppageReason({ vehicleId, alertId });
+            if (res.success) {
+                this.showToast('✅ Delay reason accepted! Stoppage alert resolved & driver notified.', 'success');
+                const reasonText = document.getElementById('wa-stoppage-reason-text');
+                const badge = document.getElementById('wa-stoppage-vehicle-badge');
+                if (reasonText) {
+                    reasonText.innerHTML = '<span style="color:#10b981;">✅ Approved & Resolved by Operations Manager</span>';
+                }
+                if (badge) {
+                    badge.style.background = 'rgba(16, 185, 129, 0.15)';
+                    badge.style.color = '#10b981';
+                    badge.textContent = `${vehicleId} (Reason Approved - Normal)`;
+                }
+                setTimeout(() => {
+                    this.renderWhatsAppLogs();
+                    if (typeof this.loadAlerts === 'function') this.loadAlerts();
+                }, 800);
+            } else {
+                this.showToast('Error: ' + (res.message || 'Could not accept reason'), 'warning');
+            }
+        } catch (err) {
+            this.showToast('Failed to accept stoppage reason: ' + err.message, 'danger');
+        } finally {
+            const btn = document.getElementById('btn-accept-driver-reason');
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '✅ Accept Reason & Clear Alert';
+            }
+        }
+    },
+
+    async dismissStoppageAlert(vehicleId = 'TN-59-EF-9012') {
+        try {
+            await window.LCOS_API.acceptStoppageReason({ vehicleId });
+            this.showToast('Stoppage alert dismissed.', 'info');
+            const reasonText = document.getElementById('wa-stoppage-reason-text');
+            if (reasonText) reasonText.textContent = 'Alert dismissed. Awaiting next event.';
+            setTimeout(() => {
+                this.renderWhatsAppLogs();
+                if (typeof this.loadAlerts === 'function') this.loadAlerts();
+            }, 600);
+        } catch (e) {
+            this.showToast('Error: ' + e.message, 'warning');
         }
     },
 
@@ -3554,6 +3631,36 @@ const app = {
                     }
                 }
             });
+
+            this.socket.on('stoppage_driver_response', (data) => {
+                if (!data) return;
+                const reasonText = document.getElementById('wa-stoppage-reason-text');
+                const timeEl = document.getElementById('wa-stoppage-reply-time');
+                if (reasonText && data.reason) {
+                    reasonText.innerHTML = `<span style="color:#38bdf8;">${data.reason}</span>`;
+                }
+                if (timeEl) {
+                    timeEl.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                }
+                this.renderWhatsAppLogs();
+                if (typeof this.loadAlerts === 'function') this.loadAlerts();
+            });
+
+            this.socket.on('stoppage_reason_accepted', (data) => {
+                const reasonText = document.getElementById('wa-stoppage-reason-text');
+                const badge = document.getElementById('wa-stoppage-vehicle-badge');
+                if (reasonText) {
+                    reasonText.innerHTML = '<span style="color:#10b981;">✅ Approved & Resolved by Operations Manager</span>';
+                }
+                if (badge && data?.vehicleId) {
+                    badge.style.background = 'rgba(16, 185, 129, 0.15)';
+                    badge.style.color = '#10b981';
+                    badge.textContent = `${data.vehicleId} (Reason Approved - Normal)`;
+                }
+                this.renderWhatsAppLogs();
+                if (typeof this.loadAlerts === 'function') this.loadAlerts();
+            });
+
             console.log('[LCOS Telemetry] Auto-Sync WebSocket listener initialized.');
         } catch (e) {
             console.warn('[LCOS Telemetry] WebSocket listener setup note:', e);

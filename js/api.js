@@ -339,6 +339,13 @@ class LCOS_API {
     });
   }
 
+  static async acceptStoppageReason(payload = {}) {
+    return this.request('/whatsapp/accept-reason', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
   static async getWhatsAppLogs(limit = 50) {
     return this.request(`/whatsapp/logs?limit=${limit}`);
   }
