@@ -668,12 +668,20 @@ table.lcos-table tbody tr:hover {
 
 .step-label {
     margin-top: 0.5rem;
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     color: var(--text-secondary);
     font-weight: 600;
     text-align: center;
-    max-width: 75px;
-    line-height: 1.2;
+    max-width: 140px;
+    line-height: 1.25;
+}
+
+.step-label .step-sublabel {
+    display: block;
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    font-weight: 500;
+    margin-top: 2px;
 }
 
 /* Step Node States */

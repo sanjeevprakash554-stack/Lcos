@@ -170,7 +170,7 @@ async function handleIncomingMessage(msg, contact = null) {
     let buttonVehId = null;
     if (interactiveButtonId) {
       const match = interactiveButtonId.match(/stp_(?:traffic|breakdown|moving)_(.+)/);
-      if (match) buttonVehId = match[1];
+      if (match && match[1] !== 'manual') buttonVehId = match[1];
     }
     const targetV = buttonVehId || 'TN-59-EF-9012';
     if (!activeTrip && targetV) {
@@ -258,8 +258,8 @@ async function handleIncomingMessage(msg, contact = null) {
     }
     let btnVehId = null;
     const match = interactiveButtonId.match(/stp_(?:traffic|breakdown|moving)_(.+)/);
-    if (match) btnVehId = match[1];
-    const resolvedVehId = btnVehId || activeTrip?.vehicle_id || targetV || 'TN-59-EF-9012';
+    if (match && match[1] !== 'manual') btnVehId = match[1];
+    const resolvedVehId = btnVehId || activeTrip?.vehicle_id || (targetV !== 'manual' ? targetV : null) || 'TN-59-EF-9012';
 
     if (interactiveButtonId.startsWith('sos_') || interactiveButtonId === 'btn_sos' || interactiveButtonId.startsWith('stp_sos_')) {
       await triggerEmergencyAlert(senderNumber, driver, activeTrip, 'Emergency SOS button pressed on WhatsApp', resolvedVehId);
@@ -277,24 +277,7 @@ async function handleIncomingMessage(msg, contact = null) {
     }
     // Logistics Reason Button 3: Resuming Movement
     if (interactiveButtonId.startsWith('stp_moving_') || interactiveButtonId === 'btn_resuming') {
-      const vehId = resolvedVehId;
-      await db.query(
-        `UPDATE vehicles 
-         SET movement_status = 'MOVING', speed_kmh = 45, stoppage_start_time = NULL, updated_at = NOW() 
-         WHERE id = $1`,
-        [vehId]
-      );
-      await db.query(
-        `UPDATE alerts SET status = 'Resolved', resolved_at = NOW() 
-         WHERE vehicle_id = $1 AND (type = 'Stoppage Detected' OR type = 'Driver Delay Report' OR type = 'Emergency Breakdown') AND status = 'Active'`,
-        [vehId]
-      );
-      await whatsappService.sendTextMessage(
-        senderNumber,
-        `🟢 *Transit Resumed!* Vehicle *${vehId}* marked as MOVING on Central Operations Map. Stoppage alert resolved. Drive safely!`
-      );
-      broadcastStoppageDriverResponse(driver?.company_id || 'COMP-001', { vehicleId: vehId, reason: '🟢 Resuming Movement (Transit Resumed)', timestamp: new Date().toISOString() });
-      broadcastStoppageReasonAccepted(driver?.company_id || 'COMP-001', { vehicleId: vehId, status: 'Resolved', message: 'Transit Resumed by Driver' });
+      await handleTransitResumed(senderNumber, driver, activeTrip, resolvedVehId);
       return;
     }
     if (interactiveButtonId.startsWith('stp_delay_') || interactiveButtonId === 'btn_delay' || interactiveButtonId === 'btn_report_delay') {
@@ -307,21 +290,16 @@ async function handleIncomingMessage(msg, contact = null) {
   const upperText = textContent.toUpperCase();
 
   // Handle Text Button Echoes
+  if (upperText.includes('RESUMING') || upperText.includes('RESUME')) {
+    await handleTransitResumed(senderNumber, driver, activeTrip, activeTrip?.vehicle_id);
+    return;
+  }
   if (upperText.includes('TRAFFIC') || upperText.includes('TOLL')) {
     await recordTransitDelay(senderNumber, driver, activeTrip, 'Heavy Traffic / Toll Plaza Congestion');
     return;
   }
   if (upperText.includes('PUNCTURE') || upperText.includes('BREAKDOWN')) {
     await triggerEmergencyAlert(senderNumber, driver, activeTrip, 'Tyre Puncture / Vehicle Mechanical Breakdown');
-    return;
-  }
-  if (upperText.includes('RESUMING') || upperText.includes('RESUME')) {
-    const vehId = activeTrip?.vehicle_id || 'Vehicle';
-    if (activeTrip && activeTrip.vehicle_id) {
-      await db.query(`UPDATE vehicles SET movement_status = 'MOVING', speed_kmh = 45, stoppage_start_time = NULL, updated_at = NOW() WHERE id = $1`, [activeTrip.vehicle_id]);
-      await db.query(`UPDATE alerts SET status = 'Resolved', resolved_at = NOW() WHERE vehicle_id = $1 AND type = 'Stoppage Detected' AND status = 'Active'`, [activeTrip.vehicle_id]);
-    }
-    await whatsappService.sendTextMessage(senderNumber, `🟢 *Transit Resumed!* Vehicle *${vehId}* marked as MOVING on Central Operations Map. Stoppage alert resolved. Drive safely!`);
     return;
   }
 
@@ -348,12 +326,7 @@ async function handleIncomingMessage(msg, contact = null) {
 
   // 4. RESUMING MOVEMENT
   if (upperText === 'MOVING' || upperText.includes('RESUMED')) {
-    if (activeTrip && activeTrip.vehicle_id) {
-      await db.query(`UPDATE vehicles SET movement_status = 'MOVING', speed_kmh = 40, updated_at = NOW() WHERE id = $1`, [activeTrip.vehicle_id]);
-      await whatsappService.sendTextMessage(senderNumber, `🟢 Status updated: Vehicle *${activeTrip.vehicle_id}* marked as MOVING. Drive safely!`);
-    } else {
-      await whatsappService.sendTextMessage(senderNumber, `🟢 Transit update noted. Thank you!`);
-    }
+    await handleTransitResumed(senderNumber, driver, activeTrip, activeTrip?.vehicle_id);
     return;
   }
 
@@ -442,6 +415,147 @@ async function sendTripStatusReply(toNumber, tripId, driver = null) {
 Send a 📍 Location pin anytime to update vehicle coordinates.`;
 
   return whatsappService.sendTextMessage(toNumber, responseText);
+}
+
+/**
+ * Helper: Handles Transit Resumption (Driver confirmed moving)
+ * Restores vehicle movement_status to 'MOVING', clears stoppage timer, resets trips to 'IN_TRANSIT',
+ * resolves active stoppage alerts, broadcasts socket updates, and sends notification to Higher Official / Tracking Team.
+ */
+async function handleTransitResumed(toNumber, driver, trip, explicitVehId = null) {
+  const vehicleId = (explicitVehId && explicitVehId !== 'manual') ? explicitVehId : (trip?.vehicle_id || 'TN-59-EF-9012');
+  
+  // If trip is not provided, try to find an active trip for this vehicle
+  let activeTrip = trip;
+  if (!activeTrip && vehicleId) {
+    try {
+      const tRes = await db.query(
+        `SELECT t.*, d.name as driver_name, d.phone as driver_phone,
+                sb.name as source_branch_name, db_br.name as destination_branch_name,
+                dest_b.phone as manager_phone
+         FROM trips t
+         LEFT JOIN drivers d ON d.id = t.driver_id
+         LEFT JOIN branches sb ON sb.id = t.source_branch_id
+         LEFT JOIN branches db_br ON db_br.id = t.destination_branch_id
+         LEFT JOIN branches dest_b ON dest_b.id = t.destination_branch_id
+         WHERE t.vehicle_id = $1 AND t.status IN ('CREATED', 'IN_TRANSIT', 'DELAYED')
+         ORDER BY t.created_at DESC LIMIT 1`,
+        [vehicleId]
+      );
+      if (tRes.rows.length > 0) {
+        activeTrip = tRes.rows[0];
+      }
+    } catch (e) {
+      console.warn('Could not find active trip for transit resume:', e.message);
+    }
+  }
+
+  const tripId = activeTrip?.id || 'Active Shipment';
+  const driverName = driver?.name || activeTrip?.driver_name || 'Assigned Driver';
+  const driverPhone = driver?.phone || activeTrip?.driver_phone || toNumber;
+  const routeInfo = (activeTrip?.source_branch_name && activeTrip?.destination_branch_name)
+    ? `${activeTrip.source_branch_name} ➔ ${activeTrip.destination_branch_name}`
+    : (activeTrip?.source_name && activeTrip?.dest_name)
+    ? `${activeTrip.source_name} ➔ ${activeTrip.dest_name}`
+    : 'In Transit Route';
+
+  // 1. Update Vehicle: set MOVING, clear stoppage_start_time, update speed and timestamp
+  await db.query(
+    `UPDATE vehicles 
+     SET movement_status = 'MOVING', speed_kmh = 45, stoppage_start_time = NULL, last_ping_at = NOW(), last_gps_update = NOW(), updated_at = NOW() 
+     WHERE id = $1`,
+    [vehicleId]
+  );
+
+  // 2. Revert Trip status from DELAYED to IN_TRANSIT and log transit update
+  if (activeTrip) {
+    const transitUpdate = {
+      type: 'TRANSIT_RESUMED',
+      reason: 'Driver confirmed resuming movement',
+      timestamp: new Date().toISOString(),
+      source: 'WhatsApp',
+    };
+
+    let updates = activeTrip.transit_updates || [];
+    if (typeof updates === 'string') {
+      try { updates = JSON.parse(updates); } catch (e) { updates = []; }
+    }
+    updates.push(transitUpdate);
+
+    await db.query(
+      `UPDATE trips SET status = 'IN_TRANSIT', transit_updates = $1, last_update_timestamp = NOW() WHERE id = $2`,
+      [JSON.stringify(updates), activeTrip.id]
+    );
+
+    broadcastTripUpdate({ ...activeTrip, status: 'IN_TRANSIT' });
+  }
+
+  // 3. Resolve active Stoppage Detected, Driver Delay Report, or Emergency Breakdown alerts
+  const resolvedAlerts = await db.query(
+    `UPDATE alerts 
+     SET status = 'Resolved', resolved_at = NOW() 
+     WHERE vehicle_id = $1 
+       AND (type = 'Stoppage Detected' OR type = 'Driver Delay Report' OR type = 'Emergency Breakdown' OR type = 'No GPS Signal') 
+       AND status IN ('Active', 'Escalated')
+     RETURNING *`,
+    [vehicleId]
+  );
+
+  if (resolvedAlerts && resolvedAlerts.rows) {
+    resolvedAlerts.rows.forEach(alt => {
+      broadcastAlertResolved(alt.company_id || 'COMP-001', { vehicle_id: vehicleId, id: alt.id });
+    });
+  }
+
+  // 4. Create system notification for Operations Control / Tracking Team
+  const notifyMsg = `Driver ${driverName} confirmed transit resumed for vehicle ${vehicleId}. Stoppage alert resolved.`;
+  await db.query(
+    `INSERT INTO notifications (company_id, title, message, type)
+     VALUES ('COMP-001', $1, $2, 'STATUS')`,
+    [`Transit Resumed: ${vehicleId}`, notifyMsg]
+  );
+
+  // 5. Broadcast real-time Socket events
+  broadcastStoppageDriverResponse(driver?.company_id || 'COMP-001', {
+    vehicleId,
+    driverName,
+    reason: '🟢 Resuming Movement (Transit Resumed)',
+    timestamp: new Date().toISOString()
+  });
+
+  broadcastStoppageReasonAccepted(driver?.company_id || 'COMP-001', {
+    vehicleId,
+    status: 'Resolved',
+    message: 'Transit Resumed by Driver'
+  });
+
+  broadcastGpsUpdate({
+    vehicleId,
+    speed: 45,
+    speedKmh: 45,
+    status: 'MOVING',
+    movementStatus: 'MOVING',
+    driverName,
+    tripId: activeTrip?.id || null,
+  });
+
+  // 6. Send dedicated notification to Higher Official / Tracking Team (WhatsApp)
+  const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE || activeTrip?.manager_phone;
+  if (higherOfficial) {
+    await whatsappService.sendHigherOfficialTransitResumed({
+      tripId,
+      vehicleId,
+      driverName,
+      driverPhone,
+      route: routeInfo,
+    }, higherOfficial).catch(e => console.warn('Higher official transit resume alert error:', e.message));
+  }
+
+  // 7. Send confirmation reply to Driver
+  return whatsappService.sendTextMessage(
+    toNumber,
+    `🟢 *Transit Resumed!* Vehicle *${vehicleId}* marked as MOVING on Central Operations Map. Stoppage alert resolved. Drive safely!`
+  );
 }
 
 /**
@@ -936,6 +1050,13 @@ router.post('/accept-reason', async (req, res) => {
       `UPDATE vehicles SET stoppage_start_time = NULL, movement_status = 'MOVING', speed_kmh = 45, updated_at = NOW() WHERE id = $1`,
       [vehId]
     );
+
+    // 2b. Revert Trip status from DELAYED to IN_TRANSIT
+    const tripToUpdate = tripId ? { id: tripId } : (await db.query(`SELECT id FROM trips WHERE vehicle_id = $1 AND status = 'DELAYED' LIMIT 1`, [vehId])).rows[0];
+    if (tripToUpdate) {
+      await db.query(`UPDATE trips SET status = 'IN_TRANSIT', last_update_timestamp = NOW() WHERE id = $1`, [tripToUpdate.id]);
+      broadcastTripUpdate({ id: tripToUpdate.id, status: 'IN_TRANSIT' });
+    }
 
     // 3. Send confirmation WhatsApp message to driver & higher official
     let driverPhone = null;

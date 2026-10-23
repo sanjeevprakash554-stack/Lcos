@@ -1,3 +1,27 @@
+function safeUnwrapObject(val, fallback = {}) {
+    let cur = val;
+    while (typeof cur === 'string') {
+        try {
+            const p = JSON.parse(cur);
+            if (p === cur) break;
+            cur = p;
+        } catch(e) { break; }
+    }
+    return (cur && typeof cur === 'object' && !Array.isArray(cur)) ? cur : fallback;
+}
+
+function safeUnwrapArray(val, fallback = []) {
+    let cur = val;
+    while (typeof cur === 'string') {
+        try {
+            const p = JSON.parse(cur);
+            if (p === cur) break;
+            cur = p;
+        } catch(e) { break; }
+    }
+    return Array.isArray(cur) ? cur : fallback;
+}
+
 /**
  * Logistics Operations Control System (LCOS) - State Management & API Sync
  * Connects UI state directly to the Express + PostgreSQL Backend APIs.
@@ -308,9 +332,9 @@ const LCOS_State = {
                     dispatchDate: t.dispatch_date,
                     expectedDeliveryDate: t.expected_delivery_date,
                     status: t.status,
-                    checklists: typeof t.checklists === 'string' ? JSON.parse(t.checklists) : (t.checklists || {}),
-                    transitUpdates: typeof t.transit_updates === 'string' ? JSON.parse(t.transit_updates) : (t.transit_updates || []),
-                    deliveryInfo: typeof t.delivery_info === 'string' ? JSON.parse(t.delivery_info) : t.delivery_info,
+                    checklists: safeUnwrapObject(t.checklists, { dispatch: { loaded: false, verified: false, vehicleReady: false, driverAvailable: false }, delivery: { quantityMatches: false, damagesChecked: false, missingChecked: false, conditionOk: false } }),
+                    transitUpdates: safeUnwrapArray(t.transit_updates, []),
+                    deliveryInfo: safeUnwrapObject(t.delivery_info, null),
                     lastUpdateTimestamp: t.last_update_timestamp,
                     callLogs: [],
                     isLiveSynced: Boolean(t.is_live_synced || (t.current_lat && t.current_lng)),
@@ -446,21 +470,44 @@ const LCOS_State = {
     },
 
     async updateTripStatus(tripId, newStatus, checklists = null, transitUpdate = null) {
+        const localTrip = this.getTripById(tripId);
+        if (localTrip) {
+            localTrip.status = newStatus;
+            if (checklists) localTrip.checklists = checklists;
+            if (transitUpdate) {
+                if (!Array.isArray(localTrip.transitUpdates)) localTrip.transitUpdates = [];
+                localTrip.transitUpdates.push(transitUpdate);
+            }
+            this.save();
+        }
         try {
             const apiRes = await LCOS_API.updateTripStatus(tripId, newStatus, checklists, transitUpdate);
-            if (apiRes.success) {
+            if (apiRes && apiRes.success) {
                 await this.loadFromBackend();
+                if (window.app && typeof window.app.renderAll === 'function') {
+                    window.app.renderAll();
+                }
             }
+            return apiRes;
         } catch (err) {
             console.error('API updateTripStatus error:', err);
         }
     },
 
     async closeTripDelivery(tripId, deliveryInfo) {
+        const localTrip = this.getTripById(tripId);
+        if (localTrip) {
+            localTrip.status = 'CLOSED';
+            localTrip.deliveryInfo = deliveryInfo;
+            this.save();
+        }
         try {
             const apiRes = await LCOS_API.closeTripDelivery(tripId, deliveryInfo);
-            if (apiRes.success) {
+            if (apiRes && apiRes.success) {
                 await this.loadFromBackend();
+                if (window.app && typeof window.app.renderAll === 'function') {
+                    window.app.renderAll();
+                }
             }
             return apiRes;
         } catch (err) {

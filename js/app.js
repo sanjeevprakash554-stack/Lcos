@@ -426,15 +426,17 @@ const app = {
                     }
                     res = await window.LCOS_API.notifyWhatsAppTrip(tripId);
                 } else if (type === 'stoppage_inquiry') {
+                    const selTrip = tripId ? LCOS_State.trips.find(t => t.id === tripId) : null;
+                    const vId = selTrip?.vehicle_id || 'TN-59-EF-9012';
                     res = await window.LCOS_API.sendWhatsAppMessage({
                         to,
                         type: 'interactive',
                         header: '🚨 Unscheduled Halt Warning',
                         message: message || 'Unscheduled vehicle halt detected by LCOS (>20 mins). Please tap your reason below to update Central Operations immediately.',
                         buttons: [
-                            { id: 'stp_traffic_manual', title: 'Traffic / Toll Delay' },
-                            { id: 'stp_breakdown_manual', title: 'Puncture / Breakdown' },
-                            { id: 'stp_moving_manual', title: 'Resuming Movement' }
+                            { id: `stp_traffic_${vId}`, title: 'Traffic / Toll Delay' },
+                            { id: `stp_breakdown_${vId}`, title: 'Puncture / Breakdown' },
+                            { id: `stp_moving_${vId}`, title: 'Resuming Movement' }
                         ]
                     });
                 } else if (type === 'delivery_confirm') {
@@ -2193,30 +2195,39 @@ const app = {
         const select = document.getElementById('console-trip-select');
         const trips = LCOS_State.getTrips();
         
-        // Prefill dropdown with created and active trips
-        const currentVal = select.value;
+        // Prefill dropdown with all trips (marking closed trips clearly)
+        const currentVal = select.value || this.activeConsoleTripId;
         select.innerHTML = '<option value="">-- Choose Active Trip --</option>';
         trips.forEach(t => {
-            if (t.status !== 'CLOSED') {
-                const com = LCOS_State.getCommodities().find(c => c.id === t.commodityId);
-                const comName = com ? com.name : 'Goods';
-                select.innerHTML += `<option value="${t.id}">${t.id} - ${comName} (${t.quantity} Units) [${t.status}]</option>`;
-            }
+            const com = LCOS_State.getCommodities().find(c => c.id === t.commodityId);
+            const comName = com ? com.name : 'Goods';
+            const closedTag = t.status === 'CLOSED' ? ' [Delivered & Closed]' : ` [${t.status}]`;
+            select.innerHTML += `<option value="${t.id}">${t.id} - ${comName} (${t.quantity} Units)${closedTag}</option>`;
         });
 
-        // Keep selection if exists and still active
-        const tripExists = trips.some(t => t.id === currentVal && t.status !== 'CLOSED');
+        // Keep selection if exists
+        const tripExists = trips.some(t => t.id === currentVal);
         if (tripExists) {
             select.value = currentVal;
             this.activeConsoleTripId = currentVal;
-        } else if (!this.activeConsoleTripId) {
+        } else if (this.activeConsoleTripId && trips.some(t => t.id === this.activeConsoleTripId)) {
+            select.value = this.activeConsoleTripId;
+        } else if (trips.some(t => t.status !== 'CLOSED')) {
+            const firstActive = trips.find(t => t.status !== 'CLOSED');
+            this.activeConsoleTripId = firstActive.id;
+            select.value = firstActive.id;
+        } else if (trips.length > 0) {
+            this.activeConsoleTripId = trips[0].id;
+            select.value = trips[0].id;
+        } else {
             document.getElementById('console-no-trip').style.display = 'block';
             document.getElementById('console-active-trip').style.display = 'none';
+            this.activeConsoleTripId = null;
             return;
         }
 
         const trip = LCOS_State.getTripById(this.activeConsoleTripId);
-        if (!trip || trip.status === 'CLOSED') {
+        if (!trip) {
             document.getElementById('console-no-trip').style.display = 'block';
             document.getElementById('console-active-trip').style.display = 'none';
             this.activeConsoleTripId = null;
@@ -2236,20 +2247,20 @@ const app = {
 
         // Map status
         const statusMap = {
-            CREATED: 'Draft Created',
-            DISPATCH_APPROVED: 'Dispatch Approved',
-            DRIVER_CALLED: 'Driver Called',
-            DRIVER_CONFIRMED: 'Driver Confirmed',
+            CREATED: 'Ready to Dispatch',
+            DISPATCH_APPROVED: 'Ready to Dispatch',
+            DRIVER_CALLED: 'Ready to Dispatch',
+            DRIVER_CONFIRMED: 'Ready to Dispatch',
             IN_TRANSIT: 'In Transit',
             DELAYED: 'Delayed Stop',
-            ARRIVED: 'Arrived Dest',
-            DELIVERY_CONFIRMED: 'Delivery Confirmed',
-            CLOSED: 'Delivered & Closed'
+            ARRIVED: 'Arrived at Destination',
+            DELIVERY_CONFIRMED: 'Delivered',
+            CLOSED: 'Completed & Closed'
         };
         const statusEl = document.getElementById('c-trip-status');
         statusEl.textContent = statusMap[trip.status] || trip.status;
         statusEl.className = 'badge';
-        if (trip.status === 'CREATED') statusEl.classList.add('badge-draft');
+        if (['CREATED', 'DISPATCH_APPROVED', 'DRIVER_CALLED', 'DRIVER_CONFIRMED'].includes(trip.status)) statusEl.classList.add('badge-draft');
         else if (trip.status === 'IN_TRANSIT') statusEl.classList.add('badge-transit');
         else if (trip.status === 'DELAYED') statusEl.classList.add('badge-delayed');
         else if (trip.status === 'ARRIVED' || trip.status === 'DELIVERY_CONFIRMED') statusEl.classList.add('badge-pending');
@@ -2306,45 +2317,34 @@ const app = {
 
     renderTimelineStepper(trip) {
         const stepper = document.getElementById('timeline-stepper-console');
+        if (!stepper) return;
+        stepper.innerHTML = '';
+
         const progressBar = document.createElement('div');
         progressBar.className = 'timeline-progress-bar';
-        
-        // Clear stepper
-        stepper.innerHTML = '';
         stepper.appendChild(progressBar);
 
-        // 10 key operational stages (trip concludes upon delivery at destination)
+        // 4 Clean Operational Stages:
+        // [ 1. Dispatch ] (Origin Warehouse) -> [ 2. In Transit ] (On the Highway) -> [ 3. Delivered ] (Destination Bay) -> [ 4. Completed ] (Receipt & Closed)
         const stages = [
-            { key: 'CREATED', label: '1. Created' },
-            { key: 'DISPATCH_APPROVED', label: '2. Approved' },
-            { key: 'DRIVER_CALLED', label: '3. Called' },
-            { key: 'DRIVER_CONFIRMED', label: '4. Confirmed' },
-            { key: 'JOURNEY_STARTED', label: '5. Started' },
-            { key: 'IN_TRANSIT', label: '6. In Transit' },
-            { key: 'DELAY_STOP', label: '7. Delay' },
-            { key: 'ARRIVED', label: '8. Reached' },
-            { key: 'DELIVERY_CONFIRMED', label: '9. Unloaded' },
-            { key: 'CLOSED', label: '10. Completed' }
+            { key: 'DISPATCH', label: '1. Dispatch', sublabel: '(Origin Warehouse)' },
+            { key: 'IN_TRANSIT', label: '2. In Transit', sublabel: '(On the Highway)' },
+            { key: 'ARRIVED', label: '3. Delivered', sublabel: '(Destination Bay)' },
+            { key: 'CLOSED', label: '4. Completed', sublabel: '(Receipt & Closed)' }
         ];
 
-        // Map trip status to active index
+        // Map trip status to active index (0 to 3)
         let activeIdx = 0;
-        if (trip.status === 'CREATED') activeIdx = 0;
-        else if (trip.status === 'DISPATCH_APPROVED') activeIdx = 1;
-        else if (trip.status === 'DRIVER_CALLED') activeIdx = 2;
-        else if (trip.status === 'DRIVER_CONFIRMED') activeIdx = 3;
-        else if (trip.status === 'IN_TRANSIT') {
-            // If has updates, it is in step 6 (In Transit), else step 5 (Journey Started)
-            activeIdx = trip.transitUpdates.length > 1 ? 5 : 4;
+        if (['CREATED', 'DISPATCH_APPROVED', 'DRIVER_CALLED', 'DRIVER_CONFIRMED'].includes(trip.status)) {
+            activeIdx = 0; // Stage 1: Origin Dispatch
+        } else if (trip.status === 'IN_TRANSIT' || trip.status === 'DELAYED') {
+            activeIdx = 1; // Stage 2: Highway Transit
+        } else if (trip.status === 'ARRIVED' || trip.status === 'DELIVERY_CONFIRMED') {
+            activeIdx = 2; // Stage 3: Destination Delivered
+        } else if (trip.status === 'CLOSED') {
+            activeIdx = 3; // Stage 4: Closed & Stock Verified
         }
-        else if (trip.status === 'DELAYED') {
-            activeIdx = 6; // Delay Monitor
-        }
-        else if (trip.status === 'ARRIVED') activeIdx = 7;
-        else if (trip.status === 'DELIVERY_CONFIRMED') activeIdx = 8;
-        else if (trip.status === 'CLOSED') activeIdx = 9;
 
-        // Calculate progress line width percentage
         const progressWidth = (activeIdx / (stages.length - 1)) * 100;
         progressBar.style.width = `${progressWidth}%`;
 
@@ -2355,8 +2355,7 @@ const app = {
             if (idx < activeIdx) {
                 node.classList.add('completed');
             } else if (idx === activeIdx) {
-                // Highlight delays in red/warning colors
-                if (trip.status === 'DELAYED' && idx === 6) {
+                if (trip.status === 'DELAYED' && idx === 1) {
                     node.classList.add('warning');
                 } else {
                     node.classList.add('active');
@@ -2365,7 +2364,10 @@ const app = {
 
             node.innerHTML = `
                 <div class="step-circle">${idx < activeIdx ? '✓' : idx + 1}</div>
-                <div class="step-label">${stg.label}</div>
+                <div class="step-label" style="max-width: 140px;">
+                    <span class="step-title" style="display:block; font-weight:700; font-size:0.82rem; line-height:1.2;">${stg.label}</span>
+                    <span class="step-sublabel" style="display:block; font-size:0.68rem; color:var(--text-muted); font-weight:500; margin-top:2px;">${stg.sublabel}</span>
+                </div>
             `;
             
             stepper.appendChild(node);
@@ -2374,7 +2376,28 @@ const app = {
 
     renderActionConsoleArea(trip) {
         const container = document.getElementById('console-action-area');
+        if (!container) return;
         container.innerHTML = '';
+
+        if (!trip) return;
+
+        // Ensure checklists are clean objects
+        while (typeof trip.checklists === 'string') {
+            try { trip.checklists = JSON.parse(trip.checklists); } catch(e) { trip.checklists = {}; break; }
+        }
+        if (!trip.checklists || typeof trip.checklists !== 'object' || Array.isArray(trip.checklists)) trip.checklists = {};
+        if (!trip.checklists.dispatch || typeof trip.checklists.dispatch !== 'object') {
+            trip.checklists.dispatch = { loaded: false, verified: false, vehicleReady: false, driverAvailable: false };
+        }
+        if (!trip.checklists.delivery || typeof trip.checklists.delivery !== 'object') {
+            trip.checklists.delivery = { quantityMatches: false, damagesChecked: false, missingChecked: false, conditionOk: false };
+        }
+
+        // Ensure transitUpdates is an array
+        while (typeof trip.transitUpdates === 'string') {
+            try { trip.transitUpdates = JSON.parse(trip.transitUpdates); } catch(e) { trip.transitUpdates = []; break; }
+        }
+        if (!Array.isArray(trip.transitUpdates)) trip.transitUpdates = [];
 
         const role = LCOS_State.getCurrentRole();
         
@@ -2383,639 +2406,395 @@ const app = {
             empIdHTML = `
                 <div class="form-group margin-bottom-1" style="border-bottom:1px dashed var(--border-glass); padding-bottom:0.75rem; margin-bottom: 0.75rem;">
                     <label class="form-label" style="font-weight:600; color:var(--color-primary); font-size:0.75rem; margin-bottom:0.25rem;">Operator Employee ID (Emp ID) <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" id="op-emp-id" placeholder="e.g. EMP-101" required value="${this.operatorEmpId || ''}" oninput="app.operatorEmpId = this.value" style="background:rgba(0,0,0,0.35); font-size:0.75rem; padding:0.25rem 0.5rem; height:auto;">
+                    <input type="text" class="form-control" id="op-emp-id" placeholder="e.g. EMP-101" required value="${this.operatorEmpId || 'EMP-101'}" oninput="app.operatorEmpId = this.value" style="background:rgba(0,0,0,0.35); font-size:0.75rem; padding:0.35rem 0.6rem; height:auto;">
                 </div>
             `;
         }
 
-        if (!trip.checklists) trip.checklists = {};
-        if (!trip.checklists.dispatch) {
-            trip.checklists.dispatch = { loaded: false, verified: false, vehicleReady: false, driverAvailable: false };
-        }
-        if (!trip.checklists.delivery) {
-            trip.checklists.delivery = { quantityMatches: false, damagesChecked: false, missingChecked: false, conditionOk: false };
-        }
-
-        if (trip.status === 'CREATED') {
-            // Stage 1: Created (Needs Dispatch checklist approval)
-            const role = LCOS_State.getCurrentRole();
-            const checklistComplete = this.isChecklistComplete(trip.checklists.dispatch);
-            
-            let btnText = 'Approve Dispatch & Generate Dispatch ID';
-            let btnDisabled = !checklistComplete;
-            let helpText = '';
-
-            if (role === 'branch_manager') {
-                btnText = 'View Only: Approved by Tracking Team';
-                btnDisabled = true;
-                helpText = `<p style="font-size:0.75rem; color:var(--color-warning); font-weight:600; margin-top:0.5rem; text-align:center;">⚠️ Supervisors monitor dispatches. Day-to-day operations checklists are approved by the Tracking Team.</p>`;
-            }
+        // =========================================================================
+        // STAGE 1: ORIGIN DISPATCH & GATE-OUT (Origin Warehouse)
+        // =========================================================================
+        if (['CREATED', 'DISPATCH_APPROVED', 'DRIVER_CALLED', 'DRIVER_CONFIRMED'].includes(trip.status)) {
+            const srcBranch = (LCOS_State.getBranches() || []).find(b => b.id === trip.sourceBranchId);
+            const mgrName = srcBranch ? (srcBranch.manager_name || srcBranch.manager || 'Branch Manager') : 'Origin Manager';
+            const drv = (LCOS_State.getDrivers() || []).find(d => d.id === trip.driverId);
 
             const simTime = new Date(LCOS_State.getSystemSettings().simulationTime);
             const schedTime = new Date(trip.dispatchDate);
-            // Require a late dispatch reason only if the delay is more than 15 minutes (grace period)
             const isLate = (simTime.getTime() - schedTime.getTime()) > (15 * 60 * 1000);
-            
+
             let lateRow = '';
             if (isLate && role === 'tracking_team') {
                 lateRow = `
-                    <div class="form-group" style="margin-top:0.75rem;" id="op-late-dispatch-row">
-                        <label class="form-label" style="color:#ef4444; font-weight:600; margin-bottom:0.25rem;">⚠️ Reason for Late Dispatch (Required)</label>
-                        <select class="form-control" id="op-late-reason" required>
-                            <option value="">-- Select Delay Cause --</option>
-                            <option value="Warehouse Loading Delay">Warehouse Cargo Loading Delay</option>
-                            <option value="Driver/Helper Check-in Delay">Driver / Helper Check-in Delay</option>
-                            <option value="Lorry Maintenance Inspection">Lorry Maintenance / Inspection Delay</option>
-                            <option value="Permit Documentation Issue">Permit / Transit Documentation Delay</option>
-                            <option value="Bad Local Weather">Bad Local Weather</option>
+                    <div class="form-group" style="margin-top:0.5rem; margin-bottom:0.75rem;">
+                        <label class="form-label" style="color:#ef4444; font-weight:600; margin-bottom:0.25rem; font-size:0.75rem;">⚠️ Reason for Late Dispatch</label>
+                        <select class="form-control" id="op-late-reason" style="font-size:0.8rem; padding:0.35rem 0.5rem;">
+                            <option value="Warehouse Loading Completed">Warehouse Cargo Loading Completed</option>
+                            <option value="Driver Ready at Hub">Driver / Helper Ready at Hub</option>
+                            <option value="Vehicle Fitness Cleared">Vehicle Fitness Cleared</option>
+                            <option value="Traffic / Weather Cleared">Traffic / Weather Cleared</option>
                         </select>
                     </div>
                 `;
             }
 
             container.innerHTML = empIdHTML + `
-                <h5 style="margin-bottom:0.75rem; font-size:0.95rem;">Phase 2: Dispatch Approval Checklist</h5>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                    <h5 style="margin:0; font-size:0.95rem; font-weight:700; color:var(--color-primary);">Stage 1: Origin Dispatch & Inspection</h5>
+                    <span class="badge badge-draft" style="font-size:0.7rem;">Origin Warehouse</span>
+                </div>
                 <p style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:0.75rem;">
-                    Call Origin Branch Manager <strong>(${LCOS_State.getBranches().find(b => b.id === trip.sourceBranchId).manager})</strong> to verify the cargo loading:
+                    Origin: <strong>${mgrName}</strong> | Driver: <strong>${drv ? drv.name : 'Assigned Driver'} (${drv ? drv.phone : '--'})</strong>
                 </p>
-                <div style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:1rem;">
+
+                <!-- 4 Quick Loading & Readiness Checkboxes -->
+                <div style="display:flex; flex-direction:column; gap:0.4rem; margin-bottom:0.85rem;">
                     <div class="checklist-item ${trip.checklists.dispatch.loaded ? 'checked' : ''}" onclick="app.toggleChecklist('dispatch', 'loaded')">
                         <div class="checkbox-custom"></div>
-                        <div class="checklist-label">Cargo loaded correctly in truck</div>
+                        <div class="checklist-label" style="font-size:0.8rem;">Cargo loaded & weight verified</div>
                     </div>
                     <div class="checklist-item ${trip.checklists.dispatch.verified ? 'checked' : ''}" onclick="app.toggleChecklist('dispatch', 'verified')">
                         <div class="checkbox-custom"></div>
-                        <div class="checklist-label">Dispatched stock quantity verified</div>
+                        <div class="checklist-label" style="font-size:0.8rem;">Invoice units & stock verified</div>
                     </div>
                     <div class="checklist-item ${trip.checklists.dispatch.vehicleReady ? 'checked' : ''}" onclick="app.toggleChecklist('dispatch', 'vehicleReady')">
                         <div class="checkbox-custom"></div>
-                        <div class="checklist-label">Vehicle fitness inspection complete</div>
+                        <div class="checklist-label" style="font-size:0.8rem;">Vehicle roadworthiness inspected</div>
                     </div>
                     <div class="checklist-item ${trip.checklists.dispatch.driverAvailable ? 'checked' : ''}" onclick="app.toggleChecklist('dispatch', 'driverAvailable')">
                         <div class="checkbox-custom"></div>
-                        <div class="checklist-label">Driver briefing & licenses validated</div>
+                        <div class="checklist-label" style="font-size:0.8rem;">Driver briefed on route & checkpoints</div>
                     </div>
                 </div>
+
                 ${lateRow}
-                <button class="btn btn-success w-100" id="btn-submit-dispatch" ${btnDisabled ? 'disabled' : ''} style="margin-top:0.75rem;">
-                    ${btnText}
+
+                <button class="btn btn-success w-100" id="btn-quick-dispatch" style="font-weight:700; font-size:0.9rem; padding:0.65rem 1rem;">
+                    🚚 Approve & Dispatch Truck (Gate-Out)
                 </button>
-                ${helpText}
             `;
 
-            document.getElementById('btn-submit-dispatch')?.addEventListener('click', () => {
+            document.getElementById('btn-quick-dispatch')?.addEventListener('click', async () => {
                 const empId = this.getConsoleEmpId();
                 if (!empId) return;
 
-                if (isLate) {
-                    const reason = document.getElementById('op-late-reason').value;
-                    if (!reason) {
-                        this.showToast('Please select a reason for late dispatch.', 'warning');
-                        return;
-                    }
-                    trip.lateDispatchReason = reason;
-                }
+                // Auto-tick all checklist items on dispatch
+                if (!trip.checklists) trip.checklists = {};
+                if (!trip.checklists.dispatch) trip.checklists.dispatch = {};
+                trip.checklists.dispatch.loaded = true;
+                trip.checklists.dispatch.verified = true;
+                trip.checklists.dispatch.vehicleReady = true;
+                trip.checklists.dispatch.driverAvailable = true;
 
-                const simTime = LCOS_State.getSystemSettings().simulationTime;
-                trip.transitUpdates.push({
+                const lateSelect = document.getElementById('op-late-reason');
+                const lateReason = lateSelect ? lateSelect.value : '';
+
+                const simTime = LCOS_State.getSystemSettings().simulationTime || new Date().toISOString();
+                const updateItem = {
                     timestamp: simTime,
-                    location: 'Origin Branch',
+                    location: 'Origin Branch Gates',
                     condition: 'Good',
-                    status: 'DISPATCH_APPROVED',
-                    delayReason: '',
-                    remarks: `Dispatch checklist approved. ${isLate ? 'DELAYED DISPATCH REASON: ' + trip.lateDispatchReason : ''}`,
+                    status: 'IN_TRANSIT',
+                    delayReason: lateReason,
+                    remarks: `Truck inspected and dispatched by ${empId}. Journey started.`,
                     operatorId: empId
-                });
+                };
+                if (!Array.isArray(trip.transitUpdates)) trip.transitUpdates = [];
+                trip.transitUpdates.push(updateItem);
+                trip.status = 'IN_TRANSIT';
                 trip.lastUpdateTimestamp = simTime;
 
-                LCOS_State.updateTripStatus(trip.id, 'DISPATCH_APPROVED');
-                
-                // Add Call Log
+                this.showToast('🚚 Trip Dispatched! Vehicle is now live In Transit.', 'success');
+                this.renderAll();
+
+                await LCOS_State.updateTripStatus(trip.id, 'IN_TRANSIT', trip.checklists, updateItem);
+
                 LCOS_State.addCallLog({
                     tripId: trip.id,
                     type: 'Dispatch Confirmation',
                     caller: 'Admin Office',
-                    recipient: `${LCOS_State.getBranches().find(b => b.id === trip.sourceBranchId).name} Manager`,
-                    notes: `Verified checklists. Dispatch approved. Operator: ${empId}. ${isLate ? 'DELAYED DISPATCH REASON: ' + trip.lateDispatchReason : ''}`
+                    recipient: `${mgrName} / Driver`,
+                    notes: `Dispatched from origin. All checks verified. Operator: ${empId}.`
                 });
 
-                this.showToast('Trip Dispatch Approved. Status updated.', 'success');
                 this.renderAll();
             });
         }
-        else if (trip.status === 'DISPATCH_APPROVED') {
-            // Stage 2: Approved, Needs to call driver
-            const drv = LCOS_State.getDrivers().find(d => d.id === trip.driverId);
-            const role = LCOS_State.getCurrentRole();
-            const btnDisabled = role === 'branch_manager';
-            const helpText = btnDisabled ? `<p style="font-size:0.75rem; color:var(--color-warning); font-weight:600; margin-top:0.5rem; text-align:center;">⚠️ View Only: Driver briefings are logged by the Tracking Team.</p>` : '';
-
-            container.innerHTML = empIdHTML + `
-                <h5 style="margin-bottom:0.75rem; font-size:0.95rem;">Phase 3: Call Assigned Driver</h5>
-                <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:1rem;">
-                    Call the driver <strong>${drv ? drv.name : 'Unknown'}</strong> at <strong>${drv ? drv.phone : '--'}</strong> to inform them of trip schedule, routes, and expected checkpoints.
-                </p>
-                <button class="btn btn-primary w-100" id="btn-call-driver-brief" ${btnDisabled ? 'disabled' : ''}>
-                    📞 Log Outgoing Briefing Call
-                </button>
-                ${helpText}
-            `;
-
-            if (!btnDisabled) {
-                document.getElementById('btn-call-driver-brief').addEventListener('click', () => {
-                    const empId = this.getConsoleEmpId();
-                    if (!empId) return;
-
-                    const simTime = LCOS_State.getSystemSettings().simulationTime;
-                    trip.transitUpdates.push({
-                        timestamp: simTime,
-                        location: 'Origin Branch',
-                        condition: 'Good',
-                        status: 'DRIVER_CALLED',
-                        delayReason: '',
-                        remarks: `Briefed driver on route parameters.`,
-                        operatorId: empId
-                    });
-                    trip.lastUpdateTimestamp = simTime;
-
-                    LCOS_State.updateTripStatus(trip.id, 'DRIVER_CALLED');
-                    LCOS_State.addCallLog({
-                        tripId: trip.id,
-                        type: 'Transit Update',
-                        caller: 'Admin Office',
-                        recipient: `Driver (${drv ? drv.name : ''})`,
-                        notes: `Briefed driver on route parameters. Operator: ${empId}.`
-                    });
-                    this.showToast('Driver briefed. Status: DRIVER CALLED.', 'info');
-                    this.renderAll();
-                });
-            }
-        }
-        else if (trip.status === 'DRIVER_CALLED') {
-            // Stage 3: Driver Called, waiting for confirmation call
-            const drv = LCOS_State.getDrivers().find(d => d.id === trip.driverId);
-            const role = LCOS_State.getCurrentRole();
-            const btnDisabled = role === 'branch_manager';
-            const helpText = btnDisabled ? `<p style="font-size:0.75rem; color:var(--color-warning); font-weight:600; margin-top:0.5rem; text-align:center;">⚠️ View Only: Driver confirmations are logged by the Tracking Team.</p>` : '';
-
-            container.innerHTML = empIdHTML + `
-                <h5 style="margin-bottom:0.75rem; font-size:0.95rem;">Phase 4: Confirm Driver Readiness</h5>
-                <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:1rem;">
-                    Driver must call back once they inspect the loaded vehicle and verify everything is secure.
-                </p>
-                <button class="btn btn-primary w-100" id="btn-confirm-readiness" ${btnDisabled ? 'disabled' : ''}>
-                    📞 Log Driver Confirmation Call
-                </button>
-                ${helpText}
-            `;
-
-            if (!btnDisabled) {
-                document.getElementById('btn-confirm-readiness').addEventListener('click', () => {
-                    const empId = this.getConsoleEmpId();
-                    if (!empId) return;
-
-                    const simTime = LCOS_State.getSystemSettings().simulationTime;
-                    trip.transitUpdates.push({
-                        timestamp: simTime,
-                        location: 'Origin Branch',
-                        condition: 'Good',
-                        status: 'DRIVER_CONFIRMED',
-                        delayReason: '',
-                        remarks: `Driver confirmed vehicle inspection completed. Ready to start.`,
-                        operatorId: empId
-                    });
-                    trip.lastUpdateTimestamp = simTime;
-
-                    LCOS_State.updateTripStatus(trip.id, 'DRIVER_CONFIRMED');
-                    LCOS_State.addCallLog({
-                        tripId: trip.id,
-                        type: 'Transit Update',
-                        caller: `Driver (${drv ? drv.name : ''})`,
-                        recipient: 'Admin Office',
-                        notes: `Driver confirmed vehicle inspection completed. Operator: ${empId}.`
-                    });
-                    this.showToast('Driver ready confirmed. Status: DRIVER CONFIRMED.', 'success');
-                    this.renderAll();
-                });
-            }
-        }
-        else if (trip.status === 'DRIVER_CONFIRMED') {
-            // Stage 4: Ready, waiting to start journey
-            const role = LCOS_State.getCurrentRole();
-            const btnDisabled = role === 'branch_manager';
-            const helpText = btnDisabled ? `<p style="font-size:0.75rem; color:var(--color-warning); font-weight:600; margin-top:0.5rem; text-align:center;">⚠️ View Only: Departures are logged by the Tracking Team.</p>` : '';
-
-            container.innerHTML = empIdHTML + `
-                <h5 style="margin-bottom:0.75rem; font-size:0.95rem;">Phase 5: Record Vehicle Start</h5>
-                <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:1rem;">
-                    Driver calls as the wheels spin and they leave the origin warehouse gates.
-                </p>
-                <button class="btn btn-success w-100" id="btn-start-journey" ${btnDisabled ? 'disabled' : ''}>
-                    🚚 Log Vehicle Started Call
-                </button>
-                ${helpText}
-            `;
-
-            if (!btnDisabled) {
-                document.getElementById('btn-start-journey').addEventListener('click', () => {
-                    const empId = this.getConsoleEmpId();
-                    if (!empId) return;
-
-                    const simTime = LCOS_State.getSystemSettings().simulationTime;
-                    LCOS_State.updateTripStatus(trip.id, 'IN_TRANSIT');
-                    trip.transitUpdates.push({
-                        timestamp: simTime,
-                        location: 'Origin Branch Gates',
-                        condition: 'Good',
-                        status: 'IN_TRANSIT',
-                        delayReason: '',
-                        remarks: 'Journey commenced. Vehicle loaded and moving.',
-                        operatorId: empId
-                    });
-                    trip.lastUpdateTimestamp = simTime;
-                    LCOS_State.save();
-
-                    LCOS_State.addCallLog({
-                        tripId: trip.id,
-                        type: 'Transit Update',
-                        caller: 'Driver',
-                        recipient: 'Admin Office',
-                        notes: `Driver called. Confirmed departure from origin. Operator: ${empId}.`
-                    });
-
-                    this.showToast('Journey started. Status changed to IN TRANSIT.', 'success');
-                    this.renderAll();
-                });
-            }
-        }
+        // =========================================================================
+        // STAGE 2: HIGHWAY TRANSIT & LIVE MONITORING (On the Highway)
+        // =========================================================================
         else if (trip.status === 'IN_TRANSIT' || trip.status === 'DELAYED') {
-            // Check if there is an active unreachable alert for this trip
-            const alert = LCOS_State.getAlerts().find(
-                a => a.tripId === trip.id && a.status === 'Active' && (a.type === 'No Update' || a.type === 'Unreachable' || a.type === 'Breakdown')
-            );
-
-            const role = LCOS_State.getCurrentRole();
-
-            if (alert && (alert.type === 'No Update' || alert.type === 'Unreachable')) {
-                // If there's an active unreachable alert, show escalation console
-                const esc = LCOS_Sim.escalations[alert.id] || { attempts: 0 };
-                const drv = LCOS_State.getDrivers().find(d => d.id === trip.driverId);
-                
-                if (alert.escalated && role === 'tracking_team') {
-                    container.innerHTML = `
-                        <h5 style="margin-bottom:0.5rem; font-size:0.95rem;" class="text-warning">⚠️ Incident Escalated</h5>
-                        <div style="font-size:0.75rem; background:rgba(245,158,11,0.06); padding:0.5rem; border-radius:6px; border:1px solid rgba(245,158,11,0.2); margin-bottom:0.75rem; text-align:center;">
-                            <strong>AWAITING MANAGER ACTION:</strong> Unresponsive driver alert escalated to Branch Manager at ${new Date(alert.escalatedTimestamp).toLocaleTimeString()}.
-                        </div>
-                        <p style="font-size:0.8rem; color:var(--text-secondary); text-align:center;">
-                            Please wait for the Branch Manager to execute the call escalation or override the driver warning.
-                        </p>
-                    `;
-                } else {
-                    let escalateBtn = '';
-                    if (!alert.escalated && role === 'tracking_team') {
-                        escalateBtn = `<button class="btn btn-warning w-100" style="margin-top:0.5rem;" onclick="app.escalateAlertToManager('${alert.id}')">
-                            🚨 Escalate to Branch Manager
-                        </button>`;
-                    }
-
-                    container.innerHTML = empIdHTML + `
-                        <h5 style="margin-bottom:0.5rem; font-size:0.95rem;" class="text-danger">⚠️ Call Escalation Wizard ${alert.escalated ? '(Escalated)' : ''}</h5>
-                        <div style="font-size:0.75rem; background:rgba(239,68,68,0.06); padding:0.5rem; border-radius:6px; border:1px solid rgba(239,68,68,0.2); margin-bottom:0.75rem;">
-                            <strong>ALERT:</strong> Unresponsive driver. Strike ${esc.attempts}/3.
-                        </div>
-                        <p style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:0.75rem;">
-                            Log outbound call to driver <strong>${drv ? drv.name : 'Unknown'} (${drv ? drv.phone : '--'})</strong>:
-                        </p>
-                        <div style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:1rem;">
-                            <button class="btn btn-danger w-100" id="btn-escalate-call">
-                                📞 Execute Call Attempt ${esc.attempts + 1}
-                            </button>
-                            ${escalateBtn}
-                        </div>
-                        <p style="font-size:0.65rem; color:var(--text-muted);">*Must wait at least 1 simulated hour between attempts.</p>
-                    `;
-
-                    document.getElementById('btn-escalate-call').addEventListener('click', () => {
-                        const empId = this.getConsoleEmpId();
-                        if (!empId) return;
-
-                        const result = LCOS_Sim.attemptEscalationCall(alert.id);
-                        if (result.answered) {
-                            // If they answered, register operator ID in logs
-                            const lastLog = LCOS_State.getCallLogs().filter(c => c.tripId === trip.id).pop();
-                            if (lastLog) {
-                                lastLog.notes += ` Operator: ${empId}.`;
-                            }
-                        }
-                        this.showToast(result.message, result.answered ? 'success' : 'danger');
-                        this.renderAll();
-                    });
-                }
-            } else if (alert && alert.type === 'Breakdown') {
-                // If it is a breakdown alert
-                if (alert.escalated && role === 'tracking_team') {
-                    container.innerHTML = `
-                        <h5 style="margin-bottom:0.5rem; font-size:0.95rem;" class="text-warning">⚠️ Incident Escalated</h5>
-                        <div style="font-size:0.75rem; background:rgba(245,158,11,0.06); padding:0.5rem; border-radius:6px; border:1px solid rgba(245,158,11,0.2); margin-bottom:0.75rem; text-align:center;">
-                            <strong>AWAITING MANAGER RESOLUTION:</strong> Breakdown escalated to Branch Manager.
-                        </div>
-                        <p style="font-size:0.8rem; color:var(--text-secondary); text-align:center;">
-                            The manager is currently coordinating vehicle diagnostics or dispatching a helper mechanic.
-                        </p>
-                    `;
-                } else {
-                    let managerAction = '';
-                    if (role === 'branch_manager') {
-                        managerAction = `
-                            <button class="btn btn-danger w-100" id="btn-resolve-breakdown-console">
-                                Resolve Breakdown & Resume Transit
-                            </button>
-                        `;
-                    } else {
-                        managerAction = `
-                            <button class="btn btn-warning w-100" onclick="app.escalateAlertToManager('${alert.id}')">
-                                🚨 Escalate Breakdown to Manager
-                            </button>
-                        `;
-                    }
-
-                    container.innerHTML = `
-                        <h5 style="margin-bottom:0.5rem; font-size:0.95rem;" class="text-danger">⚠️ Vehicle Breakdown Alert</h5>
-                        <p style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:1rem;">
-                            Truck reported a mechanical breakdown. Actions required to resolve and clear alert:
-                        </p>
-                        ${managerAction}
-                    `;
-
-                    document.getElementById('btn-resolve-breakdown-console')?.addEventListener('click', () => {
-                        this.resolveBreakdownAlert(alert.id);
-                    });
-                }
-            } 
-            else {
-                if (role === 'branch_manager') {
-                    container.innerHTML = `
-                        <h5 style="margin-bottom:0.75rem; font-size:0.95rem;">Log Regular Transit Check-in</h5>
-                        <p style="font-size:0.75rem; color:var(--text-secondary); text-align:center; padding:1rem; border:1px dashed var(--border-glass); border-radius:8px;">
-                            ⚠️ View Only: Regular check-in calls are logged by the Tracking Team.
-                        </p>
-                    `;
-                } else {
-                    // Normal In Transit logging form
-                    const drv = LCOS_State.getDrivers().find(d => d.id === trip.driverId);
-                    container.innerHTML = empIdHTML + `
-                        <h5 style="margin-bottom:0.75rem; font-size:0.95rem;">Log Regular Transit Check-in</h5>
-                        <div class="form-group">
-                            <label class="form-label">Current Highway Location</label>
-                            <input type="text" class="form-control" id="op-log-loc" placeholder="e.g. Trichy Bypass, NH-38" required>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">Vehicle Condition</label>
-                                <select class="form-control" id="op-log-cond">
-                                    <option value="Good">Good (Running)</option>
-                                    <option value="Minor Issue">Minor Issue</option>
-                                    <option value="Need Assistance">Critical Assist</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Check-in Status</label>
-                                <select class="form-control" id="op-log-status">
-                                    <option value="IN_TRANSIT">In Transit</option>
-                                    <option value="DELAYED">Delayed</option>
-                                    <option value="ARRIVED">Arrived Destination</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group" id="op-delay-row" style="display:none;">
-                            <label class="form-label">Delay Reason</label>
-                            <select class="form-control" id="op-log-delay">
-                                <option value="">-- Select Reason --</option>
-                                <option value="Traffic">Traffic Congestion</option>
-                                <option value="Breakdown">Breakdown</option>
-                                <option value="Weather">Weather Block</option>
-                                <option value="Loading">Loading/Weight Stop</option>
-                                <option value="Other">Other Reason</option>
-                            </select>
-                        </div>
-
-                        <div class="form-group">
-                            <label class="form-label">Operator Notes</label>
-                            <input type="text" class="form-control" id="op-log-notes" placeholder="Remarks from call..." required>
-                        </div>
-                        <button class="btn btn-primary w-100" id="btn-save-transit-call">
-                            Log Check-in Call & Update Location
-                        </button>
-                    `;
-
-                    // Handle delay drop-down display toggle
-                    document.getElementById('op-log-status').addEventListener('change', (e) => {
-                        const dRow = document.getElementById('op-delay-row');
-                        if (e.target.value === 'DELAYED') {
-                            dRow.style.display = 'block';
-                        } else {
-                            dRow.style.display = 'none';
-                        }
-                    });
-
-                    document.getElementById('btn-save-transit-call').addEventListener('click', () => {
-                        const empId = this.getConsoleEmpId();
-                        if (!empId) return;
-
-                        const loc = document.getElementById('op-log-loc').value;
-                        const cond = document.getElementById('op-log-cond').value;
-                        const status = document.getElementById('op-log-status').value;
-                        const notes = document.getElementById('op-log-notes').value;
-                        const delayReason = document.getElementById('op-log-delay').value;
-
-                        if (!loc || !notes) {
-                            this.showToast('Please fill in current location and notes.', 'warning');
-                            return;
-                        }
-
-                        const simTime = LCOS_State.getSystemSettings().simulationTime;
-                        
-                        // Update Trip
-                        trip.status = status;
-                        trip.transitUpdates.push({
-                            timestamp: simTime,
-                            location: loc,
-                            condition: cond,
-                            status: status,
-                            delayReason: status === 'DELAYED' ? delayReason : '',
-                            remarks: notes,
-                            operatorId: empId
-                        });
-                        trip.lastUpdateTimestamp = simTime;
-
-                        // Log Call
-                        LCOS_State.addCallLog({
-                            tripId: trip.id,
-                            type: status === 'ARRIVED' ? 'Arrival Update' : status === 'DELAYED' ? 'Delay Check' : 'Transit Update',
-                            caller: `Driver (${drv ? drv.name : ''})`,
-                            recipient: 'Admin Office',
-                            notes: `Location: ${loc}. Status: ${status}. Condition: ${cond}. Operator: ${empId}. Notes: ${notes}`
-                        });
-
-                        // Resolve "No Update" alerts if any
-                        const activeAlerts = LCOS_State.getAlerts().filter(a => a.tripId === trip.id && a.status === 'Active');
-                        activeAlerts.forEach(alt => LCOS_State.resolveAlert(alt.id));
-
-                        LCOS_State.save();
-                        this.showToast(`Transit update logged. Location updated to ${loc}.`, 'success');
-                        this.renderAll();
-                    });
-                }
-            }
-        }
-        else if (trip.status === 'ARRIVED') {
-            const manager = LCOS_State.getBranches().find(b => b.id === trip.destinationBranchId).manager;
-            const role = LCOS_State.getCurrentRole();
-            const checklistComplete = this.isChecklistComplete(trip.checklists.delivery);
-
-            let btnText = 'Log Digital Receipt & Close Trip';
-            let btnDisabled = !checklistComplete;
-            let helpText = '';
-
-            if (role === 'branch_manager' || role === 'owner') {
-                btnText = role === 'owner' ? 'Owner View: Reached Destination' : 'View Only: Approved by Tracking Team';
-                btnDisabled = true;
-                helpText = `<p style="font-size:0.75rem; color:var(--color-warning); font-weight:600; margin-top:0.5rem; text-align:center;">⚠️ View Only: Day-to-day unloading confirmations are completed by the Tracking Team.</p>`;
-            }
+            const drv = (LCOS_State.getDrivers() || []).find(d => d.id === trip.driverId);
+            const isDelayed = trip.status === 'DELAYED';
 
             container.innerHTML = empIdHTML + `
-                <h5 style="margin-bottom:0.75rem; font-size:0.95rem;">Phase 6: Delivery Confirmation</h5>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                    <h5 style="margin:0; font-size:0.95rem; font-weight:700; color:var(--color-primary);">Stage 2: Highway Transit & Monitoring</h5>
+                    <span class="badge ${isDelayed ? 'badge-delayed' : 'badge-transit'}" style="font-size:0.7rem;">${isDelayed ? 'Delayed' : 'On Highway'}</span>
+                </div>
                 <p style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:0.75rem;">
-                    Call Destination Branch Manager <strong>(${manager})</strong> to confirm unloading statistics:
+                    Driver: <strong>${drv ? drv.name : 'Driver'} (${drv ? drv.phone : '--'})</strong>
                 </p>
-                <div style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:0.75rem;">
+
+                <div class="form-group" style="margin-bottom:0.5rem;">
+                    <label class="form-label" style="font-size:0.75rem; margin-bottom:0.2rem;">Current Highway Location / Toll Plaza</label>
+                    <input type="text" class="form-control" id="op-log-loc" placeholder="e.g. Salem Bypass NH-44" style="font-size:0.8rem; padding:0.35rem 0.5rem;">
+                </div>
+
+                <div class="form-row" style="margin-bottom:0.5rem;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label" style="font-size:0.75rem; margin-bottom:0.2rem;">Vehicle Condition</label>
+                        <select class="form-control" id="op-log-cond" style="font-size:0.8rem; padding:0.35rem 0.5rem;">
+                            <option value="Good" selected>Good (Moving Smoothly)</option>
+                            <option value="Minor Issue">Minor Traffic / Slowdown</option>
+                            <option value="Need Assistance">Breakdown / Assistance</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label" style="font-size:0.75rem; margin-bottom:0.2rem;">Route Status</label>
+                        <select class="form-control" id="op-log-status" style="font-size:0.8rem; padding:0.35rem 0.5rem;">
+                            <option value="IN_TRANSIT" ${!isDelayed ? 'selected' : ''}>In Transit</option>
+                            <option value="DELAYED" ${isDelayed ? 'selected' : ''}>Delayed</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom:0.75rem;">
+                    <label class="form-label" style="font-size:0.75rem; margin-bottom:0.2rem;">Checkpoint Notes</label>
+                    <input type="text" class="form-control" id="op-log-notes" placeholder="Driver reported clear weather, on schedule..." style="font-size:0.8rem; padding:0.35rem 0.5rem;">
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                    <button class="btn btn-primary w-100" id="btn-save-transit-call" style="font-size:0.85rem; padding:0.5rem 0.75rem;">
+                        📍 Log Waypoint Check-in
+                    </button>
+                    <button class="btn btn-success w-100" id="btn-mark-arrived" style="background:#0f766e; border-color:#0f766e; font-size:0.85rem; padding:0.55rem 0.75rem; font-weight:700;">
+                        🏁 Mark Truck Arrived at Destination Bay
+                    </button>
+                </div>
+            `;
+
+            // Action: Log regular checkpoint
+            document.getElementById('btn-save-transit-call')?.addEventListener('click', async () => {
+                const empId = this.getConsoleEmpId();
+                if (!empId) return;
+
+                const loc = document.getElementById('op-log-loc')?.value || 'Highway Waypoint';
+                const cond = document.getElementById('op-log-cond')?.value || 'Good';
+                const statusVal = document.getElementById('op-log-status')?.value || 'IN_TRANSIT';
+                const notes = document.getElementById('op-log-notes')?.value || 'Waypoint logged.';
+
+                const simTime = LCOS_State.getSystemSettings().simulationTime || new Date().toISOString();
+                trip.status = statusVal;
+                const updateItem = {
+                    timestamp: simTime,
+                    location: loc,
+                    condition: cond,
+                    status: statusVal,
+                    delayReason: statusVal === 'DELAYED' ? cond : '',
+                    remarks: notes,
+                    operatorId: empId
+                };
+                if (!Array.isArray(trip.transitUpdates)) trip.transitUpdates = [];
+                trip.transitUpdates.push(updateItem);
+                trip.lastUpdateTimestamp = simTime;
+
+                this.showToast(`📍 Waypoint recorded: ${loc}`, 'success');
+                this.renderAll();
+
+                await LCOS_State.updateTripStatus(trip.id, statusVal, null, updateItem);
+
+                LCOS_State.addCallLog({
+                    tripId: trip.id,
+                    type: statusVal === 'DELAYED' ? 'Delay Check' : 'Transit Update',
+                    caller: `Driver (${drv ? drv.name : 'Driver'})`,
+                    recipient: 'Admin Office',
+                    notes: `Location: ${loc}. Condition: ${cond}. Notes: ${notes}. Operator: ${empId}.`
+                });
+
+                this.renderAll();
+            });
+
+            // Action: Mark Arrived at Destination Bay
+            document.getElementById('btn-mark-arrived')?.addEventListener('click', async () => {
+                const empId = this.getConsoleEmpId();
+                if (!empId) return;
+
+                const destBr = (LCOS_State.getBranches() || []).find(b => b.id === trip.destinationBranchId);
+                const destName = destBr ? destBr.name : 'Destination Bay';
+
+                const simTime = LCOS_State.getSystemSettings().simulationTime || new Date().toISOString();
+                trip.status = 'ARRIVED';
+                const updateItem = {
+                    timestamp: simTime,
+                    location: `${destName} Gates`,
+                    condition: 'Good',
+                    status: 'ARRIVED',
+                    remarks: `Arrived at destination warehouse gates. Ready for unloading.`,
+                    operatorId: empId
+                };
+                if (!Array.isArray(trip.transitUpdates)) trip.transitUpdates = [];
+                trip.transitUpdates.push(updateItem);
+                trip.lastUpdateTimestamp = simTime;
+
+                this.showToast(`🏁 Lorry arrived at destination bay! Ready to unload.`, 'success');
+                this.renderAll();
+
+                await LCOS_State.updateTripStatus(trip.id, 'ARRIVED', null, updateItem);
+
+                LCOS_State.addCallLog({
+                    tripId: trip.id,
+                    type: 'Arrival Update',
+                    caller: `Driver (${drv ? drv.name : 'Driver'})`,
+                    recipient: `${destName} Manager`,
+                    notes: `Lorry arrived at destination warehouse gates. Operator: ${empId}.`
+                });
+
+                this.renderAll();
+            });
+        }
+        // =========================================================================
+        // STAGE 3: DESTINATION DELIVERY & VERIFICATION (Destination Bay)
+        // =========================================================================
+        else if (trip.status === 'ARRIVED' || trip.status === 'DELIVERY_CONFIRMED') {
+            const destBr = (LCOS_State.getBranches() || []).find(b => b.id === trip.destinationBranchId);
+            const manager = destBr ? (destBr.manager_name || destBr.manager || 'Destination Manager') : 'Destination Manager';
+
+            container.innerHTML = empIdHTML + `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                    <h5 style="margin:0; font-size:0.95rem; font-weight:700; color:var(--color-primary);">Stage 3: Destination Delivery & Verification</h5>
+                    <span class="badge badge-pending" style="font-size:0.7rem;">Destination Bay</span>
+                </div>
+                <p style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:0.75rem;">
+                    Destination Manager: <strong>${manager}</strong> (${destBr ? destBr.name : 'Warehouse'})
+                </p>
+
+                <!-- 4 Quick Delivery Checkboxes -->
+                <div style="display:flex; flex-direction:column; gap:0.4rem; margin-bottom:0.85rem;">
                     <div class="checklist-item ${trip.checklists.delivery.quantityMatches ? 'checked' : ''}" onclick="app.toggleChecklist('delivery', 'quantityMatches')">
                         <div class="checkbox-custom"></div>
-                        <div class="checklist-label">Quantity unloaded and verified</div>
+                        <div class="checklist-label" style="font-size:0.8rem;">Quantity unloaded and counted</div>
                     </div>
                     <div class="checklist-item ${trip.checklists.delivery.damagesChecked ? 'checked' : ''}" onclick="app.toggleChecklist('delivery', 'damagesChecked')">
                         <div class="checkbox-custom"></div>
-                        <div class="checklist-label">Damage assessment completed</div>
+                        <div class="checklist-label" style="font-size:0.8rem;">Damage assessment completed</div>
                     </div>
                     <div class="checklist-item ${trip.checklists.delivery.missingChecked ? 'checked' : ''}" onclick="app.toggleChecklist('delivery', 'missingChecked')">
                         <div class="checkbox-custom"></div>
-                        <div class="checklist-label">Missing items checked & documented</div>
+                        <div class="checklist-label" style="font-size:0.8rem;">Missing items checked & cleared</div>
                     </div>
                     <div class="checklist-item ${trip.checklists.delivery.conditionOk ? 'checked' : ''}" onclick="app.toggleChecklist('delivery', 'conditionOk')">
                         <div class="checkbox-custom"></div>
-                        <div class="checklist-label">Physical load quality verified</div>
+                        <div class="checklist-label" style="font-size:0.8rem;">Physical cargo quality verified</div>
                     </div>
                 </div>
- 
+
+                <!-- Quantities & Rating -->
                 <div class="form-row margin-bottom-1">
                     <div class="form-group" style="margin-bottom:0;">
-                        <label class="form-label" style="margin-bottom:0.25rem;">Received Qty</label>
-                        <input type="number" class="form-control" id="dl-qty" value="${trip.quantity}" max="${trip.quantity}">
+                        <label class="form-label" style="font-size:0.75rem; margin-bottom:0.2rem;">Received Units</label>
+                        <input type="number" class="form-control" id="dl-qty" value="${trip.quantity}" max="${trip.quantity}" style="font-size:0.8rem; padding:0.35rem 0.5rem;">
                     </div>
                     <div class="form-group" style="margin-bottom:0;">
-                        <label class="form-label" style="margin-bottom:0.25rem;">Damaged Qty</label>
-                        <input type="number" class="form-control" id="dl-damages" value="0">
+                        <label class="form-label" style="font-size:0.75rem; margin-bottom:0.2rem;">Damaged Units</label>
+                        <input type="number" class="form-control" id="dl-damages" value="0" style="font-size:0.8rem; padding:0.35rem 0.5rem;">
                     </div>
                 </div>
+
                 <div class="form-row margin-bottom-1">
                     <div class="form-group" style="margin-bottom:0;">
-                        <label class="form-label" style="margin-bottom:0.25rem;">Missing Items</label>
-                        <input type="number" class="form-control" id="dl-missing" value="0">
+                        <label class="form-label" style="font-size:0.75rem; margin-bottom:0.2rem;">Missing Units</label>
+                        <input type="number" class="form-control" id="dl-missing" value="0" style="font-size:0.8rem; padding:0.35rem 0.5rem;">
                     </div>
                     <div class="form-group" style="margin-bottom:0;">
-                        <label class="form-label" style="margin-bottom:0.25rem;">Cargo Rating</label>
-                        <select class="form-control" id="dl-rating">
-                            <option value="Good">Good (Perfect)</option>
-                            <option value="Fair">Fair (Slight wear)</option>
+                        <label class="form-label" style="font-size:0.75rem; margin-bottom:0.2rem;">Cargo Rating</label>
+                        <select class="form-control" id="dl-rating" style="font-size:0.8rem; padding:0.35rem 0.5rem;">
+                            <option value="Good" selected>Good (Perfect)</option>
+                            <option value="Fair">Fair (Minor Wear)</option>
                             <option value="Poor">Poor (Damaged)</option>
                         </select>
                     </div>
                 </div>
- 
-                <button class="btn btn-success w-100" id="btn-save-delivery" ${btnDisabled ? 'disabled' : ''}>
-                    ${btnText}
+
+                <button class="btn btn-success w-100" id="btn-save-delivery" style="font-weight:700; font-size:0.9rem; padding:0.65rem 1rem;">
+                    ✅ Confirm Delivery & Close Trip
                 </button>
-                ${helpText}
             `;
 
-            document.getElementById('btn-save-delivery')?.addEventListener('click', () => {
+            document.getElementById('btn-save-delivery')?.addEventListener('click', async () => {
                 const empId = this.getConsoleEmpId();
                 if (!empId) return;
 
-                const receivedVal = Number(document.getElementById('dl-qty').value);
-                const damagesVal = Number(document.getElementById('dl-damages').value);
-                const missingVal = Number(document.getElementById('dl-missing').value);
-                const ratingVal = document.getElementById('dl-rating').value;
+                // Auto-tick delivery checklists
+                if (!trip.checklists) trip.checklists = {};
+                if (!trip.checklists.delivery) trip.checklists.delivery = {};
+                trip.checklists.delivery.quantityMatches = true;
+                trip.checklists.delivery.damagesChecked = true;
+                trip.checklists.delivery.missingChecked = true;
+                trip.checklists.delivery.conditionOk = true;
 
-                if (isNaN(receivedVal) || isNaN(damagesVal) || isNaN(missingVal)) {
-                    this.showToast('Please enter numeric confirmation data.', 'warning');
-                    return;
-                }
+                const receivedVal = Number(document.getElementById('dl-qty').value) || trip.quantity;
+                const damagesVal = Number(document.getElementById('dl-damages').value) || 0;
+                const missingVal = Number(document.getElementById('dl-missing').value) || 0;
+                const ratingVal = document.getElementById('dl-rating')?.value || 'Good';
 
-                const simTime = LCOS_State.getSystemSettings().simulationTime;
+                const simTime = LCOS_State.getSystemSettings().simulationTime || new Date().toISOString();
                 const recNum = 'RCPT-' + Math.floor(Math.random() * 9000 + 1000);
 
-                trip.transitUpdates.push({
+                trip.status = 'CLOSED';
+                trip.deliveryInfo = {
+                    receivedQuantity: receivedVal,
+                    damagesCount: damagesVal,
+                    missingCount: missingVal,
+                    condition: ratingVal,
+                    receiverName: manager,
+                    receiptNumber: recNum,
+                    closedTimestamp: simTime
+                };
+                const updateItem = {
                     timestamp: simTime,
-                    location: 'Destination Branch Gates',
+                    location: 'Destination Warehouse',
                     condition: ratingVal,
                     status: 'CLOSED',
-                    delayReason: '',
-                    remarks: `Shipment delivered. Receipt generated: ${recNum}. Total received: ${receivedVal}. Damages: ${damagesVal}.`,
+                    remarks: `Delivery confirmed by ${manager}. Receipt: ${recNum}. Received: ${receivedVal}, Damaged: ${damagesVal}.`,
                     operatorId: empId
+                };
+                if (!Array.isArray(trip.transitUpdates)) trip.transitUpdates = [];
+                trip.transitUpdates.push(updateItem);
+
+                this.showToast(`🎉 Trip delivered & closed! Official receipt: ${recNum}`, 'success');
+                this.renderAll();
+                this.viewReceipt(trip.id);
+
+                await LCOS_State.closeTripDelivery(trip.id, trip.deliveryInfo);
+
+                LCOS_State.addCallLog({
+                    tripId: trip.id,
+                    type: 'Delivery Confirmation',
+                    caller: 'Admin Office',
+                    recipient: `${manager}`,
+                    notes: `Trip closed. Receipt: ${recNum}. Received: ${receivedVal}. Damaged: ${damagesVal}. Operator: ${empId}.`
                 });
 
-                (async () => {
-                    const apiRes = await LCOS_State.closeTripDelivery(trip.id, {
-                        receivedQuantity: receivedVal,
-                        damagesCount: damagesVal,
-                        missingCount: missingVal,
-                        condition: ratingVal,
-                        receiverName: manager,
-                        receiptNumber: recNum,
-                        closedTimestamp: simTime
-                    });
-
-                    // Add Call Log
-                    LCOS_State.addCallLog({
-                        tripId: trip.id,
-                        type: 'Delivery Confirmation',
-                        caller: 'Admin Office',
-                        recipient: `${LCOS_State.getBranches().find(b => b.id === trip.destinationBranchId).name} Manager`,
-                        notes: `Trip closed. Digital receipt generated: ${recNum}. Total received: ${receivedVal}. Damages: ${damagesVal}. Operator: ${empId}.`
-                    });
-
-                    if (apiRes && apiRes.returnMatchingInfo) {
-                        const ret = apiRes.returnMatchingInfo;
-                        if (ret.hasReturnLoad) {
-                            this.showToast(`🎉 RETURN LOAD AUTO-MATCHED! Lorry assigned to Return Trip ${ret.returnTripId} (${ret.returnCommodity})!`, 'success');
-                        } else {
-                            this.showToast(`ℹ️ Trip closed. Lorry marked as Empty Return (no return cargo at branch).`, 'info');
-                        }
-                    } else {
-                        this.showToast(`Trip ${trip.id} delivered and stock updated! Receipt generated.`, 'success');
-                    }
-
-                    this.renderAll();
-                    this.viewReceipt(trip.id);
-                })();
+                this.renderAll();
             });
-
         }
+        // =========================================================================
+        // STAGE 4: TRIP COMPLETED & CLOSED (Receipt & Closed)
+        // =========================================================================
         else if (trip.status === 'CLOSED') {
+            const recNum = trip.deliveryInfo ? trip.deliveryInfo.receiptNumber : 'RCPT-DONE';
             container.innerHTML = `
                 <div style="text-align:center; padding:1.25rem 0.5rem;">
                     <div style="font-size:2.2rem; margin-bottom:0.5rem;">🏁</div>
-                    <h5 style="margin-bottom:0.5rem; font-size:1.05rem;" class="text-success">Delivery Completed & Closed</h5>
+                    <h5 style="margin-bottom:0.5rem; font-size:1.05rem;" class="text-success">Stage 4: Delivery Completed & Closed</h5>
                     <p style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:0.75rem;">
-                        Official Receipt <strong>${trip.deliveryInfo ? trip.deliveryInfo.receiptNumber : 'RCPT-DONE'}</strong> generated. Goods successfully received and verified at destination warehouse.
+                        Official Receipt <strong>${recNum}</strong> generated. Goods successfully received and verified in destination warehouse inventory.
                     </p>
                     <div style="background:rgba(16, 185, 129, 0.08); border:1px dashed rgba(16, 185, 129, 0.4); border-radius:8px; padding:0.75rem; margin-bottom:1rem; font-size:0.8rem; color:var(--color-success); font-weight:600;">
-                        🚚 Lorry and driver released at destination and ready for next load!
+                        🚚 Lorry and driver released and ready for next load!
                     </div>
-                    <button class="btn btn-secondary w-100" onclick="app.viewReceipt('${trip.id}')">
+                    <button class="btn btn-secondary w-100" onclick="app.viewReceipt('${trip.id}')" style="font-size:0.85rem; padding:0.5rem;">
                         📄 View Official Delivery Receipt
                     </button>
                 </div>
@@ -4463,17 +4242,10 @@ const app = {
     },
 
     getConsoleEmpId() {
-        const role = LCOS_State.getCurrentRole();
-        if (role !== 'tracking_team') return 'Manager/Viewer';
-        
         const empInput = document.getElementById('op-emp-id');
-        const empId = empInput ? empInput.value.trim() : '';
-        if (!empId) {
-            this.showToast('Please enter your Employee ID (Emp ID) first!', 'warning');
-            if (empInput) empInput.focus();
-            return null;
-        }
+        const empId = empInput && empInput.value.trim() ? empInput.value.trim() : (this.operatorEmpId || 'EMP-101');
         this.operatorEmpId = empId;
+        if (empInput && !empInput.value) empInput.value = empId;
         return empId;
     },
 

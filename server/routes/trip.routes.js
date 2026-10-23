@@ -92,8 +92,10 @@ router.post('/', authenticateToken, authorizeRoles('SUPER_ADMIN', 'OWNER', 'TRAC
       return res.status(400).json({ success: false, message: 'All required trip dispatch fields must be provided' });
     }
 
-    const tripCountRes = await db.query(`SELECT COUNT(*) FROM trips`);
-    const count = parseInt(tripCountRes.rows[0].count, 10);
+    const tripCountRes = await db.query(`SELECT COUNT(*) AS count FROM trips`);
+    const countRow = tripCountRes.rows[0];
+    const rawCount = countRow ? (countRow.count ?? countRow['COUNT(*)'] ?? countRow['count(*)'] ?? 0) : 0;
+    const count = parseInt(rawCount, 10) || 0;
     const tripId = 'TRIP-' + String(count + 1001);
     const dispatchId = 'DISP-' + String(count + 2001);
 
@@ -169,12 +171,27 @@ router.put('/:id/status', authenticateToken, async (req, res) => {
     const trip = tripRes.rows[0];
     const oldStatus = trip.status;
 
-    let updatedChecklists = trip.checklists;
-    if (checklists) {
-      updatedChecklists = { ...trip.checklists, ...checklists };
+    // Safely unwrap checklists from SQLite/Postgres
+    let baseChecklists = trip.checklists;
+    while (typeof baseChecklists === 'string') {
+      try { baseChecklists = JSON.parse(baseChecklists); } catch(e) { baseChecklists = {}; break; }
     }
+    if (!baseChecklists || typeof baseChecklists !== 'object') baseChecklists = {};
 
-    let updatedTransitUpdates = trip.transit_updates || [];
+    let inputChecklists = checklists;
+    while (typeof inputChecklists === 'string') {
+      try { inputChecklists = JSON.parse(inputChecklists); } catch(e) { inputChecklists = {}; break; }
+    }
+    let updatedChecklists = inputChecklists ? { ...baseChecklists, ...inputChecklists } : baseChecklists;
+
+    // Safely unwrap transitUpdates from SQLite/Postgres
+    let baseTransitUpdates = trip.transit_updates;
+    while (typeof baseTransitUpdates === 'string') {
+      try { baseTransitUpdates = JSON.parse(baseTransitUpdates); } catch(e) { baseTransitUpdates = []; break; }
+    }
+    if (!Array.isArray(baseTransitUpdates)) baseTransitUpdates = [];
+
+    let updatedTransitUpdates = [...baseTransitUpdates];
     if (transitUpdate) {
       updatedTransitUpdates.push(transitUpdate);
     }

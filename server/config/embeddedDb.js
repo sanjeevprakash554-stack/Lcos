@@ -135,7 +135,15 @@ async function query(sqlText, params = []) {
     const stmt = db.prepare(sql);
     if (isSelect) {
       const rawRows = stmt.all(...sanitizedParams);
-      const rows = rawRows.map(r => ({ ...r }));
+      const rows = rawRows.map(r => {
+        const row = { ...r };
+        for (const k of Object.keys(row)) {
+          if (/^count\(\*\)$/i.test(k) && row.count === undefined) {
+            row.count = row[k];
+          }
+        }
+        return row;
+      });
       return { rows, rowCount: rows.length };
     } else {
       const info = stmt.run(...sanitizedParams);

@@ -377,6 +377,27 @@ Automated inquiry sent to driver. Immediate review or driver follow-up required.
   }
 
   /**
+   * Automated Trigger: Send Transit Resumed Notification to Higher Official / Tracking Team
+   */
+  async sendHigherOfficialTransitResumed(details, officialPhone) {
+    if (!officialPhone) return null;
+
+    const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' });
+    const bodyText =
+`🟢 *TRANSIT RESUMED: VEHICLE ON THE MOVE*
+────────────────────────────
+📋 *Trip ID:* ${details.tripId || 'Active Shipment'}
+🚛 *Vehicle:* ${details.vehicleId || 'Assigned Lorry'}
+👤 *Driver:* ${details.driverName || 'Driver'} (📞 ${details.driverPhone || 'N/A'})
+📍 *Route:* ${details.route || 'In Transit'}
+🕒 *Resumed At:* ${currentTime}
+────────────────────────────
+✅ *Status:* Driver confirmed "Resuming Movement". Stoppage alert cleared and vehicle is back in transit. Operations Control has updated live tracking.`;
+
+    return this.sendTextMessage(officialPhone, bodyText);
+  }
+
+  /**
    * Automated Trigger: Send Delivery Confirmation Notification
    */
   async sendDeliveryConfirmationNotification(trip, recipientPhone) {
