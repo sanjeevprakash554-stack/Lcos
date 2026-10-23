@@ -124,14 +124,21 @@ async function query(sqlText, params = []) {
 
   const isSelect = /^\s*(SELECT|WITH|PRAGMA)/i.test(sql) || /RETURNING/i.test(sql);
 
+  const sanitizedParams = (params || []).map(p => {
+    if (p instanceof Date) return p.toISOString();
+    if (typeof p === 'boolean') return p ? 1 : 0;
+    if (p === undefined) return null;
+    return p;
+  });
+
   try {
     const stmt = db.prepare(sql);
     if (isSelect) {
-      const rawRows = stmt.all(...params);
+      const rawRows = stmt.all(...sanitizedParams);
       const rows = rawRows.map(r => ({ ...r }));
       return { rows, rowCount: rows.length };
     } else {
-      const info = stmt.run(...params);
+      const info = stmt.run(...sanitizedParams);
       return { rows: [], rowCount: info.changes };
     }
   } catch (err) {

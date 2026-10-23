@@ -261,7 +261,7 @@ function evaluateMovementStatus(prevVehicle, trackerState, lat, lng, speedKmh) {
       // Require 2 consecutive slow points to flip from MOVING to STOPPED
       if (trackerState.slowReadingsCount >= 2) {
         newStatus = 'STOPPED';
-        stoppageStartTime = new Date();
+        stoppageStartTime = new Date().toISOString();
         trackerState.slowReadingsCount = 0;
       }
     } else {
@@ -277,7 +277,7 @@ function evaluateMovementStatus(prevVehicle, trackerState, lat, lng, speedKmh) {
     } else {
       // Retain existing stoppage_start_time
       newStatus = 'STOPPED';
-      if (!stoppageStartTime) stoppageStartTime = new Date();
+      if (!stoppageStartTime) stoppageStartTime = new Date().toISOString();
     }
   }
 
