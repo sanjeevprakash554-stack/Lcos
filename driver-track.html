@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; media-src 'self' data: blob:; worker-src 'self' blob:;">
   <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
+  <link rel="apple-touch-icon" href="/icon-192.png">
   <meta name="theme-color" content="#131c2e">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -265,6 +268,32 @@
     <button id="btnInstallApp" class="btn btn-secondary" style="min-height:30px; width:auto; padding:3px 12px; font-size:0.75rem;">Install</button>
   </div>
 
+  <!-- PWA Install Guide Modal -->
+  <div id="modalInstallGuide" class="banner-hidden" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9999; display:flex; align-items:center; justify-content:center; padding:16px;">
+    <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:14px; max-width:360px; width:100%; padding:20px; box-shadow:0 12px 32px rgba(0,0,0,0.8);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3 style="font-size:1.05rem; display:flex; align-items:center; gap:8px;">
+          <span>📲</span>
+          <span>Install Driver App</span>
+        </h3>
+        <button id="btnCloseInstallGuide" style="background:none; border:none; color:var(--text-muted); font-size:1.4rem; cursor:pointer; line-height:1; padding:0 4px;">&times;</button>
+      </div>
+      <p style="font-size:0.84rem; color:var(--text-muted); margin-bottom:14px; line-height:1.4;">
+        Install this app to your phone for reliable background GPS tracking without browser sleep:
+      </p>
+      <div style="background:rgba(15,23,42,0.8); border:1px solid var(--card-border); border-radius:8px; padding:12px; font-size:0.84rem; line-height:1.6; margin-bottom:16px;">
+        <div style="color:#38bdf8; font-weight:700; margin-bottom:4px;">Android (Chrome / Samsung / Edge):</div>
+        <div>1. Tap <strong>⋮ (3 dots menu)</strong> at top right</div>
+        <div>2. Tap <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong></div>
+        <div>3. Tap <strong>Install</strong> to confirm</div>
+        <div style="margin-top:10px; border-top:1px solid rgba(255,255,255,0.08); padding-top:8px; color:#38bdf8; font-weight:700; margin-bottom:4px;">iPhone (Safari):</div>
+        <div>1. Tap <strong>Share icon (⎋)</strong> at bottom</div>
+        <div>2. Tap <strong>"Add to Home Screen"</strong></div>
+      </div>
+      <button id="btnDismissInstallGuide" class="btn btn-primary" style="min-height:42px; font-size:0.92rem;">Got It</button>
+    </div>
+  </div>
+
   <!-- Dispatcher Immediate Fix Request Banner -->
   <div id="bannerDispatcherRequest" class="banner banner-info banner-hidden">
     <span>📡</span>
@@ -438,6 +467,9 @@
         bannerBackgroundWarning: document.getElementById('bannerBackgroundWarning'),
         bannerInstallApp: document.getElementById('bannerInstallApp'),
         btnInstallApp: document.getElementById('btnInstallApp'),
+        modalInstallGuide: document.getElementById('modalInstallGuide'),
+        btnCloseInstallGuide: document.getElementById('btnCloseInstallGuide'),
+        btnDismissInstallGuide: document.getElementById('btnDismissInstallGuide'),
         bannerDispatcherRequest: document.getElementById('bannerDispatcherRequest'),
         textDispatcherRequest: document.getElementById('textDispatcherRequest'),
         bannerNotice: document.getElementById('bannerNotice'),
@@ -1267,6 +1299,21 @@
           });
         }
 
+        function showInstallGuide() {
+          if (el.modalInstallGuide) {
+            el.modalInstallGuide.classList.remove('banner-hidden');
+          }
+        }
+
+        function hideInstallGuide() {
+          if (el.modalInstallGuide) {
+            el.modalInstallGuide.classList.add('banner-hidden');
+          }
+        }
+
+        if (el.btnCloseInstallGuide) el.btnCloseInstallGuide.addEventListener('click', hideInstallGuide);
+        if (el.btnDismissInstallGuide) el.btnDismissInstallGuide.addEventListener('click', hideInstallGuide);
+
         // PWA Install Prompt Banner Event
         window.addEventListener('beforeinstallprompt', (e) => {
           e.preventDefault();
@@ -1276,16 +1323,44 @@
           }
         });
 
+        // App Installed Event
+        window.addEventListener('appinstalled', () => {
+          console.log('[PWA] Driver app installed successfully');
+          state.deferredInstallPrompt = null;
+          hideInstallGuide();
+          if (el.bannerInstallApp) el.bannerInstallApp.classList.add('banner-hidden');
+          showNotice('LCOS Driver App installed to your Home Screen!', 'info');
+          setTimeout(() => hideNotice(), 6000);
+        });
+
         if (el.btnInstallApp) {
           el.btnInstallApp.addEventListener('click', async () => {
-            if (!state.deferredInstallPrompt) return;
-            state.deferredInstallPrompt.prompt();
-            const choice = await state.deferredInstallPrompt.userChoice;
-            if (choice.outcome === 'accepted') {
-              if (el.bannerInstallApp) el.bannerInstallApp.classList.add('banner-hidden');
+            if (state.deferredInstallPrompt) {
+              try {
+                await state.deferredInstallPrompt.prompt();
+                const choice = await state.deferredInstallPrompt.userChoice;
+                if (choice && choice.outcome === 'accepted') {
+                  if (el.bannerInstallApp) el.bannerInstallApp.classList.add('banner-hidden');
+                  showNotice('Adding LCOS Driver App to your home screen...', 'info');
+                } else {
+                  showInstallGuide();
+                }
+              } catch (err) {
+                console.warn('[PWA Install Prompt error]:', err);
+                showInstallGuide();
+              }
+              state.deferredInstallPrompt = null;
+            } else {
+              // Direct user to install guide
+              showInstallGuide();
             }
-            state.deferredInstallPrompt = null;
           });
+        }
+
+        // Hide install banner if already in standalone display mode
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+        if (isStandalone) {
+          if (el.bannerInstallApp) el.bannerInstallApp.classList.add('banner-hidden');
         }
 
         if (state.token) {

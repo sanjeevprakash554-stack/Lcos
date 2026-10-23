@@ -1,8 +1,12 @@
 // LCOS Driver Service Worker
-const CACHE_NAME = 'lcos-driver-v1';
+const CACHE_NAME = 'lcos-driver-v2';
 const ASSETS_TO_CACHE = [
   '/driver-track.html',
-  '/manifest.json'
+  '/manifest.json',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/icon-maskable-192.png',
+  '/icon-maskable-512.png'
 ];
 
 self.addEventListener('install', (e) => {
@@ -24,7 +28,7 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-  // Network first, fallback to cache for HTML, bypass API
+  // Network first, fallback to cache for HTML & icons, bypass API
   if (e.request.url.includes('/api/') || e.request.url.includes('/socket.io/')) {
     return;
   }
