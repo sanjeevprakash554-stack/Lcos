@@ -3,7 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; media-src 'self' data: blob:; worker-src 'self' blob:;">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#131c2e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="LCOS Driver">
   <title>LCOS Driver Mobile GPS Tracker</title>
   <style>
     :root {
@@ -250,6 +256,15 @@
     </div>
   </div>
 
+  <!-- PWA Install Banner -->
+  <div id="bannerInstallApp" class="banner banner-info banner-hidden" style="justify-content:space-between; align-items:center;">
+    <div style="display:flex; align-items:center; gap:8px;">
+      <span>📲</span>
+      <span>Install <strong>LCOS Driver App</strong> for reliable background GPS tracking</span>
+    </div>
+    <button id="btnInstallApp" class="btn btn-secondary" style="min-height:30px; width:auto; padding:3px 12px; font-size:0.75rem;">Install</button>
+  </div>
+
   <!-- Dispatcher Immediate Fix Request Banner -->
   <div id="bannerDispatcherRequest" class="banner banner-info banner-hidden">
     <span>📡</span>
@@ -350,6 +365,11 @@
         <span>Last Ping: <strong id="textLastSync" style="color:#e2e8f0;">Never</strong></span>
         <span>Screen Awake: <strong id="textWakeLockStatus" style="color:#e2e8f0;">Off</strong></span>
       </div>
+
+      <div style="margin-top:8px; font-size:0.75rem; color:var(--text-muted); display:flex; justify-content:space-between; border-top:1px solid rgba(255,255,255,0.06); padding-top:8px;">
+        <span>Background Mode: <strong id="textBackgroundStatus" style="color:#34d399;">Active (Keep-Alive)</strong></span>
+        <span>Auto-Resume on Refresh: <strong id="textAutoResumeStatus" style="color:#34d399;">ON</strong></span>
+      </div>
     </div>
 
     <!-- Main Toggle Action -->
@@ -380,6 +400,7 @@
       // ==========================================
       const CONFIG = {
         STORAGE_KEY: 'LCOS_JWT_TOKEN',
+        TRACKING_KEY: 'LCOS_DRIVER_TRACKING_ACTIVE',
         MIN_SEND_INTERVAL_MS: 3000,   // Strict server rate limit (3s)
         MOVING_INTERVAL_MS: 3000,     // 5 seconds when moving
         STOPPED_INTERVAL_MS: 5000,   // 30 seconds when stopped
@@ -403,6 +424,9 @@
         queueSize: 0,
         isFlushingQueue: false,
         backoffUntilMs: 0,
+        bgAudio: null,
+        bgWorker: null,
+        deferredInstallPrompt: null,
       };
 
       // ==========================================
@@ -412,6 +436,8 @@
         badgeNetwork: document.getElementById('badgeNetwork'),
         badgeTracking: document.getElementById('badgeTracking'),
         bannerBackgroundWarning: document.getElementById('bannerBackgroundWarning'),
+        bannerInstallApp: document.getElementById('bannerInstallApp'),
+        btnInstallApp: document.getElementById('btnInstallApp'),
         bannerDispatcherRequest: document.getElementById('bannerDispatcherRequest'),
         textDispatcherRequest: document.getElementById('textDispatcherRequest'),
         bannerNotice: document.getElementById('bannerNotice'),
@@ -438,6 +464,8 @@
         textQueueCount: document.getElementById('textQueueCount'),
         textLastSync: document.getElementById('textLastSync'),
         textWakeLockStatus: document.getElementById('textWakeLockStatus'),
+        textBackgroundStatus: document.getElementById('textBackgroundStatus'),
+        textAutoResumeStatus: document.getElementById('textAutoResumeStatus'),
         btnToggleTracking: document.getElementById('btnToggleTracking'),
         textToggleTracking: document.getElementById('textToggleTracking'),
         textCoords: document.getElementById('textCoords'),
@@ -584,6 +612,126 @@
       }
 
       // ==========================================
+      // BACKGROUND AUDIO KEEP-ALIVE (Mobile OS Media Process Loop)
+      // ==========================================
+      function initSilentAudio() {
+        if (state.bgAudio) return state.bgAudio;
+        try {
+          // Generate a 1-second 8000Hz mono 8-bit PCM silent WAV Blob
+          const sampleRate = 8000;
+          const numSamples = sampleRate * 1;
+          const buffer = new ArrayBuffer(44 + numSamples);
+          const view = new DataView(buffer);
+
+          function writeStr(offset, s) {
+            for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i));
+          }
+          writeStr(0, 'RIFF');
+          view.setUint32(4, 36 + numSamples, true);
+          writeStr(8, 'WAVE');
+          writeStr(12, 'fmt ');
+          view.setUint32(16, 16, true); // Subchunk1Size
+          view.setUint16(20, 1, true);  // PCM format
+          view.setUint16(22, 1, true);  // Mono
+          view.setUint32(24, sampleRate, true);
+          view.setUint32(28, sampleRate, true); // ByteRate
+          view.setUint16(32, 1, true);  // BlockAlign
+          view.setUint16(34, 8, true);  // 8-bit
+          writeStr(36, 'data');
+          view.setUint32(40, numSamples, true);
+
+          const pcm = new Uint8Array(buffer, 44);
+          pcm.fill(128); // 8-bit PCM silence
+
+          const blob = new Blob([buffer], { type: 'audio/wav' });
+          const audio = new Audio();
+          audio.src = URL.createObjectURL(blob);
+          audio.loop = true;
+          audio.volume = 0.01;
+          audio.setAttribute('playsinline', '');
+          audio.setAttribute('webkit-playsinline', '');
+          state.bgAudio = audio;
+          return audio;
+        } catch (err) {
+          console.warn('[KeepAlive Audio] Error creating silent audio:', err);
+          return null;
+        }
+      }
+
+      function playBackgroundAudio() {
+        try {
+          const audio = initSilentAudio();
+          if (audio) {
+            const p = audio.play();
+            if (p && typeof p.catch === 'function') {
+              p.catch((e) => console.warn('[KeepAlive Audio] Play promise ignored:', e.message));
+            }
+          }
+        } catch (e) {
+          console.warn('[KeepAlive Audio] Could not play audio:', e);
+        }
+      }
+
+      function pauseBackgroundAudio() {
+        if (state.bgAudio) {
+          try {
+            state.bgAudio.pause();
+            state.bgAudio.currentTime = 0;
+          } catch (_) {}
+        }
+      }
+
+      // ==========================================
+      // BACKGROUND WEB WORKER TIMER
+      // ==========================================
+      function startBackgroundWorker() {
+        if (state.bgWorker) return;
+        try {
+          const workerCode = `
+            let timer = null;
+            self.onmessage = function(e) {
+              if (e.data === 'start') {
+                if (timer) clearInterval(timer);
+                timer = setInterval(function() {
+                  self.postMessage('tick');
+                }, 4000);
+              } else if (e.data === 'stop') {
+                if (timer) {
+                  clearInterval(timer);
+                  timer = null;
+                }
+              }
+            };
+          `;
+          const blob = new Blob([workerCode], { type: 'application/javascript' });
+          const worker = new Worker(URL.createObjectURL(blob));
+          worker.onmessage = function(e) {
+            if (e.data === 'tick' && state.isTracking && navigator.geolocation) {
+              navigator.geolocation.getCurrentPosition(
+                (pos) => transmitOrQueuePoint(pos, false),
+                () => {},
+                { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+              );
+            }
+          };
+          worker.postMessage('start');
+          state.bgWorker = worker;
+        } catch (err) {
+          console.warn('[Worker Timer] Dedicated worker timer not available:', err);
+        }
+      }
+
+      function stopBackgroundWorker() {
+        if (state.bgWorker) {
+          try {
+            state.bgWorker.postMessage('stop');
+            state.bgWorker.terminate();
+          } catch (_) {}
+          state.bgWorker = null;
+        }
+      }
+
+      // ==========================================
       // SCREEN WAKE LOCK & VISIBILITY
       // ==========================================
       async function requestWakeLock() {
@@ -593,6 +741,9 @@
             safeSetText(el.textWakeLockStatus, 'Active');
             state.wakeLock.addEventListener('release', () => {
               safeSetText(el.textWakeLockStatus, 'Released');
+              if (state.isTracking && document.visibilityState === 'visible') {
+                requestWakeLock();
+              }
             });
           } catch (err) {
             safeSetText(el.textWakeLockStatus, 'Unavailable');
@@ -622,6 +773,13 @@
           }
           if (state.isTracking) {
             requestWakeLock();
+            if (navigator.geolocation) {
+              navigator.geolocation.getCurrentPosition(
+                (pos) => transmitOrQueuePoint(pos, true),
+                () => {},
+                { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+              );
+            }
             flushOfflineQueue();
           }
         }
@@ -703,6 +861,7 @@
         stopTracking();
         state.token = null;
         localStorage.removeItem(CONFIG.STORAGE_KEY);
+        localStorage.removeItem(CONFIG.TRACKING_KEY);
         el.sectionLogin.classList.remove('banner-hidden');
         el.sectionDashboard.classList.add('banner-hidden');
       }
@@ -754,6 +913,7 @@
         }
         state.token = null;
         localStorage.removeItem(CONFIG.STORAGE_KEY);
+        localStorage.removeItem(CONFIG.TRACKING_KEY);
         el.sectionLogin.classList.remove('banner-hidden');
         el.sectionDashboard.classList.add('banner-hidden');
         hideNotice();
@@ -1014,6 +1174,9 @@
         }
 
         state.isTracking = true;
+        localStorage.setItem(CONFIG.TRACKING_KEY, 'true');
+        safeSetText(el.textAutoResumeStatus, 'ON');
+
         el.badgeTracking.className = 'badge badge-active';
         safeSetText(el.badgeTracking, 'Active');
 
@@ -1021,6 +1184,9 @@
         safeSetText(el.textToggleTracking, 'Stop Tracking');
 
         requestWakeLock();
+        playBackgroundAudio();
+        startBackgroundWorker();
+
         hideNotice();
         safeSetText(el.textCoords, 'Acquiring satellite fix...');
 
@@ -1056,6 +1222,9 @@
 
       function stopTracking() {
         state.isTracking = false;
+        localStorage.removeItem(CONFIG.TRACKING_KEY);
+        safeSetText(el.textAutoResumeStatus, 'PAUSED');
+
         if (state.watchId !== null) {
           navigator.geolocation.clearWatch(state.watchId);
           state.watchId = null;
@@ -1065,6 +1234,8 @@
           state.pollingTimer = null;
         }
 
+        pauseBackgroundAudio();
+        stopBackgroundWorker();
         releaseWakeLock();
 
         el.badgeTracking.className = 'badge badge-idle';
@@ -1087,12 +1258,51 @@
       // INITIALIZATION
       // ==========================================
       async function init() {
+        // Register PWA Service Worker
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js')
+              .then(() => console.log('[PWA] Service worker registered successfully.'))
+              .catch((err) => console.warn('[PWA] Service worker registration error:', err));
+          });
+        }
+
+        // PWA Install Prompt Banner Event
+        window.addEventListener('beforeinstallprompt', (e) => {
+          e.preventDefault();
+          state.deferredInstallPrompt = e;
+          if (el.bannerInstallApp) {
+            el.bannerInstallApp.classList.remove('banner-hidden');
+          }
+        });
+
+        if (el.btnInstallApp) {
+          el.btnInstallApp.addEventListener('click', async () => {
+            if (!state.deferredInstallPrompt) return;
+            state.deferredInstallPrompt.prompt();
+            const choice = await state.deferredInstallPrompt.userChoice;
+            if (choice.outcome === 'accepted') {
+              if (el.bannerInstallApp) el.bannerInstallApp.classList.add('banner-hidden');
+            }
+            state.deferredInstallPrompt = null;
+          });
+        }
+
         if (state.token) {
           el.sectionLogin.classList.add('banner-hidden');
           el.sectionDashboard.classList.remove('banner-hidden');
           initSocketConnection();
           await fetchActiveTrip();
           updateQueueCountUI();
+
+          // Auto-resume tracking if active prior to refresh
+          const wasTracking = localStorage.getItem(CONFIG.TRACKING_KEY) === 'true';
+          if (wasTracking && state.activeTrip) {
+            console.log('[LCOS Driver] Auto-resuming GPS tracking after reload...');
+            startTracking();
+            showNotice('GPS tracking automatically resumed after refresh.', 'info');
+            setTimeout(() => hideNotice(), 4000);
+          }
         } else {
           el.sectionLogin.classList.remove('banner-hidden');
           el.sectionDashboard.classList.add('banner-hidden');
