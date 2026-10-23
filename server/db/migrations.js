@@ -126,6 +126,30 @@ async function runMigrations() {
       await db.query("UPDATE trips SET status = 'IN_TRANSIT' WHERE id = 'TRIP-1001' AND status = 'CREATED'");
     } catch (_) {}
 
+    // 10. Ensure multiple driver accounts exist for concurrent mobile tracking testing
+    const extraDrivers = [
+      { id: 'USR-DRIVER2', username: 'driver2', empId: 'DRV-102', fullName: 'Kumaravel P.', phone: '+91 98840 23456' },
+      { id: 'USR-DRIVER3', username: 'driver3', empId: 'DRV-104', fullName: 'Murugan T.', phone: '+91 98840 45678' },
+      { id: 'USR-DRIVER4', username: 'driver4', empId: 'DRV-105', fullName: 'Saravanan K.', phone: '+91 98840 56789' },
+      { id: 'USR-DRIVER5', username: 'driver5', empId: 'DRV-112', fullName: 'Sanjeev', phone: '+91 79047 43468' }
+    ];
+
+    for (const d of extraDrivers) {
+      try {
+        await db.query(
+          `INSERT INTO users (id, company_id, username, email, password_hash, full_name, phone, role, emp_id, status)
+           VALUES ($1, 'COMP-001', $2, $3, '$2a$10$wM3J4sEwN7e8K0eL6f.g2.oT7r1Z1v3z4w5x6y7z8a9b0c1d2e3f4', $4, $5, 'DRIVER', $6, 'ACTIVE')
+           ON CONFLICT (id) DO NOTHING`,
+          [d.id, d.username, `${d.username}@lcos.com`, d.fullName, d.phone, d.empId]
+        );
+        await db.query(`UPDATE drivers SET user_id = $1 WHERE id = $2`, [d.id, d.empId]);
+      } catch (_) {}
+    }
+
+    try {
+      await db.query("UPDATE trips SET status = 'IN_TRANSIT' WHERE id IN ('TRIP-1001', 'TRIP-1002', 'TRIP-1005', 'TRIP-1006', 'TRIP-1012')");
+    } catch (_) {}
+
     // 6. Backfill branch coordinates
     for (const b of BRANCH_COORDINATES) {
       try {
