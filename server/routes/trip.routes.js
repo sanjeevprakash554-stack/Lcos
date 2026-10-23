@@ -259,7 +259,7 @@ router.put('/:id/status', authenticateToken, async (req, res) => {
             }
 
             // 2. Alert Higher Official
-            const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE;
+            const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE || "916382897998";
             if (higherOfficial) {
               await whatsappService.sendTextMessage(
                 higherOfficial,

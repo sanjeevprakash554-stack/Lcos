@@ -734,7 +734,7 @@ router.get('/status', async (req, res) => {
 
     const protocol = req.protocol;
     const host = req.get('host');
-    const publicBase = process.env.CLOUDFLARE_URL || `${protocol}://${host}`;
+    const publicBase = process.env.RENDER_EXTERNAL_URL || process.env.CLOUDFLARE_URL || `${req.get("x-forwarded-proto") || req.protocol}://${host}`;
     const webhookUrl = `${publicBase}/api/whatsapp/webhook`;
 
     res.json({

@@ -1,19 +1,29 @@
 const { Pool } = require('pg');
 const embeddedDb = require('./embeddedDb');
 
-let useEmbedded = process.env.USE_EMBEDDED_DB === 'true';
+let useEmbedded = process.env.DATABASE_URL ? false : (process.env.USE_EMBEDDED_DB === 'true');
 let pgConnected = false;
 
-const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || '127.0.0.1',
-  database: process.env.DB_NAME || 'postgres',
-  password: process.env.DB_PASSWORD || '',
-  port: parseInt(process.env.DB_PORT || '5434', 10),
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
+const poolConfig = process.env.DATABASE_URL
+  ? {
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false },
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+    }
+  : {
+      user: process.env.DB_USER || 'postgres',
+      host: process.env.DB_HOST || '127.0.0.1',
+      database: process.env.DB_NAME || 'postgres',
+      password: process.env.DB_PASSWORD || '',
+      port: parseInt(process.env.DB_PORT || '5434', 10),
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
+    };
+
+const pool = new Pool(poolConfig);
 
 pool.on('error', (err) => {
   if (!useEmbedded) {

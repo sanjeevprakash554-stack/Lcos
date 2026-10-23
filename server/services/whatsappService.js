@@ -19,14 +19,21 @@ class WhatsAppService {
   }
 
   getConfig() {
+    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || '1246879781843655';
+    const accessToken = process.env.WHATSAPP_ACCESS_TOKEN || 'EAAQeAI63VoYBSw60w5C4LZBBg4AXIipaVBK8MZA8c9uFZBoPqXf426GgnMwbp9JcvXQaCBFvmhItuWcO2NFAJ7azzZAIe9jzrNXHXhuA2UNPZCoxykaSjruteZCxYyLvkZCiwnAgAwxuMWLF5u9xEAulduVqTMfQOL857HnURSJgYXI9KiDuun0y7vKhkgjGqFbWwZDZD';
+    const businessAccountId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '2546380309167877';
+    const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN || 'lcos_meta_verify_token_2026';
+    const higherOfficialPhone = process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
+
     return {
       apiVersion: process.env.WHATSAPP_API_VERSION || 'v21.0',
-      phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
-      accessToken: process.env.WHATSAPP_ACCESS_TOKEN || '',
-      businessAccountId: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '',
-      verifyToken: process.env.WHATSAPP_VERIFY_TOKEN || 'lcos_meta_verify_token_2026',
+      phoneNumberId,
+      accessToken,
+      businessAccountId,
+      verifyToken,
+      higherOfficialPhone,
       enabled: process.env.WHATSAPP_ENABLED !== 'false',
-      isConfigured: !!(process.env.WHATSAPP_PHONE_NUMBER_ID && process.env.WHATSAPP_ACCESS_TOKEN),
+      isConfigured: !!(phoneNumberId && accessToken),
     };
   }
 
@@ -143,7 +150,24 @@ class WhatsAppService {
 
       if (!response.ok) {
         const errorMsg = data.error?.message || response.statusText || 'Unknown Meta API Error';
-        console.error(`❌ [WhatsApp API Error] (${response.status}):`, errorMsg);
+        const errorCode = data.error?.code;
+        console.error(`❌ [WhatsApp API Error] (${response.status} - Code ${errorCode}):`, errorMsg);
+
+        // Auto-forward for Meta Sandbox Allowed List restriction (Error 131030)
+        const officialPhone = this.formatPhoneNumber(config.higherOfficialPhone || '916382897998');
+        if (errorCode === 131030 && formattedTo !== officialPhone && !payload._rerouted) {
+          console.warn(`⚠️ [WhatsApp Sandbox Notice]: Recipient +${formattedTo} is not in Meta's allowed test list. Auto-forwarding to verified official phone: +${officialPhone}`);
+          const reroutedPayload = { ...payload, to: officialPhone, _rerouted: true };
+          const noticeHeader = `⚠️ *[Sandbox Forward: Driver +${formattedTo} not in Meta Allowed List]*\n\n`;
+          if (reroutedPayload.text?.body) {
+            reroutedPayload.text.body = noticeHeader + reroutedPayload.text.body;
+          } else if (reroutedPayload.interactive?.body?.text) {
+            reroutedPayload.interactive.body.text = noticeHeader + reroutedPayload.interactive.body.text;
+          }
+          const reroutedSummary = `[Auto-Forwarded to +${officialPhone}]: ${rawContentSummary}`;
+          return this.sendPayload(reroutedPayload, reroutedSummary, officialPhone);
+        }
+
         await this.logMessage({
           direction: 'OUTBOUND',
           fromNumber: config.phoneNumberId,

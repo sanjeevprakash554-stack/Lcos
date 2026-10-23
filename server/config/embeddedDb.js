@@ -21,6 +21,7 @@ function initEmbeddedDb() {
     const dbFilePath = getDbFilePath();
     const isNew = !fs.existsSync(dbFilePath);
 
+    const dir = path.dirname(dbFilePath); if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     sqlite = new DatabaseSync(dbFilePath);
     sqlite.exec("PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;");
 
