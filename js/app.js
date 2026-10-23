@@ -543,7 +543,7 @@ const app = {
             // so that all dispatches and logs receive real timestamps!
             const settings = LCOS_State.getSystemSettings();
             settings.simulationTime = date.toISOString();
-            LCOS_State.save();
+            if (typeof LCOS_State.save === "function") LCOS_State.save();
         };
         
         updateClock();
@@ -3739,7 +3739,8 @@ const app = {
 
         filteredTrips.forEach(t => {
             const statusLabel = statusMap[t.status] || t.status;
-            vehSelect.innerHTML += `<option value="${t.id}">${t.vehicleId} (${statusLabel})</option>`;
+            const liveTag = t.isLiveSynced ? ' 🟢 Live' : '';
+            vehSelect.innerHTML += `<option value="${t.id}">${t.vehicleId} (${statusLabel}${liveTag})</option>`;
         });
         
         if (Array.from(vehSelect.options).some(opt => opt.value === prevSelected)) {
@@ -4224,28 +4225,27 @@ const app = {
 
                     // Vehicle Marker in Registry
                     const vehicleId = trip.vehicleId;
-                    let entry = this.vehicleMarkerRegistry.get(vehicleId);
+                    const pos = this.getTripCurrentCoordinates(trip);
+                    const veh = LCOS_State.getVehicles().find(v => v.id === vehicleId);
 
-                    if (entry) {
+                    this.updateSingleVehicleMarker({
+                        vehicleId,
+                        tripId: trip.id,
+                        lat: pos.lat,
+                        lng: pos.lng,
+                        speedKmh: trip.speedKmh || (veh?.speedKmh) || 0,
+                        movementStatus: trip.movementStatus || (veh?.movementStatus) || (trip.status === 'IN_TRANSIT' ? 'MOVING' : 'STOPPED'),
+                        recordedAt: trip.last_gps_update || (veh?.lastGpsUpdate) || trip.lastUpdateTimestamp || '1970-01-01T00:00:00.000Z'
+                    });
+
+                    let entry = this.vehicleMarkerRegistry.get(vehicleId);
+                    if (entry && !this.routeLayerGroup.hasLayer(entry.marker)) {
                         this.routeLayerGroup.addLayer(entry.marker);
-                    } else {
-                        const pos = this.getTripCurrentCoordinates(trip);
-                        const veh = LCOS_State.getVehicles().find(v => v.id === vehicleId);
-                        this.updateSingleVehicleMarker({
-                            vehicleId,
-                            tripId: trip.id,
-                            lat: pos.lat,
-                            lng: pos.lng,
-                            speedKmh: trip.speedKmh || (veh?.speedKmh) || 0,
-                            movementStatus: trip.movementStatus || (veh?.movementStatus) || (trip.status === 'IN_TRANSIT' ? 'MOVING' : 'STOPPED'),
-                            recordedAt: trip.last_gps_update || (veh?.lastGpsUpdate) || trip.lastUpdateTimestamp || '1970-01-01T00:00:00.000Z'
-                        });
-                        entry = this.vehicleMarkerRegistry.get(vehicleId);
                     }
 
                     if (selectedVehTripId && trip.id === selectedVehTripId) {
                         if (entry) {
-                            this.leafletMap.flyTo([entry.currentLat, entry.currentLng], 12, { duration: 1 });
+                            this.leafletMap.flyTo([entry.currentLat, entry.currentLng], 14, { duration: 1 });
                             setTimeout(() => entry.marker.openPopup(), 400);
                         }
                         this.loadVehicleTripHistoryPolyline(vehicleId);
@@ -4352,6 +4352,9 @@ const app = {
                 if (!data) return;
                 // Update ONLY that marker. Do NOT re-render the whole map or call updateMapHighlights().
                 this.updateSingleVehicleMarker(data);
+                if (this.activeSelectedVehicleId === data.vehicleId && this.leafletMap) {
+                    this.leafletMap.panTo([data.lat, data.lng]);
+                }
             });
 
             this.socket.on('stoppage_driver_response', async (data) => {

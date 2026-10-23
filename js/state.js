@@ -392,6 +392,12 @@ const LCOS_State = {
     getStock() { return this.data.stock; },
     getRequests() { return this.data.requests || []; },
 
+    save() {
+        try {
+            localStorage.setItem('LCOS_STATE_BACKUP', JSON.stringify(this.data));
+        } catch (_) {}
+    },
+
     getTripById(id) {
         return this.data.trips.find(t => t.id === id);
     },
