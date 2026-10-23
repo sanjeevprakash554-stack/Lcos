@@ -276,7 +276,7 @@ const LCOS_State = {
             if (vehiclesRes.status === 'fulfilled' && vehiclesRes.value && vehiclesRes.value.vehicles && vehiclesRes.value.vehicles.length > 0) {
                 this.data.vehicles = vehiclesRes.value.vehicles.map(v => ({
                     id: v.id, type: v.type, capacity: Number(v.capacity_tons), owner: v.ownership, status: v.status,
-                    currentLat: Number(v.current_lat), currentLng: Number(v.current_lng), movementStatus: v.movement_status
+                    currentLat: (v.current_lat !== null && v.current_lat !== undefined) ? Number(v.current_lat) : null, currentLng: (v.current_lng !== null && v.current_lng !== undefined) ? Number(v.current_lng) : null, speedKmh: v.speed_kmh !== undefined ? Number(v.speed_kmh) : 0, heading: v.heading !== undefined ? Number(v.heading) : 0, movementStatus: v.movement_status || 'STOPPED', lastGpsUpdate: v.last_gps_update || null, lastPingAt: v.last_ping_at || null
                 }));
             }
 
@@ -313,7 +313,12 @@ const LCOS_State = {
                     deliveryInfo: typeof t.delivery_info === 'string' ? JSON.parse(t.delivery_info) : t.delivery_info,
                     lastUpdateTimestamp: t.last_update_timestamp,
                     callLogs: [],
-                    isLiveSynced: Boolean(t.is_live_synced),
+                    isLiveSynced: Boolean(t.is_live_synced || (t.current_lat && t.current_lng)),
+                    currentGPS: (t.current_lat && t.current_lng) ? { lat: Number(t.current_lat), lng: Number(t.current_lng) } : null,
+                    speedKmh: t.speed_kmh !== undefined ? Number(t.speed_kmh) : 0,
+                    heading: t.heading !== undefined ? Number(t.heading) : 0,
+                    movementStatus: t.movement_status || 'STOPPED',
+                    last_gps_update: t.last_gps_update || null,
                     realOriginGPS: t.real_origin_gps || null,
                     realDestinationGPS: t.real_destination_gps || null,
                     currentGPS: t.current_gps || null,

@@ -17,7 +17,9 @@ router.get('/', authenticateToken, async (req, res) => {
              c.name AS commodity_name, c.unit AS commodity_unit,
              sb.name AS source_branch_name, db_br.name AS destination_branch_name,
              v.type AS vehicle_type, d.name AS driver_name, d.phone AS driver_phone,
-             h.name AS helper_name
+             h.name AS helper_name,
+             v.current_lat, v.current_lng, v.speed_kmh, v.heading, v.movement_status,
+             v.last_gps_update, v.last_ping_at
       FROM trips t
       LEFT JOIN commodities c ON c.id = t.commodity_id
       LEFT JOIN branches sb ON sb.id = t.source_branch_id
@@ -56,7 +58,9 @@ router.get('/:id', authenticateToken, async (req, res) => {
              c.name AS commodity_name, c.unit AS commodity_unit,
              sb.name AS source_branch_name, db_br.name AS destination_branch_name,
              v.type AS vehicle_type, d.name AS driver_name, d.phone AS driver_phone,
-             h.name AS helper_name
+             h.name AS helper_name,
+             v.current_lat, v.current_lng, v.speed_kmh, v.heading, v.movement_status,
+             v.last_gps_update, v.last_ping_at
       FROM trips t
       LEFT JOIN commodities c ON c.id = t.commodity_id
       LEFT JOIN branches sb ON sb.id = t.source_branch_id

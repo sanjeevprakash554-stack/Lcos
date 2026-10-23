@@ -3582,6 +3582,23 @@ const app = {
     },
 
     getTripCurrentCoordinates(trip) {
+        if (trip.currentGPS && trip.currentGPS.lat && trip.currentGPS.lng) {
+            return {
+                lat: Number(trip.currentGPS.lat),
+                lng: Number(trip.currentGPS.lng),
+                isLive: true
+            };
+        }
+
+        const vehicle = LCOS_State.getVehicles().find(v => v.id === trip.vehicleId);
+        if (vehicle && vehicle.currentLat && vehicle.currentLng && !isNaN(vehicle.currentLat)) {
+            return {
+                lat: Number(vehicle.currentLat),
+                lng: Number(vehicle.currentLng),
+                isLive: true
+            };
+        }
+
         if (trip.isLiveSynced && trip.currentGPS && trip.currentGPS.lat && trip.currentGPS.lng) {
             return {
                 lat: Number(trip.currentGPS.lat),
@@ -3821,6 +3838,7 @@ const app = {
                     <div>📦 <strong>Cargo:</strong> ${cargoDesc}</div>
                     <div>🛣️ <strong>Route:</strong> ${routeText}</div>
                     <div>⚡ <strong>Speed:</strong> ${speedText} km/h (${this.escapeHtml(entry.movementStatus || 'STOPPED')})</div>
+                    <div>📍 <strong>Location:</strong> ${(entry.currentLat || 0).toFixed(4)}°N, ${(entry.currentLng || 0).toFixed(4)}°E</div>
                     <div style="margin-top:10px; padding-top:8px; border-top:1px solid #f1f5f9;">
                         <button type="button" class="btn btn-sm btn-primary ping-driver-btn" data-vehicle-id="${vehPlate}" style="width:100%; padding:6px 10px; font-size:0.78rem; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px; background:#2563eb; color:#fff; border:none; border-radius:6px; cursor:pointer;">
                             📡 Ping Driver Now
@@ -4212,14 +4230,15 @@ const app = {
                         this.routeLayerGroup.addLayer(entry.marker);
                     } else {
                         const pos = this.getTripCurrentCoordinates(trip);
+                        const veh = LCOS_State.getVehicles().find(v => v.id === vehicleId);
                         this.updateSingleVehicleMarker({
                             vehicleId,
                             tripId: trip.id,
                             lat: pos.lat,
                             lng: pos.lng,
-                            speedKmh: trip.speedKmh || 0,
-                            movementStatus: trip.status === 'IN_TRANSIT' ? 'MOVING' : 'STOPPED',
-                            recordedAt: trip.last_gps_update || trip.lastUpdateTimestamp || '1970-01-01T00:00:00.000Z'
+                            speedKmh: trip.speedKmh || (veh?.speedKmh) || 0,
+                            movementStatus: trip.movementStatus || (veh?.movementStatus) || (trip.status === 'IN_TRANSIT' ? 'MOVING' : 'STOPPED'),
+                            recordedAt: trip.last_gps_update || (veh?.lastGpsUpdate) || trip.lastUpdateTimestamp || '1970-01-01T00:00:00.000Z'
                         });
                         entry = this.vehicleMarkerRegistry.get(vehicleId);
                     }
