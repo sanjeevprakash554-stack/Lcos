@@ -1240,6 +1240,15 @@
           }
         );
 
+        // Immediately fetch high-accuracy location fix without waiting for timer
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => transmitOrQueuePoint(pos, true),
+            (err) => console.warn('[Initial Fix Note]:', err.message),
+            { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
+          );
+        }
+
         // Continuous interval poll in case mobile browser throttles watchPosition
         state.pollingTimer = setInterval(() => {
           if (state.isTracking && navigator.geolocation) {

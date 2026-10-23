@@ -3916,6 +3916,11 @@ const app = {
             const marker = L.marker([lat, lng], { icon });
             this.routeLayerGroup.addLayer(marker);
 
+            const dName = data.driverName || (driver ? driver.name : (trip ? trip.driver_name : 'Assigned Driver'));
+            const cDesc = data.cargoDesc || (commodity ? `${commodity.name} (${trip.quantity} ${commodity.unit})` : 'Freight Cargo');
+            const oName = data.originName || (originBranch ? originBranch.name : 'Origin Hub');
+            const dstName = data.destName || (destBranch ? destBranch.name : 'Destination Hub');
+
             entry = {
                 vehicleId,
                 marker,
@@ -3927,11 +3932,11 @@ const app = {
                 heading,
                 speedKmh,
                 movementStatus,
-                tripId: trip ? trip.id : null,
-                driverName: driver ? driver.name : (trip ? trip.driver_name : null),
-                cargoDesc: commodity ? `${commodity.name} (${trip.quantity} ${commodity.unit})` : null,
-                originName: originBranch ? originBranch.name : null,
-                destName: destBranch ? destBranch.name : null,
+                tripId: data.tripId || (trip ? trip.id : null),
+                driverName: dName,
+                cargoDesc: cDesc,
+                originName: oName,
+                destName: dstName,
                 animFrame: null,
             };
 
@@ -3957,6 +3962,10 @@ const app = {
         entry.speedKmh = speedKmh;
         entry.movementStatus = movementStatus;
         entry.lastRecordedAt = recordedAt;
+        if (data.driverName) entry.driverName = data.driverName;
+        if (data.cargoDesc) entry.cargoDesc = data.cargoDesc;
+        if (data.originName) entry.originName = data.originName;
+        if (data.destName) entry.destName = data.destName;
         if (trip) {
             entry.tripId = trip.id;
             if (driver) entry.driverName = driver.name;
@@ -4350,10 +4359,47 @@ const app = {
             });
             this.socket.on('gps_update', (data) => {
                 if (!data) return;
-                // Update ONLY that marker. Do NOT re-render the whole map or call updateMapHighlights().
+
+                // 1. Update ONLY that marker on the Leaflet map (smooth animation)
                 this.updateSingleVehicleMarker(data);
+
+                // 2. Synchronize LCOS_State vehicle & trip models in memory
+                if (window.LCOS_State) {
+                    const veh = (LCOS_State.getVehicles() || []).find(v => v.id === data.vehicleId);
+                    if (veh) {
+                        veh.current_lat = data.lat;
+                        veh.current_lng = data.lng;
+                        veh.currentLat = data.lat;
+                        veh.currentLng = data.lng;
+                        veh.speedKmh = data.speedKmh;
+                        veh.movementStatus = data.movementStatus;
+                        veh.heading = data.heading;
+                        veh.lastGpsUpdate = data.recordedAt;
+                    }
+                    const trip = (LCOS_State.getTrips() || []).find(t => t.vehicleId === data.vehicleId || (data.tripId && t.id === data.tripId));
+                    if (trip) {
+                        trip.currentLat = data.lat;
+                        trip.currentLng = data.lng;
+                        trip.speedKmh = data.speedKmh;
+                        trip.movementStatus = data.movementStatus;
+                        trip.last_gps_update = data.recordedAt;
+                        trip.lastUpdateTimestamp = data.recordedAt;
+                        trip.isLiveSynced = true;
+                        if (['CREATED', 'SCHEDULED', 'DISPATCH_APPROVED'].includes(trip.status)) {
+                            trip.status = 'IN_TRANSIT';
+                        }
+                    }
+                }
+
+                // 3. Pan to vehicle if operator explicitly focused it
                 if (this.activeSelectedVehicleId === data.vehicleId && this.leafletMap) {
                     this.leafletMap.panTo([data.lat, data.lng]);
+                }
+
+                // 4. Update Running Trucks filter count if newly active
+                const vehSelect = document.getElementById('map-filter-vehicle');
+                if (vehSelect && data.tripId && !Array.from(vehSelect.options).some(opt => opt.value === data.tripId)) {
+                    this.updateMapReport();
                 }
             });
 

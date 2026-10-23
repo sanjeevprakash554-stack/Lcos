@@ -112,9 +112,17 @@ async function authenticateGpsSender(req, res, next) {
 
       // Look up driver's active trip (IN_TRANSIT, DELAYED, CREATED, DISPATCH_APPROVED, etc.) server-side
       const tripRes = await db.query(
-        `SELECT t.*, v.company_id AS vehicle_company_id 
+        `SELECT t.*, v.company_id AS vehicle_company_id, v.type AS vehicle_type,
+                d.name AS driver_name,
+                c.name AS commodity_name, c.unit AS commodity_unit,
+                sb.name AS source_branch_name,
+                dest_b.name AS destination_branch_name
          FROM trips t
          LEFT JOIN vehicles v ON v.id = t.vehicle_id
+         LEFT JOIN drivers d ON d.id = t.driver_id
+         LEFT JOIN commodities c ON c.id = t.commodity_id
+         LEFT JOIN branches sb ON sb.id = t.source_branch_id
+         LEFT JOIN branches dest_b ON dest_b.id = t.destination_branch_id
          WHERE t.driver_id = $1 AND t.status IN ('IN_TRANSIT', 'DELAYED', 'CREATED', 'DISPATCH_APPROVED', 'JOURNEY_STARTED', 'DRIVER_CONFIRMED')
          ORDER BY t.created_at DESC LIMIT 1`,
         [driverId]
@@ -449,6 +457,11 @@ router.post('/update', authenticateGpsSender, async (req, res) => {
         vehicleId,
         tripId: activeTrip?.id || null,
         driverId,
+        driverName: activeTrip?.driver_name || null,
+        cargoDesc: activeTrip?.commodity_name ? `${activeTrip.commodity_name} (${activeTrip.quantity || 0} ${activeTrip.commodity_unit || 'Units'})` : null,
+        originName: activeTrip?.source_branch_name || null,
+        destName: activeTrip?.destination_branch_name || null,
+        vehicleType: activeTrip?.vehicle_type || null,
         companyId,
         lat,
         lng,
@@ -636,6 +649,11 @@ router.post('/batch', authenticateGpsSender, async (req, res) => {
         vehicleId,
         tripId: activeTrip?.id || null,
         driverId,
+        driverName: activeTrip?.driver_name || null,
+        cargoDesc: activeTrip?.commodity_name ? `${activeTrip.commodity_name} (${activeTrip.quantity || 0} ${activeTrip.commodity_unit || 'Units'})` : null,
+        originName: activeTrip?.source_branch_name || null,
+        destName: activeTrip?.destination_branch_name || null,
+        vehicleType: activeTrip?.vehicle_type || null,
         companyId,
         lat: newestPoint.lat,
         lng: newestPoint.lng,

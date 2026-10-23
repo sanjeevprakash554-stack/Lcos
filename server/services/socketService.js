@@ -206,6 +206,11 @@ function broadcastGpsUpdate(payload) {
     vehicleId: payload.vehicleId || payload.id,
     tripId: payload.tripId || payload.trip_id || null,
     driverId: payload.driverId || payload.driver_id || null,
+    driverName: payload.driverName || payload.driver_name || null,
+    cargoDesc: payload.cargoDesc || payload.cargo_desc || null,
+    originName: payload.originName || payload.origin_name || null,
+    destName: payload.destName || payload.dest_name || null,
+    vehicleType: payload.vehicleType || payload.vehicle_type || null,
     companyId: companyId,
     lat: payload.lat !== undefined ? Number(payload.lat) : Number(payload.current_lat),
     lng: payload.lng !== undefined ? Number(payload.lng) : Number(payload.current_lng),
@@ -217,6 +222,7 @@ function broadcastGpsUpdate(payload) {
   };
 
   io.to(`company_${companyId}`).emit('gps_update', standardized);
+  io.emit('gps_update', standardized);
 
   if (standardized.tripId) {
     io.to(`trip_${standardized.tripId}`).emit('gps_update', standardized);
