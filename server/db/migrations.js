@@ -121,6 +121,11 @@ async function runMigrations() {
       // Index might already exist
     }
 
+    // 9. Ensure default initial test trip TRIP-1001 is IN_TRANSIT for mobile tracking demo
+    try {
+      await db.query("UPDATE trips SET status = 'IN_TRANSIT' WHERE id = 'TRIP-1001' AND status = 'CREATED'");
+    } catch (_) {}
+
     // 6. Backfill branch coordinates
     for (const b of BRANCH_COORDINATES) {
       try {

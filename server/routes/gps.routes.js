@@ -110,12 +110,12 @@ async function authenticateGpsSender(req, res, next) {
         return res.status(404).json({ success: false, message: 'Driver record not found for user' });
       }
 
-      // Look up driver's active trip (IN_TRANSIT or DELAYED) server-side
+      // Look up driver's active trip (IN_TRANSIT, DELAYED, CREATED, DISPATCH_APPROVED, etc.) server-side
       const tripRes = await db.query(
         `SELECT t.*, v.company_id AS vehicle_company_id 
          FROM trips t
          LEFT JOIN vehicles v ON v.id = t.vehicle_id
-         WHERE t.driver_id = $1 AND t.status IN ('IN_TRANSIT', 'DELAYED')
+         WHERE t.driver_id = $1 AND t.status IN ('IN_TRANSIT', 'DELAYED', 'CREATED', 'DISPATCH_APPROVED', 'JOURNEY_STARTED', 'DRIVER_CONFIRMED')
          ORDER BY t.created_at DESC LIMIT 1`,
         [driverId]
       );
@@ -128,6 +128,15 @@ async function authenticateGpsSender(req, res, next) {
       }
 
       const activeTrip = tripRes.rows[0];
+
+      // Auto-transition trip to IN_TRANSIT if tracking commences from CREATED / DISPATCH_APPROVED
+      if (['CREATED', 'DISPATCH_APPROVED', 'JOURNEY_STARTED', 'DRIVER_CONFIRMED'].includes(activeTrip.status)) {
+        try {
+          await db.query(`UPDATE trips SET status = 'IN_TRANSIT' WHERE id = $1`, [activeTrip.id]);
+          activeTrip.status = 'IN_TRANSIT';
+        } catch (_) {}
+      }
+
       req.gpsAuth = {
         type: 'DRIVER',
         driverId,
@@ -162,7 +171,7 @@ async function authenticateGpsSender(req, res, next) {
 
       // Look up active trip if one exists
       const tripRes = await db.query(
-        `SELECT * FROM trips WHERE vehicle_id = $1 AND status IN ('IN_TRANSIT', 'DELAYED') ORDER BY created_at DESC LIMIT 1`,
+        `SELECT * FROM trips WHERE vehicle_id = $1 AND status IN ('IN_TRANSIT', 'DELAYED', 'CREATED', 'DISPATCH_APPROVED', 'JOURNEY_STARTED', 'DRIVER_CONFIRMED') ORDER BY created_at DESC LIMIT 1`,
         [vehicleId]
       );
 
