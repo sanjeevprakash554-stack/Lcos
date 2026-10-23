@@ -2,13 +2,23 @@ const fs = require('fs');
 const path = require('path');
 
 let sqlite = null;
-const dbFilePath = path.join(__dirname, '../db/lcos_embedded.sqlite');
+function getDbFilePath() {
+  return process.env.LCOS_DB_PATH || path.join(__dirname, '../db/lcos_embedded.sqlite');
+}
+
+function closeEmbeddedDb() {
+  if (sqlite) {
+    try { sqlite.close(); } catch (_) {}
+    sqlite = null;
+  }
+}
 
 function initEmbeddedDb() {
   if (sqlite) return sqlite;
 
   try {
     const { DatabaseSync } = require('node:sqlite');
+    const dbFilePath = getDbFilePath();
     const isNew = !fs.existsSync(dbFilePath);
 
     sqlite = new DatabaseSync(dbFilePath);
@@ -34,9 +44,12 @@ function initEmbeddedDb() {
       if (fs.existsSync(schemaPath)) {
         let schema = fs.readFileSync(schemaPath, 'utf8')
           .replace(/::[a-zA-Z0-9_]+/gi, '')
-          .replace(/TIMESTAMPTZ\s+DEFAULT\s+NOW\(\)/gi, "TEXT DEFAULT (datetime('now'))")
+          .replace(/TIMESTAMPTZ\s+DEFAULT\s+NOW\(\)/gi, "TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))")
           .replace(/TIMESTAMPTZ/gi, 'TEXT')
           .replace(/JSONB/gi, 'TEXT')
+          .replace(/ALTER\s+TABLE\s+[\s\S]*?;/gi, '')
+          .replace(/BOOLEAN\s+DEFAULT\s+FALSE/gi, 'INTEGER DEFAULT 0')
+          .replace(/BOOLEAN\s+DEFAULT\s+TRUE/gi, 'INTEGER DEFAULT 1')
           .replace(/BOOLEAN/gi, 'INTEGER')
           .replace(/(BIGSERIAL|SERIAL)\s+PRIMARY\s+KEY/gi, 'INTEGER PRIMARY KEY AUTOINCREMENT');
 
@@ -51,7 +64,7 @@ function initEmbeddedDb() {
           .replace(/NOW\(\)\s*-\s*INTERVAL\s*'(\d+)\s*days?'/gi, "datetime('now', '-$1 days')")
           .replace(/NOW\(\)\s*\+\s*INTERVAL\s*'(\d+)\s*days?'/gi, "datetime('now', '+$1 days')")
           .replace(/NOW\(\)\s*\+\s*INTERVAL\s*'(\d+)\s*years?'/gi, "datetime('now', '+$1 years')")
-          .replace(/NOW\(\)/gi, "datetime('now')")
+          .replace(/NOW\(\)/gi, "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')")
           .replace(/\btrue\b/g, '1')
           .replace(/\bfalse\b/g, '0');
 
@@ -101,7 +114,7 @@ async function query(sqlText, params = []) {
     .replace(/(?:NOW\(\)|datetime\('now'\))\s*\+\s*INTERVAL\s*'(\d+)\s*years?'/gi, "datetime('now', '+$1 years')")
     .replace(/(?:NOW\(\)|datetime\('now'\))\s*\+\s*INTERVAL\s*'1\s*months?'\s*\*\s*\??(\d+)/gi, "datetime('now', '+' || ?$1 || ' months')")
     .replace(/(?:NOW\(\)|datetime\('now'\))\s*-\s*v\.stoppage_start_time\s*>=\s*INTERVAL\s*'1 minute'\s*\*\s*\?(\d+)/gi, "(strftime('%s', 'now') - strftime('%s', v.stoppage_start_time)) >= (?$1 * 60)")
-    .replace(/\bNOW\(\)/gi, "datetime('now')")
+    .replace(/\bNOW\(\)/gi, "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')")
     .replace(/\btrue\b/gi, '1')
     .replace(/\bfalse\b/gi, '0')
     .replace(/\bILIKE\b/gi, 'LIKE')
@@ -127,8 +140,30 @@ async function query(sqlText, params = []) {
   }
 }
 
+
+async function withTransaction(fn) {
+  const db = initEmbeddedDb();
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const tx = {
+      query: (sql, params) => query(sql, params),
+    };
+    const result = await fn(tx);
+    db.exec("COMMIT");
+    return result;
+  } catch (err) {
+    try {
+      db.exec("ROLLBACK");
+    } catch (_) {}
+    throw err;
+  }
+}
+
 module.exports = {
   initEmbeddedDb,
   query,
-  dbFilePath
+  withTransaction,
+  getDbFilePath,
+  closeEmbeddedDb,
 };
+

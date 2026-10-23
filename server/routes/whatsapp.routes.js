@@ -5,7 +5,16 @@ const path = require('path');
 const db = require('../config/db');
 const whatsappService = require('../services/whatsappService');
 const stoppageDetector = require('../services/stoppageDetector');
-const { broadcastAlert, broadcastTripUpdate, broadcastGpsUpdate, getIO } = require('../services/socketService');
+const {
+  broadcastAlert,
+  broadcastTripUpdate,
+  broadcastGpsUpdate,
+  broadcastStoppageDriverResponse,
+  broadcastStoppageReasonAccepted,
+  broadcastStoppageReasonDeclined,
+  broadcastAlertResolved,
+  getIO
+} = require('../services/socketService');
 
 /**
  * Normalizes phone numbers for matching (last 10 digits)
@@ -284,19 +293,8 @@ async function handleIncomingMessage(msg, contact = null) {
         senderNumber,
         `🟢 *Transit Resumed!* Vehicle *${vehId}* marked as MOVING on Central Operations Map. Stoppage alert resolved. Drive safely!`
       );
-      const io = getIO();
-      if (io) {
-        io.emit('stoppage_driver_response', {
-          vehicleId: vehId,
-          reason: '🟢 Resuming Movement (Transit Resumed)',
-          timestamp: new Date().toISOString()
-        });
-        io.emit('stoppage_reason_accepted', {
-          vehicleId: vehId,
-          status: 'Resolved',
-          message: 'Transit Resumed by Driver'
-        });
-      }
+      broadcastStoppageDriverResponse(driver?.company_id || 'COMP-001', { vehicleId: vehId, reason: '🟢 Resuming Movement (Transit Resumed)', timestamp: new Date().toISOString() });
+      broadcastStoppageReasonAccepted(driver?.company_id || 'COMP-001', { vehicleId: vehId, status: 'Resolved', message: 'Transit Resumed by Driver' });
       return;
     }
     if (interactiveButtonId.startsWith('stp_delay_') || interactiveButtonId === 'btn_delay' || interactiveButtonId === 'btn_report_delay') {
@@ -515,16 +513,13 @@ async function recordTransitDelay(toNumber, driver, trip, reason, explicitVehId 
   if (alertRecord) broadcastAlert(alertRecord);
   if (trip) broadcastTripUpdate({ ...trip, status: 'DELAYED' });
 
-  const io = getIO();
-  if (io) {
-    io.emit('stoppage_driver_response', {
-      vehicleId,
-      driverName,
-      reason: `🟡 ${reason}`,
-      alertId: alertRecord?.id,
-      timestamp: new Date().toISOString()
-    });
-  }
+  broadcastStoppageDriverResponse(driver?.company_id || 'COMP-001', {
+    vehicleId,
+    driverName,
+    reason: '🟡 ' + reason,
+    alertId: alertRecord?.id,
+    timestamp: new Date().toISOString()
+  });
 
   // Notify Higher Official of the delay report immediately in all cases
   const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE;
@@ -586,16 +581,13 @@ async function triggerEmergencyAlert(toNumber, driver, trip, messageText, explic
   );
 
   if (alertRecord) broadcastAlert(alertRecord);
-  const io = getIO();
-  if (io) {
-    io.emit('stoppage_driver_response', {
-      vehicleId,
-      driverName,
-      reason: `🔴 ${messageText}`,
-      alertId: alertRecord?.id,
-      timestamp: new Date().toISOString()
-    });
-  }
+  broadcastStoppageDriverResponse(driver?.company_id || 'COMP-001', {
+    vehicleId,
+    driverName,
+    reason: '🔴 ' + messageText,
+    alertId: alertRecord?.id,
+    timestamp: new Date().toISOString()
+  });
 
   // Notify Higher Official of Emergency SOS immediately
   const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE;
@@ -968,17 +960,8 @@ router.post('/accept-reason', async (req, res) => {
       .catch(e => console.warn('Accept reason WhatsApp notification note:', e.message));
 
     // 4. Broadcast resolution via socket
-    const io = getIO();
-    if (io) {
-      io.emit('stoppage_reason_accepted', {
-        vehicleId: vehId,
-        alertId,
-        status: 'Resolved',
-        message: 'Reason accepted by Operations Manager',
-        timestamp: new Date().toISOString()
-      });
-      io.emit('alert_resolved', { vehicle_id: vehId, id: alertId });
-    }
+    broadcastStoppageReasonAccepted('COMP-001', { vehicleId: vehId, alertId, status: 'Resolved', message: 'Reason accepted by Operations Manager', timestamp: new Date().toISOString() });
+    broadcastAlertResolved('COMP-001', { vehicle_id: vehId, id: alertId });
 
     res.json({
       success: true,
@@ -1002,10 +985,10 @@ router.post('/decline-reason', async (req, res) => {
 
     // 1. Escalate alert
     if (alertId) {
-      await db.query(`UPDATE alerts SET severity = 'critical', status = 'Escalated', escalated = 1, escalated_at = NOW() WHERE id = $1`, [alertId]);
+      await db.query(`UPDATE alerts SET severity = 'critical', status = 'Escalated', escalated = TRUE, escalated_at = NOW() WHERE id = $1`, [alertId]);
     } else {
       await db.query(
-        `UPDATE alerts SET severity = 'critical', status = 'Escalated', escalated = 1, escalated_at = NOW() 
+        `UPDATE alerts SET severity = 'critical', status = 'Escalated', escalated = TRUE, escalated_at = NOW() 
          WHERE vehicle_id = $1 AND (type = 'Stoppage Detected' OR type = 'Driver Delay Report' OR type = 'Emergency Breakdown') AND status = 'Active'`,
         [vehId]
       );
@@ -1033,16 +1016,7 @@ router.post('/decline-reason', async (req, res) => {
       .catch(e => console.warn('Decline reason WhatsApp notification note:', e.message));
 
     // 3. Broadcast decline via socket
-    const io = getIO();
-    if (io) {
-      io.emit('stoppage_reason_declined', {
-        vehicleId: vehId,
-        alertId,
-        status: 'Declined',
-        message: 'Delay reason declined by Operations Manager',
-        timestamp: new Date().toISOString()
-      });
-    }
+    broadcastStoppageReasonDeclined('COMP-001', { vehicleId: vehId, alertId, status: 'Declined', message: 'Delay reason declined by Operations Manager', timestamp: new Date().toISOString() });
 
     res.json({
       success: true,

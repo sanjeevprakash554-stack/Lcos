@@ -46,6 +46,26 @@ router.post('/login', async (req, res) => {
       return res.status(404).json({ success: false, message: 'User account not found' });
     }
 
+    // Resolve driverId if role is DRIVER
+    let driverId = null;
+    if (user.role && user.role.toUpperCase() === 'DRIVER') {
+      try {
+        const dRes = await db.query(
+          `SELECT id FROM drivers WHERE user_id = $1 OR id = $2 LIMIT 1`,
+          [user.id, user.emp_id]
+        );
+        if (dRes.rows.length > 0) {
+          driverId = dRes.rows[0].id;
+        } else if (user.emp_id && user.emp_id.startsWith('DRV-')) {
+          driverId = user.emp_id;
+        }
+      } catch (dErr) {
+        if (user.emp_id && user.emp_id.startsWith('DRV-')) {
+          driverId = user.emp_id;
+        }
+      }
+    }
+
     const payload = {
       id: user.id,
       companyId: user.company_id,
@@ -53,6 +73,7 @@ router.post('/login', async (req, res) => {
       fullName: user.full_name,
       role: user.role,
       empId: user.emp_id,
+      driverId: driverId || undefined,
     };
 
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
@@ -73,6 +94,7 @@ router.post('/login', async (req, res) => {
         fullName: user.full_name,
         role: user.role,
         empId: user.emp_id,
+        driverId: driverId,
         companyName: user.company_name,
       },
     });
@@ -97,7 +119,20 @@ router.get('/me', authenticateToken, async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    res.json({ success: true, user: userRes.rows[0] });
+    const userData = { ...userRes.rows[0] };
+    if (userData.role && userData.role.toUpperCase() === 'DRIVER') {
+      try {
+        const dRes = await db.query(
+          `SELECT id FROM drivers WHERE user_id = $1 OR id = $2 LIMIT 1`,
+          [userData.id, userData.emp_id]
+        );
+        userData.driverId = dRes.rows[0]?.id || userData.emp_id;
+      } catch (e) {
+        userData.driverId = userData.emp_id;
+      }
+    }
+
+    res.json({ success: true, user: userData });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

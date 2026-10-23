@@ -21,15 +21,64 @@ pool.on('error', (err) => {
   }
 });
 
+const db = {
+  query: async (text, params) => {
+    if (useEmbedded) {
+      return embeddedDb.query(text, params);
+    }
+    try {
+      return await pool.query(text, params);
+    } catch (err) {
+      if (!pgConnected) {
+        useEmbedded = true;
+        console.warn('⚠️ PostgreSQL query failed. Switching to embedded DB fallback.');
+        return embeddedDb.query(text, params);
+      }
+      throw err;
+    }
+  },
+  withTransaction: async (fn) => {
+    if (useEmbedded) {
+      return embeddedDb.withTransaction(fn);
+    }
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const tx = {
+        query: (text, params) => client.query(text, params),
+      };
+      const result = await fn(tx);
+      await client.query("COMMIT");
+      return result;
+    } catch (err) {
+      try { await client.query("ROLLBACK"); } catch (_) {}
+      throw err;
+    } finally {
+      client.release();
+    }
+  },
+  pool,
+  isUsingEmbedded: () => useEmbedded
+};
+
+// Export early to avoid circular dependency with migrations.js
+module.exports = db;
+
 // Auto-detect PostgreSQL availability on boot
 (async () => {
   if (useEmbedded) {
     console.log('=======================================================');
     console.log('✅ [Database Ready] Built-in Embedded SQLite Database Active!');
-    console.log('📦 Database file: server/db/lcos_embedded.sqlite');
+    console.log('📦 Database file: ' + embeddedDb.getDbFilePath());
     console.log('✨ All tables, trips, vehicles, drivers & stock ready!');
     console.log('=======================================================');
     embeddedDb.initEmbeddedDb();
+    try {
+      const { runMigrations } = require('../db/migrations');
+      await runMigrations();
+    } catch (mErr) {
+      console.warn('⚠️ [Migration Notice]:', mErr.message);
+    }
     return;
   }
 
@@ -60,29 +109,17 @@ pool.on('error', (err) => {
     console.log('========================================================================');
     console.log('💡 [Database Notice] External PostgreSQL is not running or not found.');
     console.log('⚡ [Auto-Fallback] Activated Built-in Zero-Config Embedded Database!');
-    console.log('📦 Embedded SQLite file: server/db/lcos_embedded.sqlite');
+    console.log('📦 Embedded SQLite file: ' + embeddedDb.getDbFilePath());
     console.log('✨ All tables, trips, vehicles, drivers & stock are ready with zero setup!');
     console.log('========================================================================');
     embeddedDb.initEmbeddedDb();
   }
-})();
 
-module.exports = {
-  query: async (text, params) => {
-    if (useEmbedded) {
-      return embeddedDb.query(text, params);
-    }
-    try {
-      return await pool.query(text, params);
-    } catch (err) {
-      if (!pgConnected) {
-        useEmbedded = true;
-        console.warn('⚠️ PostgreSQL query failed. Switching to embedded DB fallback.');
-        return embeddedDb.query(text, params);
-      }
-      throw err;
-    }
-  },
-  pool,
-  isUsingEmbedded: () => useEmbedded
-};
+  // Run migrations across whichever database is currently active
+  try {
+    const { runMigrations } = require('../db/migrations');
+    await runMigrations();
+  } catch (mErr) {
+    console.warn('⚠️ [Migration Notice]:', mErr.message);
+  }
+})();

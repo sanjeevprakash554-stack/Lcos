@@ -45,6 +45,8 @@ CREATE TABLE IF NOT EXISTS branches (
     phone VARCHAR(50),
     x_coord INT DEFAULT 50,
     y_coord INT DEFAULT 50,
+    lat NUMERIC,
+    lng NUMERIC,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -69,6 +71,7 @@ CREATE TABLE IF NOT EXISTS vehicles (
     capacity_tons NUMERIC NOT NULL,
     ownership VARCHAR(50) NOT NULL, -- 'Self Owned', 'Logistics Partners'
     status VARCHAR(50) DEFAULT 'Available', -- 'Available', 'In Transit', 'Maintenance'
+    device_key VARCHAR(255),
     current_lat NUMERIC DEFAULT 13.0827,
     current_lng NUMERIC DEFAULT 80.2707,
     speed_kmh NUMERIC DEFAULT 0,
@@ -76,6 +79,7 @@ CREATE TABLE IF NOT EXISTS vehicles (
     movement_status VARCHAR(50) DEFAULT 'STOPPED', -- 'MOVING', 'STOPPED', 'IDLE'
     stoppage_start_time TIMESTAMPTZ,
     last_gps_update TIMESTAMPTZ DEFAULT NOW(),
+    last_ping_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -142,6 +146,7 @@ CREATE TABLE IF NOT EXISTS trips (
     checklists JSONB DEFAULT '{}'::jsonb,
     transit_updates JSONB DEFAULT '[]'::jsonb,
     delivery_info JSONB,
+    arriving_notified BOOLEAN DEFAULT FALSE,
     last_update_timestamp TIMESTAMPTZ DEFAULT NOW(),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -157,6 +162,7 @@ CREATE TABLE IF NOT EXISTS gps_tracking_records (
     longitude NUMERIC(10, 7) NOT NULL,
     speed_kmh NUMERIC DEFAULT 0,
     heading NUMERIC DEFAULT 0,
+    accuracy NUMERIC DEFAULT 0,
     movement_status VARCHAR(50) DEFAULT 'MOVING',
     recorded_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -324,3 +330,13 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_company ON subscriptions(company_id
 CREATE INDEX IF NOT EXISTS idx_payments_company ON payments(company_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_company_time ON audit_logs(company_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_whatsapp_logs_time ON whatsapp_logs(created_at DESC);
+
+-- Idempotent column migrations for existing databases
+ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS device_key VARCHAR(255);
+ALTER TABLE gps_tracking_records ADD COLUMN IF NOT EXISTS accuracy NUMERIC DEFAULT 0;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS lat NUMERIC;
+ALTER TABLE branches ADD COLUMN IF NOT EXISTS lng NUMERIC;
+ALTER TABLE trips ADD COLUMN IF NOT EXISTS arriving_notified BOOLEAN DEFAULT FALSE;
+ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS last_ping_at TIMESTAMPTZ;
+
+

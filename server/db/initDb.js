@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('../config/db');
+const { runMigrations } = require('./migrations');
 
 async function initDb() {
   try {
@@ -15,6 +16,10 @@ async function initDb() {
     console.log('Executing PostgreSQL Seed data initialization...');
     await db.query(seedSql);
     console.log('Database seeded successfully.');
+
+    console.log('Executing Schema Migrations & Branch Coordinate Backfills...');
+    await runMigrations();
+    console.log('Migrations completed successfully.');
 
   } catch (err) {
     console.error('Error initializing database:', err);

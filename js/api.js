@@ -3,11 +3,7 @@
  * Connects the existing frontend components to the Node.js / Express / PostgreSQL Backend API.
  */
 const API_BASE_URL = (typeof window !== 'undefined' && window.location)
-  ? (window.location.port === '5000' || window.location.port === '5173'
-      ? '/api'
-      : (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:'
-          ? 'http://localhost:5000/api'
-          : `${window.location.origin}/api`))
+  ? (window.location.protocol === 'file:' ? 'http://localhost:5000/api' : '/api')
   : 'http://localhost:5000/api';
 
 class LCOS_API {

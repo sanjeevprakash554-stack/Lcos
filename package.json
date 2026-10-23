@@ -8,9 +8,18 @@
     "server": "node server/index.js",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "node server/index.js"
+    "start": "node server/index.js",
+    "test": "node scripts/test_gps_ingest.js",
+    "test:pg": "node scripts/run_pg_tests.js",
+    "test:driver": "node scripts/test_driver_track.js",
+    "test:map": "node scripts/test_dashboard_map.js",
+    "tunnel:test": "node scripts/tunnel_test.js",
+    "sim": "node scripts/gps_simulator.js"
   },
   "devDependencies": {
+    "embedded-postgres": "^18.4.0-beta.17",
+    "playwright": "^1.64.1",
+    "socket.io-client": "^4.8.4",
     "vite": "^5.0.0"
   },
   "dependencies": {

@@ -16,6 +16,7 @@ const app = {
         this.bindEvents();
         this.setupSimulation();
         this.initSocketTelemetryListener();
+        this.startStalenessWatcher();
 
         // 2. Initialize landing subscription status
         try {
@@ -635,6 +636,7 @@ const app = {
                 if (window.LCOS_API) {
                     await LCOS_API.login(username, role);
                     await LCOS_State.loadFromBackend();
+                    this.initSocketTelemetryListener();
                 }
             } catch (e) {
                 console.warn('Backend login notice:', e.message);
@@ -700,6 +702,10 @@ const app = {
     },
 
     logout() {
+        if (this.socket) {
+            try { this.socket.disconnect(); } catch (e) {}
+            this.socket = null;
+        }
         const loginPage = document.getElementById('login-page');
         const appContainer = document.getElementById('app-container');
         
@@ -3726,6 +3732,434 @@ const app = {
         this.updateMapHighlights();
     },
 
+    // ==========================================
+    // STEP 6: REAL-TIME VEHICLE REGISTRY & MAP
+    // ==========================================
+    vehicleMarkerRegistry: new Map(),
+    selectedTripHistoryPolyline: null,
+    activeSelectedVehicleId: null,
+    stalenessIntervalId: null,
+    _hadSocketDisconnect: false,
+
+    escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    },
+
+    haversineDistanceKm(lat1, lon1, lat2, lon2) {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    },
+
+    getMarkerVisualState(lastRecordedAt, movementStatus, speedKmh) {
+        const ageSec = Math.max(0, (Date.now() - new Date(lastRecordedAt || Date.now()).getTime()) / 1000);
+        let color = '#10b981';
+        let statusText = 'Live';
+        let badgeHtml = '';
+
+        if (ageSec > 300) {
+            color = '#64748b'; // Grey (> 5 min)
+            const mins = Math.floor(ageSec / 60);
+            statusText = `Stale (${mins}m ago)`;
+            badgeHtml = `<span style="background:#334155; color:#cbd5e1; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700;">● Stale (${mins}m ago)</span>`;
+        } else if (movementStatus === 'STOPPED' || (!movementStatus && speedKmh < 3)) {
+            color = '#f59e0b'; // Amber (stopped/idle)
+            if (ageSec < 60) {
+                statusText = 'Stopped (Live)';
+                badgeHtml = `<span style="background:#78350f; color:#fde68a; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700;">● Stopped</span>`;
+            } else {
+                const mins = Math.floor(ageSec / 60);
+                statusText = `Stopped (${mins}m ago)`;
+                badgeHtml = `<span style="background:#78350f; color:#fde68a; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700;">● Seen ${mins}m ago</span>`;
+            }
+        } else {
+            color = '#10b981'; // Green (moving)
+            if (ageSec < 60) {
+                statusText = 'Moving (Live)';
+                badgeHtml = `<span style="background:#064e3b; color:#6ee7b7; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700;">● Live (${Math.round(speedKmh || 0)} km/h)</span>`;
+            } else {
+                const mins = Math.floor(ageSec / 60);
+                statusText = `Last seen ${mins}m ago`;
+                badgeHtml = `<span style="background:#064e3b; color:#6ee7b7; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:700;">● Last seen ${mins}m ago</span>`;
+            }
+        }
+
+        return { color, statusText, badgeHtml, ageSec };
+    },
+
+    getTruckPopupHtml(entry) {
+        const visual = this.getMarkerVisualState(entry.lastRecordedAt, entry.movementStatus, entry.speedKmh);
+        const vehPlate = this.escapeHtml(entry.vehicleId);
+        const driverName = this.escapeHtml(entry.driverName || 'Assigned Driver');
+        const tripId = this.escapeHtml(entry.tripId || 'N/A');
+        const cargoDesc = this.escapeHtml(entry.cargoDesc || 'Freight Cargo');
+        const routeText = `${this.escapeHtml(entry.originName || 'Origin')} ➔ ${this.escapeHtml(entry.destName || 'Destination')}`;
+        const speedText = Math.round(entry.speedKmh || 0);
+
+        return `
+            <div class="telemetry-popup-box" style="min-width:240px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color:#0f172a;">
+                <div style="background:linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding:8px 12px; border-radius:8px 8px 0 0; color:#fff; display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <div style="font-weight:700; font-size:0.95rem;">🚚 ${vehPlate}</div>
+                        <div style="font-size:0.72rem; color:#94a3b8;">Trip: ${tripId}</div>
+                    </div>
+                    <div>${visual.badgeHtml}</div>
+                </div>
+                <div style="padding:10px 12px; font-size:0.8rem; background:#ffffff; line-height:1.55; border-radius:0 0 8px 8px; border:1px solid #e2e8f0; border-top:none;">
+                    <div>👤 <strong>Driver:</strong> ${driverName}</div>
+                    <div>📦 <strong>Cargo:</strong> ${cargoDesc}</div>
+                    <div>🛣️ <strong>Route:</strong> ${routeText}</div>
+                    <div>⚡ <strong>Speed:</strong> ${speedText} km/h (${this.escapeHtml(entry.movementStatus || 'STOPPED')})</div>
+                    <div style="margin-top:10px; padding-top:8px; border-top:1px solid #f1f5f9;">
+                        <button type="button" class="btn btn-sm btn-primary ping-driver-btn" data-vehicle-id="${vehPlate}" style="width:100%; padding:6px 10px; font-size:0.78rem; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px; background:#2563eb; color:#fff; border:none; border-radius:6px; cursor:pointer;">
+                            📡 Ping Driver Now
+                        </button>
+                        <div class="ping-status-feedback" id="ping-status-${vehPlate}" style="margin-top:5px; font-size:0.73rem; text-align:center; min-height:16px;"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    updateMarkerVisual(entry) {
+        if (!entry || !entry.marker) return;
+        const visual = this.getMarkerVisualState(entry.lastRecordedAt, entry.movementStatus, entry.speedKmh);
+        const iconEl = entry.marker.getElement();
+        if (iconEl) {
+            const inner = iconEl.querySelector('.truck-marker-inner');
+            if (inner) {
+                inner.style.transform = `rotate(${entry.heading || 0}deg)`;
+                const dot = inner.querySelector('div');
+                if (dot) {
+                    dot.style.backgroundColor = visual.color;
+                    dot.style.boxShadow = `0 0 8px ${visual.color}`;
+                }
+            }
+        }
+    },
+
+    updateSingleVehicleMarker(data) {
+        if (!data || !this.leafletMap || !this.routeLayerGroup) return;
+
+        const vehicleId = data.vehicleId || (data.tripId ? LCOS_State.getTrips().find(t => t.id === data.tripId)?.vehicleId : null);
+        if (!vehicleId) return;
+
+        const lat = Number(data.lat !== undefined ? data.lat : data.current_lat);
+        const lng = Number(data.lng !== undefined ? data.lng : data.current_lng);
+        if (isNaN(lat) || isNaN(lng)) return;
+
+        const heading = Number(data.heading || 0);
+        const speedKmh = Number(data.speedKmh !== undefined ? data.speedKmh : (data.speed_kmh || 0));
+        const movementStatus = data.movementStatus || data.movement_status || (speedKmh >= 3 ? 'MOVING' : 'STOPPED');
+        const recordedAt = data.recordedAt || data.recorded_at || new Date().toISOString();
+
+        let entry = this.vehicleMarkerRegistry.get(vehicleId);
+
+        // Ignore out-of-order packets older than current marker timestamp
+        if (entry && entry.lastRecordedAt) {
+            if (new Date(recordedAt).getTime() < new Date(entry.lastRecordedAt).getTime()) {
+                return;
+            }
+        }
+
+        const trip = (data.tripId ? LCOS_State.getTripById(data.tripId) : null) ||
+                     LCOS_State.getTrips().find(t => t.vehicleId === vehicleId && t.status !== 'CLOSED');
+        const driver = (trip && trip.driverId) ? LCOS_State.getDrivers().find(d => d.id === trip.driverId) : null;
+        const commodity = (trip && trip.commodityId) ? LCOS_State.getCommodities().find(c => c.id === trip.commodityId) : null;
+        const originBranch = trip ? LCOS_State.getBranches().find(b => b.id === trip.sourceBranchId) : null;
+        const destBranch = trip ? LCOS_State.getBranches().find(b => b.id === trip.destinationBranchId) : null;
+
+        if (!entry) {
+            const visual = this.getMarkerVisualState(recordedAt, movementStatus, speedKmh);
+            const icon = L.divIcon({
+                className: 'lcos-truck-marker',
+                html: `<div class="truck-marker-inner" style="width:28px; height:28px; display:flex; align-items:center; justify-content:center; transform:rotate(${heading}deg); transition:transform 0.4s ease;">
+                    <div style="background-color:${visual.color}; width:20px; height:20px; border-radius:50%; border:2px solid #ffffff; box-shadow:0 0 8px ${visual.color}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px;">
+                        ▲
+                    </div>
+                </div>`,
+                iconSize: [28, 28],
+                iconAnchor: [14, 14],
+                popupAnchor: [0, -14],
+            });
+
+            const marker = L.marker([lat, lng], { icon });
+            this.routeLayerGroup.addLayer(marker);
+
+            entry = {
+                vehicleId,
+                marker,
+                lastRecordedAt: recordedAt,
+                currentLat: lat,
+                currentLng: lng,
+                targetLat: lat,
+                targetLng: lng,
+                heading,
+                speedKmh,
+                movementStatus,
+                tripId: trip ? trip.id : null,
+                driverName: driver ? driver.name : (trip ? trip.driver_name : null),
+                cargoDesc: commodity ? `${commodity.name} (${trip.quantity} ${commodity.unit})` : null,
+                originName: originBranch ? originBranch.name : null,
+                destName: destBranch ? destBranch.name : null,
+                animFrame: null,
+            };
+
+            marker.bindPopup(this.getTruckPopupHtml(entry));
+            marker.on('popupopen', () => {
+                marker.setPopupContent(this.getTruckPopupHtml(entry));
+                const btn = document.querySelector(`.ping-driver-btn[data-vehicle-id="${vehicleId}"]`);
+                if (btn) btn.onclick = (e) => { e.preventDefault(); this.handleRequestLocation(vehicleId); };
+            });
+
+            this.vehicleMarkerRegistry.set(vehicleId, entry);
+            return;
+        }
+
+        // Re-attach marker to layer group if missing
+        if (!this.routeLayerGroup.hasLayer(entry.marker)) {
+            this.routeLayerGroup.addLayer(entry.marker);
+        }
+
+        entry.targetLat = lat;
+        entry.targetLng = lng;
+        entry.heading = heading;
+        entry.speedKmh = speedKmh;
+        entry.movementStatus = movementStatus;
+        entry.lastRecordedAt = recordedAt;
+        if (trip) {
+            entry.tripId = trip.id;
+            if (driver) entry.driverName = driver.name;
+            if (commodity) entry.cargoDesc = `${commodity.name} (${trip.quantity} ${commodity.unit})`;
+            if (originBranch) entry.originName = originBranch.name;
+            if (destBranch) entry.destName = destBranch.name;
+        }
+
+        // Append to active history polyline if currently selected
+        if (this.selectedTripHistoryPolyline && this.activeSelectedVehicleId === vehicleId) {
+            this.selectedTripHistoryPolyline.addLatLng([lat, lng]);
+        }
+
+        // Clean up if trip has been closed
+        if (movementStatus === 'CLOSED' || (trip && trip.status === 'CLOSED')) {
+            this.removeVehicleFromMap(vehicleId);
+            return;
+        }
+
+        // Update popup HTML if currently open
+        if (entry.marker.isPopupOpen()) {
+            entry.marker.setPopupContent(this.getTruckPopupHtml(entry));
+            const btn = document.querySelector(`.ping-driver-btn[data-vehicle-id="${vehicleId}"]`);
+            if (btn) btn.onclick = (e) => { e.preventDefault(); this.handleRequestLocation(vehicleId); };
+        }
+
+        // Jump distance check & tab visibility
+        const distKm = this.haversineDistanceKm(entry.currentLat, entry.currentLng, lat, lng);
+        const isHidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
+
+        if (distKm > 5 || isHidden) {
+            if (entry.animFrame) cancelAnimationFrame(entry.animFrame);
+            entry.animFrame = null;
+            entry.currentLat = lat;
+            entry.currentLng = lng;
+            entry.marker.setLatLng([lat, lng]);
+            this.updateMarkerVisual(entry);
+        } else {
+            // Smoothly interpolate over 1.5 seconds using requestAnimationFrame
+            if (entry.animFrame) cancelAnimationFrame(entry.animFrame);
+            const startLat = entry.currentLat;
+            const startLng = entry.currentLng;
+            const startTime = performance.now();
+            const duration = 1500;
+
+            const step = (now) => {
+                const elapsed = now - startTime;
+                const progress = Math.min(1, elapsed / duration);
+                const t = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+
+                const curLat = startLat + (lat - startLat) * t;
+                const curLng = startLng + (lng - startLng) * t;
+                entry.marker.setLatLng([curLat, curLng]);
+
+                if (progress < 1) {
+                    entry.animFrame = requestAnimationFrame(step);
+                } else {
+                    entry.currentLat = lat;
+                    entry.currentLng = lng;
+                    entry.animFrame = null;
+                    this.updateMarkerVisual(entry);
+                }
+            };
+            entry.animFrame = requestAnimationFrame(step);
+        }
+    },
+
+    async loadVehicleTripHistoryPolyline(vehicleId) {
+        if (!vehicleId || !this.leafletMap || !this.routeLayerGroup) return;
+
+        if (this.selectedTripHistoryPolyline) {
+            this.routeLayerGroup.removeLayer(this.selectedTripHistoryPolyline);
+            this.selectedTripHistoryPolyline = null;
+        }
+
+        this.activeSelectedVehicleId = vehicleId;
+
+        try {
+            const token = window.LCOS_API ? LCOS_API.getToken() : localStorage.getItem('LCOS_JWT_TOKEN');
+            const res = await fetch(`/api/gps/history/${encodeURIComponent(vehicleId)}`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
+
+            if (!res.ok) return;
+            const data = await res.json();
+            const list = data.records || data.history || [];
+            if (!data.success || !Array.isArray(list) || list.length === 0) return;
+
+            let points = list
+                .filter(r => (r.lat || r.latitude) && (r.lng || r.longitude))
+                .map(r => [Number(r.lat !== undefined ? r.lat : r.latitude), Number(r.lng !== undefined ? r.lng : r.longitude)]);
+
+            // Downsample to <= 500 points if larger
+            if (points.length > 500) {
+                const step = Math.ceil(points.length / 500);
+                const downsampled = [];
+                for (let i = 0; i < points.length; i += step) {
+                    downsampled.push(points[i]);
+                }
+                if (downsampled[downsampled.length - 1] !== points[points.length - 1]) {
+                    downsampled.push(points[points.length - 1]);
+                }
+                points = downsampled;
+            }
+
+            if (points.length > 1) {
+                this.selectedTripHistoryPolyline = L.polyline(points, {
+                    color: '#2563eb',
+                    weight: 4,
+                    opacity: 0.9,
+                    lineJoin: 'round',
+                    lineCap: 'round',
+                });
+                this.routeLayerGroup.addLayer(this.selectedTripHistoryPolyline);
+            }
+        } catch (err) {
+            console.warn('[History Polyline Load Error]:', err.message);
+        }
+    },
+
+    removeVehicleFromMap(vehicleId) {
+        if (!vehicleId) return;
+        const entry = this.vehicleMarkerRegistry.get(vehicleId);
+        if (entry) {
+            if (entry.animFrame) cancelAnimationFrame(entry.animFrame);
+            if (entry.marker && this.routeLayerGroup) {
+                this.routeLayerGroup.removeLayer(entry.marker);
+            }
+            this.vehicleMarkerRegistry.delete(vehicleId);
+        }
+        if (this.activeSelectedVehicleId === vehicleId) {
+            if (this.selectedTripHistoryPolyline && this.routeLayerGroup) {
+                this.routeLayerGroup.removeLayer(this.selectedTripHistoryPolyline);
+            }
+            this.selectedTripHistoryPolyline = null;
+            this.activeSelectedVehicleId = null;
+        }
+    },
+
+    startStalenessWatcher() {
+        if (this.stalenessIntervalId) clearInterval(this.stalenessIntervalId);
+        this.stalenessIntervalId = setInterval(() => {
+            this.vehicleMarkerRegistry.forEach((entry) => {
+                this.updateMarkerVisual(entry);
+                if (entry.marker.isPopupOpen()) {
+                    entry.marker.setPopupContent(this.getTruckPopupHtml(entry));
+                }
+            });
+        }, 30000);
+    },
+
+    handleRequestLocation(vehicleId, feedbackElementId) {
+        if (!vehicleId) return;
+        const feedbackEl = feedbackElementId
+            ? document.getElementById(feedbackElementId)
+            : document.getElementById(`ping-status-${vehicleId}`);
+        const btn = document.querySelector(`.ping-driver-btn[data-vehicle-id="${vehicleId}"]`) ||
+                    document.getElementById('btn-sim-ping');
+
+        if (btn) btn.disabled = true;
+        if (feedbackEl) {
+            feedbackEl.innerHTML = '<span style="color:#2563eb;">⏳ Contacting driver device...</span>';
+        }
+
+        if (!this.socket || !this.socket.connected) {
+            if (feedbackEl) feedbackEl.innerHTML = '<span style="color:#dc2626;">❌ Dashboard socket disconnected</span>';
+            if (btn) btn.disabled = false;
+            return;
+        }
+
+        this.socket.emit('request_location', { vehicleId }, (res) => {
+            if (!res) return;
+
+            if (res.status === 'sent') {
+                if (feedbackEl) {
+                    feedbackEl.innerHTML = '<span style="color:#059669;">📡 Ping sent! Waiting for GPS fix...</span>';
+                }
+
+                let secondsLeft = 15;
+                const startTime = Date.now();
+                const timerId = setInterval(() => {
+                    secondsLeft--;
+                    const entry = this.vehicleMarkerRegistry.get(vehicleId);
+                    if (entry && entry.lastRecordedAt && new Date(entry.lastRecordedAt).getTime() > startTime) {
+                        clearInterval(timerId);
+                        const elapsedSec = Math.max(1, Math.round((Date.now() - new Date(entry.lastRecordedAt).getTime()) / 1000));
+                        if (feedbackEl) {
+                            feedbackEl.innerHTML = `<span style="color:#059669; font-weight:700;">✅ Location received (${elapsedSec}s ago)</span>`;
+                        }
+                        if (btn) btn.disabled = false;
+                        return;
+                    }
+
+                    if (secondsLeft <= 0) {
+                        clearInterval(timerId);
+                        if (feedbackEl) {
+                            feedbackEl.innerHTML = '<span style="color:#dc2626; font-weight:700;">⚠️ Request timed out (Driver not responding)</span>';
+                        }
+                        if (btn) btn.disabled = false;
+                    } else if (feedbackEl) {
+                        feedbackEl.innerHTML = `<span style="color:#059669;">📡 Waiting for fix... (${secondsLeft}s)</span>`;
+                    }
+                }, 1000);
+            } else if (res.status === 'driver_not_connected') {
+                if (feedbackEl) {
+                    feedbackEl.innerHTML = '<span style="color:#d97706; font-weight:700;">⚠️ Driver not tracking (App closed or offline)</span>';
+                }
+                if (btn) btn.disabled = false;
+            } else if (res.status === 'rate_limited') {
+                if (feedbackEl) {
+                    feedbackEl.innerHTML = `<span style="color:#d97706;">⏳ ${this.escapeHtml(res.message)}</span>`;
+                }
+                if (btn) btn.disabled = false;
+            } else {
+                if (feedbackEl) {
+                    feedbackEl.innerHTML = `<span style="color:#dc2626;">❌ ${this.escapeHtml(res.message || 'Unauthorized')}</span>`;
+                }
+                if (btn) btn.disabled = false;
+            }
+        });
+    },
+
     updateMapHighlights() {
         if (!this.leafletMap || !this.routeLayerGroup) return;
 
@@ -3739,19 +4173,26 @@ const app = {
                 this.leafletMap.flyTo([b.lat, b.lng], 11, { duration: 1 });
             }
         } else if (!selectedVehTripId) {
-            // Default view: Full Tamil Nadu Regional Overview structure bounds
             this.leafletMap.fitBounds([[8.05, 76.2], [13.55, 80.35]], { padding: [15, 15] });
         }
 
         if (this.activeTab === 'dashboard') {
             const filteredTrips = this.getFilteredTrips();
-            
+
+            // Clean up closed trips from registry and map
             filteredTrips.forEach(trip => {
+                if (trip.status === 'CLOSED' && trip.vehicleId) {
+                    this.removeVehicleFromMap(trip.vehicleId);
+                }
+            });
+
+            const activeTrips = filteredTrips.filter(t => t.status !== 'CLOSED' && t.status !== 'COMPLETED_RETURN');
+            activeTrips.forEach(trip => {
                 if (!selectedVehTripId || trip.id === selectedVehTripId) {
                     const endpoints = this.getTripEndpoints(trip);
                     const { origin, destination } = endpoints;
 
-                    // 1. Draw highway route polyline connecting Departed (Origin) to Destination
+                    // Highway route polyline connecting Origin to Destination
                     const routeColor = trip.status === 'DELAYED' ? '#ef4444' : (trip.status === 'CLOSED' ? '#10b981' : '#38bdf8');
                     const routeLine = L.polyline([[origin.lat, origin.lng], [destination.lat, destination.lng]], {
                         color: routeColor,
@@ -3763,66 +4204,46 @@ const app = {
                     });
                     this.routeLayerGroup.addLayer(routeLine);
 
-                    // 2. Vehicle Moving Dot (Current Position on Tamil Nadu Highway)
-                    const pos = this.getTripCurrentCoordinates(trip);
-                    let dotColor = '#38bdf8';
-                    if (trip.status === 'DELAYED') dotColor = '#ef4444';
-                    if (trip.status === 'CLOSED') dotColor = '#10b981';
+                    // Vehicle Marker in Registry
+                    const vehicleId = trip.vehicleId;
+                    let entry = this.vehicleMarkerRegistry.get(vehicleId);
 
-                    const truckIcon = L.divIcon({
-                        className: 'custom-map-dot truck-dot',
-                        html: `<div class="moving-truck-dot" style="background-color: ${dotColor}; width:16px; height:16px; border-radius:50%; border:2px solid #ffffff; box-shadow:0 0 10px ${dotColor}; cursor:pointer;" title="Vehicle: ${trip.vehicleId}"></div>`,
-                        iconSize: [16, 16],
-                        iconAnchor: [8, 8],
-                        popupAnchor: [0, -8]
-                    });
+                    if (entry) {
+                        this.routeLayerGroup.addLayer(entry.marker);
+                    } else {
+                        const pos = this.getTripCurrentCoordinates(trip);
+                        this.updateSingleVehicleMarker({
+                            vehicleId,
+                            tripId: trip.id,
+                            lat: pos.lat,
+                            lng: pos.lng,
+                            speedKmh: trip.speedKmh || 0,
+                            movementStatus: trip.status === 'IN_TRANSIT' ? 'MOVING' : 'STOPPED',
+                            recordedAt: trip.last_gps_update || trip.lastUpdateTimestamp || '1970-01-01T00:00:00.000Z'
+                        });
+                        entry = this.vehicleMarkerRegistry.get(vehicleId);
+                    }
 
-                    const truckMarker = L.marker([pos.lat, pos.lng], { icon: truckIcon });
-
-                    const lastUpdate = trip.transitUpdates ? trip.transitUpdates[trip.transitUpdates.length - 1] : null;
-                    const lastLoc = lastUpdate ? lastUpdate.location : `${origin.name} Transit Point`;
-                    const com = LCOS_State.getCommodities().find(c => c.id === trip.commodityId);
-                    const cargoDesc = com ? `${com.name} (${trip.quantity} ${com.unit})` : 'Freight Cargo';
-                    const etaStr = trip.expectedDeliveryDate 
-                        ? new Date(trip.expectedDeliveryDate).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
-                        : 'In Transit';
-
-                    truckMarker.bindPopup(`
-                        <div class="telemetry-popup-box" style="min-width:220px; font-family:sans-serif;">
-                            <div style="background:linear-gradient(135deg, #0284c7 0%, #1e40af 100%); padding:0.6rem 0.85rem; border-radius:8px 8px 0 0; color:#fff;">
-                                <div style="font-weight:700; font-size:0.95rem;">🚚 ${trip.vehicleId}</div>
-                                <div style="font-size:0.75rem; opacity:0.9;">Status: ${trip.status}</div>
-                            </div>
-                            <div style="padding:0.75rem; font-size:0.8rem; color:#1e293b; background:#ffffff; line-height:1.6; border-radius:0 0 8px 8px;">
-                                <div>📦 <strong>Cargo:</strong> ${cargoDesc}</div>
-                                <div>🛫 <strong>Origin:</strong> ${origin.name}</div>
-                                <div>🏁 <strong>Destination:</strong> ${destination.name}</div>
-                                <div>📍 <strong>Location:</strong> ${lastLoc}</div>
-                                <div>⏱️ <strong>ETA:</strong> ${etaStr}</div>
-                            </div>
-                        </div>
-                    `);
-
-                    truckMarker.on('click', () => {
-                        this.leafletMap.flyTo([pos.lat, pos.lng], 12, { duration: 1 });
-                        truckMarker.openPopup();
-                    });
-                    
-                    this.routeLayerGroup.addLayer(truckMarker);
-
-                    // If this specific vehicle was selected from the dropdown, fly to it and open popup
                     if (selectedVehTripId && trip.id === selectedVehTripId) {
-                        this.leafletMap.flyTo([pos.lat, pos.lng], 12, { duration: 1 });
-                        setTimeout(() => truckMarker.openPopup(), 400);
+                        if (entry) {
+                            this.leafletMap.flyTo([entry.currentLat, entry.currentLng], 12, { duration: 1 });
+                            setTimeout(() => entry.marker.openPopup(), 400);
+                        }
+                        this.loadVehicleTripHistoryPolyline(vehicleId);
                     }
                 }
             });
+
+            // Re-attach selected history polyline if present
+            if (this.selectedTripHistoryPolyline) {
+                this.routeLayerGroup.addLayer(this.selectedTripHistoryPolyline);
+            }
         } else if (this.activeConsoleTripId && this.activeTab === 'operations') {
             const trip = LCOS_State.getTripById(this.activeConsoleTripId);
             if (trip && trip.status !== 'CLOSED') {
                 const bSrc = LCOS_State.getBranches().find(b => b.id === trip.sourceBranchId);
                 const bDest = LCOS_State.getBranches().find(b => b.id === trip.destinationBranchId);
-                
+
                 if (bSrc && bSrc.lat && bDest && bDest.lat && this.routeLayerGroup) {
                     const line = L.polyline([[bSrc.lat, bSrc.lng], [bDest.lat, bDest.lng]], {
                         color: '#38bdf8',
@@ -3835,11 +4256,6 @@ const app = {
         }
     },
 
-    /**
-     * Real-Time Telemetry Auto-Sync Ingestion Hook.
-     * When external GPS trackers, Mobile Drivers App, or WebSockets push live data,
-     * this updates the trip to live-synced and refreshes the map smoothly.
-     */
     syncLiveTripTelemetry(tripId, telemetryData) {
         const trip = LCOS_State.getTripById(tripId);
         if (!trip) return false;
@@ -3857,40 +4273,66 @@ const app = {
                 status: telemetryData.status || trip.status,
                 remarks: 'Live GPS Auto-Sync telemetry update received.'
             });
+            // Cap transitUpdates to prevent excessive memory consumption
+            if (trip.transitUpdates.length > 50) {
+                trip.transitUpdates = trip.transitUpdates.slice(-50);
+            }
         }
 
-        this.updateMapHighlights();
+        // Direct marker update without re-rendering entire map
+        if (trip.vehicleId && telemetryData.currentGPS) {
+            this.updateSingleVehicleMarker({
+                vehicleId: trip.vehicleId,
+                tripId: trip.id,
+                lat: telemetryData.currentGPS.lat,
+                lng: telemetryData.currentGPS.lng,
+                movementStatus: telemetryData.status || trip.status,
+            });
+        }
         return true;
     },
 
-    /**
-     * Listen for real-time WebSocket telemetry updates.
-     */
     initSocketTelemetryListener() {
         if (typeof io === 'undefined') return;
+        const token = window.LCOS_API ? LCOS_API.getToken() : localStorage.getItem('LCOS_JWT_TOKEN');
+        if (!token) {
+            console.log('📡 [Socket.IO] No active auth token; socket connection deferred until login.');
+            return;
+        }
         try {
-            if (this.socket) return;
-            this.socket = io();
+            if (this.socket) {
+                try { this.socket.disconnect(); } catch (e) {}
+                this.socket = null;
+            }
+            this.socket = io({
+                auth: { token },
+                transports: ['websocket', 'polling']
+            });
+            this.socket.on('connect', () => {
+                console.log('📡 [Socket.IO] Authenticated socket connected successfully.');
+                if (this._hadSocketDisconnect) {
+                    console.log('🔄 [Socket.IO] Reconnect detected: refetching live trips and vehicles...');
+                    this.refreshAlertsAndDashboard();
+                    this._hadSocketDisconnect = false;
+                }
+            });
+            this.socket.on('disconnect', (reason) => {
+                console.warn(`[Socket.IO] Disconnected: ${reason}`);
+                this._hadSocketDisconnect = true;
+            });
+            this.socket.on('token_expired', () => {
+                this.showToast('Session expired. Please log in again.', 'danger');
+                if (typeof this.handleLogout === 'function') {
+                    this.handleLogout();
+                }
+            });
+            this.socket.on('connect_error', (err) => {
+                console.warn('⚠️ [Socket.IO Auth Error]:', err.message);
+            });
             this.socket.on('gps_update', (data) => {
                 if (!data) return;
-                if (data.tripId) {
-                    this.syncLiveTripTelemetry(data.tripId, {
-                        source: 'LIVE_WEBSOCKET_GPS',
-                        currentGPS: { lat: data.lat || data.latitude, lng: data.lng || data.longitude },
-                        lastLocation: data.location || `GPS (${Number(data.lat || data.latitude).toFixed(3)}, ${Number(data.lng || data.longitude).toFixed(3)})`,
-                        status: data.movementStatus || 'IN_TRANSIT'
-                    });
-                } else if (data.vehicleId) {
-                    const activeTrip = LCOS_State.getTrips().find(t => t.vehicleId === data.vehicleId && t.status !== 'CLOSED');
-                    if (activeTrip) {
-                        this.syncLiveTripTelemetry(activeTrip.id, {
-                            source: 'LIVE_WEBSOCKET_GPS',
-                            currentGPS: { lat: data.lat || data.latitude, lng: data.lng || data.longitude },
-                            lastLocation: data.location || `GPS (${Number(data.lat || data.latitude).toFixed(3)}, ${Number(data.lng || data.longitude).toFixed(3)})`,
-                            status: data.movementStatus || 'IN_TRANSIT'
-                        });
-                    }
-                }
+                // Update ONLY that marker. Do NOT re-render the whole map or call updateMapHighlights().
+                this.updateSingleVehicleMarker(data);
             });
 
             this.socket.on('stoppage_driver_response', async (data) => {

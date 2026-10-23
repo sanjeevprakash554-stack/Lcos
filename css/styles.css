@@ -1765,9 +1765,15 @@ aside.sim-panel.collapsed {
 }
 
 /* Custom Leaflet divIcon Dot Styling */
-.custom-map-dot {
+.custom-map-dot, .lcos-truck-marker {
     background: transparent !important;
     border: none !important;
+}
+
+.truck-marker-inner {
+    will-change: transform;
+    pointer-events: auto;
+    cursor: pointer;
 }
 
 /* ==========================================================================

@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:;">
+  <title>LCOS Driver Mobile GPS Tracker</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #131c2e;
+      --card-border: #23334d;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-green: #10b981;
+      --accent-green-dark: #059669;
+      --accent-amber: #f59e0b;
+      --accent-red: #ef4444;
+      --accent-blue: #3b82f6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 14px;
+      padding-bottom: 24px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--card-border);
+      margin-bottom: 12px;
+    }
+
+    .brand-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-online { background: #064e3b; color: #34d399; border: 1px solid #059669; }
+    .badge-offline { background: #7f1d1d; color: #f87171; border: 1px solid #dc2626; }
+    .badge-active { background: #064e3b; color: #6ee7b7; border: 1px solid #10b981; }
+    .badge-idle { background: #374151; color: #9ca3af; border: 1px solid #4b5563; }
+
+    /* Alert Banners */
+    .banner {
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      line-height: 1.35;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .banner-warning { background: #451a03; border: 1px solid #b45309; color: #fef3c7; }
+    .banner-danger { background: #450a0a; border: 1px solid #b91c1c; color: #fee2e2; }
+    .banner-info { background: #172554; border: 1px solid #1d4ed8; color: #dbeafe; }
+    .banner-hidden { display: none !important; }
+
+    /* Card Containers */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+
+    .card-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 8px;
+    }
+
+    /* Key Values Grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .metric-box {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    .metric-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-bottom: 3px;
+    }
+
+    .metric-value {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    /* Buttons */
+    .btn {
+      width: 100%;
+      min-height: 52px;
+      border: none;
+      border-radius: 10px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: transform 0.1s, opacity 0.1s;
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+      opacity: 0.9;
+    }
+
+    .btn-start {
+      background: var(--accent-green);
+      color: #022c22;
+    }
+
+    .btn-stop {
+      background: var(--accent-red);
+      color: #ffffff;
+    }
+
+    .btn-primary {
+      background: var(--accent-blue);
+      color: #ffffff;
+    }
+
+    .btn-secondary {
+      background: #334155;
+      color: var(--text-main);
+      min-height: 42px;
+      font-size: 0.88rem;
+    }
+
+    /* Input Fields */
+    .form-group {
+      margin-bottom: 12px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+
+    .form-input {
+      width: 100%;
+      min-height: 46px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 0 12px;
+      color: #fff;
+      font-size: 1rem;
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: var(--accent-blue);
+    }
+
+    /* Trip Details */
+    .trip-route {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .trip-meta {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* Privacy Footer */
+    footer {
+      margin-top: auto;
+      text-align: center;
+      font-size: 0.72rem;
+      color: #64748b;
+      line-height: 1.4;
+      padding-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- App Header -->
+  <header>
+    <div class="brand-title">
+      <span>🚚</span>
+      <span>LCOS Driver GPS</span>
+    </div>
+    <div style="display:flex; gap:6px; align-items:center;">
+      <span id="badgeNetwork" class="badge badge-online">Online</span>
+      <span id="badgeTracking" class="badge badge-idle">Idle</span>
+    </div>
+  </header>
+
+  <!-- Browser Visibility / Background Warning Banner -->
+  <div id="bannerBackgroundWarning" class="banner banner-warning banner-hidden">
+    <span>⚠️</span>
+    <div>
+      <strong>Tab In Background:</strong> Mobile browsers pause GPS while screen is locked or tab is hidden. Keep this screen open while driving.
+    </div>
+  </div>
+
+  <!-- Dispatcher Immediate Fix Request Banner -->
+  <div id="bannerDispatcherRequest" class="banner banner-info banner-hidden">
+    <span>📡</span>
+    <div id="textDispatcherRequest">
+      Dispatcher requested an immediate high-accuracy location ping. Transmitting now...
+    </div>
+  </div>
+
+  <!-- General Notification Banner -->
+  <div id="bannerNotice" class="banner banner-warning banner-hidden">
+    <span id="bannerNoticeIcon">⚠️</span>
+    <div id="bannerNoticeText">Notice message</div>
+  </div>
+
+  <!-- SCREEN 1: LOGIN (When unauthenticated) -->
+  <section id="sectionLogin" class="card">
+    <div class="card-title">Driver Authentication</div>
+    <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">
+      Log in with your driver credentials to synchronize GPS telemetry with Central Operations.
+    </p>
+
+    <form id="formLogin">
+      <div class="form-group">
+        <label class="form-label" for="inputUsername">Username or Employee ID</label>
+        <input type="text" id="inputUsername" class="form-input" placeholder="e.g. driver1" required autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="inputPassword">Password</label>
+        <input type="password" id="inputPassword" class="form-input" placeholder="Enter password" required autocomplete="current-password">
+      </div>
+      <button type="submit" id="btnLogin" class="btn btn-primary">Log In as Driver</button>
+    </form>
+  </section>
+
+  <!-- SCREEN 2: ACTIVE TRIP & TRACKING CONTROLS -->
+  <section id="sectionDashboard" class="banner-hidden">
+    <!-- Active Trip Card -->
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <div class="card-title" style="margin-bottom:0;">Active Shipment</div>
+        <button id="btnLogout" style="background:none; border:none; color:#f87171; font-size:0.78rem; cursor:pointer; font-weight:600;">Sign Out</button>
+      </div>
+
+      <div id="viewHasTrip">
+        <div class="trip-route">
+          <span id="textSource">Branch A</span>
+          <span style="color:var(--text-muted);">➔</span>
+          <span id="textDestination">Branch B</span>
+        </div>
+        <div class="trip-meta">
+          <div>Trip ID: <strong id="textTripId" style="color:#fff;">-</strong></div>
+          <div>Vehicle: <strong id="textVehicleId" style="color:#fff;">-</strong> (<span id="textVehicleType">-</span>)</div>
+          <div>Cargo: <span id="textCommodity">-</span></div>
+          <div>Driver: <span id="textDriverName">-</span></div>
+        </div>
+      </div>
+
+      <div id="viewNoTrip" class="banner-hidden" style="text-align:center; padding:12px 0;">
+        <p style="font-size:0.95rem; font-weight:700; color:#facc15; margin-bottom:4px;">No Active Shipment In Transit</p>
+        <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:8px;">
+          You do not have any trips marked IN_TRANSIT. Please contact dispatch to start a shipment.
+        </p>
+        <button id="btnRefreshTrip" class="btn btn-secondary">Check for Active Trips</button>
+      </div>
+    </div>
+
+    <!-- Live Telemetry Telemetry Box -->
+    <div class="card">
+      <div class="card-title">Live Telemetry & Diagnostics</div>
+      <div class="metrics-grid">
+        <div class="metric-box">
+          <div class="metric-label">CURRENT SPEED</div>
+          <div class="metric-value" id="textSpeed">0 <span style="font-size:0.75rem; font-weight:normal; color:#94a3b8;">km/h</span></div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">STATUS</div>
+          <div class="metric-value" id="textMovementStatus" style="font-size:1rem; color:#facc15;">STOPPED</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">ACCURACY</div>
+          <div class="metric-value" id="textAccuracy">±0 <span style="font-size:0.75rem; font-weight:normal; color:#94a3b8;">m</span></div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">OFFLINE QUEUE</div>
+          <div class="metric-value" id="textQueueCount">0 <span style="font-size:0.75rem; font-weight:normal; color:#94a3b8;">pts</span></div>
+        </div>
+      </div>
+
+      <div style="margin-top:10px; font-size:0.78rem; color:var(--text-muted); display:flex; justify-content:space-between;">
+        <span>Last Ping: <strong id="textLastSync" style="color:#e2e8f0;">Never</strong></span>
+        <span>Screen Awake: <strong id="textWakeLockStatus" style="color:#e2e8f0;">Off</strong></span>
+      </div>
+    </div>
+
+    <!-- Main Toggle Action -->
+    <div style="margin-top:6px; margin-bottom:14px;">
+      <button id="btnToggleTracking" class="btn btn-start">
+        <span>▶</span>
+        <span id="textToggleTracking">Start GPS Tracking</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- Privacy & Browser Limitation Notice -->
+  <footer>
+    <p>🔒 <strong>Privacy Protected:</strong> GPS is transmitted only while tracking is Active and an authorized shipment is in transit.</p>
+    <p style="margin-top:4px;">Keep screen turned on. For true background lock-screen tracking, a native app or PWA background service is required.</p>
+  </footer>
+
+  <!-- Socket.IO Client (Self-hosted) -->
+  <script src="/socket.io/socket.io.js"></script>
+
+  <!-- Vanilla JavaScript Application Logic -->
+  <script>
+    (function() {
+      'use strict';
+
+      // ==========================================
+      // STATE & CONFIGURATION
+      // ==========================================
+      const CONFIG = {
+        STORAGE_KEY: 'LCOS_JWT_TOKEN',
+        MIN_SEND_INTERVAL_MS: 3000,   // Strict server rate limit (3s)
+        MOVING_INTERVAL_MS: 5000,     // 5 seconds when moving
+        STOPPED_INTERVAL_MS: 30000,   // 30 seconds when stopped
+        SPEED_THRESHOLD_KMH: 3,       // >= 3 km/h counts as moving
+        DISTANCE_THRESHOLD_M: 15,     // >= 15m delta counts as moving
+        MAX_QUEUE_CAP: 5000,          // Cap offline queue at 5000
+        BATCH_CHUNK_SIZE: 500,        // Max points per batch flush
+      };
+
+      let state = {
+        token: localStorage.getItem(CONFIG.STORAGE_KEY) || null,
+        activeTrip: null,
+        isTracking: false,
+        watchId: null,
+        wakeLock: null,
+        socket: null,
+        clockOffsetMs: 0,
+        lastFix: null,
+        lastSentTime: 0,
+        movementStatus: 'STOPPED',
+        queueSize: 0,
+        isFlushingQueue: false,
+        backoffUntilMs: 0,
+      };
+
+      // ==========================================
+      // DOM ELEMENT CACHE
+      // ==========================================
+      const el = {
+        badgeNetwork: document.getElementById('badgeNetwork'),
+        badgeTracking: document.getElementById('badgeTracking'),
+        bannerBackgroundWarning: document.getElementById('bannerBackgroundWarning'),
+        bannerDispatcherRequest: document.getElementById('bannerDispatcherRequest'),
+        textDispatcherRequest: document.getElementById('textDispatcherRequest'),
+        bannerNotice: document.getElementById('bannerNotice'),
+        bannerNoticeText: document.getElementById('bannerNoticeText'),
+        sectionLogin: document.getElementById('sectionLogin'),
+        formLogin: document.getElementById('formLogin'),
+        inputUsername: document.getElementById('inputUsername'),
+        inputPassword: document.getElementById('inputPassword'),
+        sectionDashboard: document.getElementById('sectionDashboard'),
+        btnLogout: document.getElementById('btnLogout'),
+        viewHasTrip: document.getElementById('viewHasTrip'),
+        viewNoTrip: document.getElementById('viewNoTrip'),
+        btnRefreshTrip: document.getElementById('btnRefreshTrip'),
+        textSource: document.getElementById('textSource'),
+        textDestination: document.getElementById('textDestination'),
+        textTripId: document.getElementById('textTripId'),
+        textVehicleId: document.getElementById('textVehicleId'),
+        textVehicleType: document.getElementById('textVehicleType'),
+        textCommodity: document.getElementById('textCommodity'),
+        textDriverName: document.getElementById('textDriverName'),
+        textSpeed: document.getElementById('textSpeed'),
+        textMovementStatus: document.getElementById('textMovementStatus'),
+        textAccuracy: document.getElementById('textAccuracy'),
+        textQueueCount: document.getElementById('textQueueCount'),
+        textLastSync: document.getElementById('textLastSync'),
+        textWakeLockStatus: document.getElementById('textWakeLockStatus'),
+        btnToggleTracking: document.getElementById('btnToggleTracking'),
+        textToggleTracking: document.getElementById('textToggleTracking'),
+      };
+
+      // ==========================================
+      // SAFE RENDERING HELPERS (No innerHTML)
+      // ==========================================
+      function safeSetText(elem, text) {
+        if (elem) elem.textContent = text !== null && text !== undefined ? String(text) : '-';
+      }
+
+      function showNotice(text, type = 'warning') {
+        if (!el.bannerNotice || !el.bannerNoticeText) return;
+        safeSetText(el.bannerNoticeText, text);
+        el.bannerNotice.className = 'banner banner-' + type;
+      }
+
+      function hideNotice() {
+        if (el.bannerNotice) el.bannerNotice.className = 'banner banner-warning banner-hidden';
+      }
+
+      // Haversine distance in meters
+      function haversineMeters(lat1, lon1, lat2, lon2) {
+        const R = 6371000;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+          Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      }
+
+      // ==========================================
+      // INDEXEDDB OFFLINE QUEUE
+      // ==========================================
+      const DB_NAME = 'LcosDriverGpsDB';
+      const STORE_NAME = 'offlineQueue';
+
+      function openDb() {
+        return new Promise((resolve, reject) => {
+          if (!window.indexedDB) return resolve(null);
+          const req = indexedDB.open(DB_NAME, 1);
+          req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+              db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+            }
+          };
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => resolve(null);
+        });
+      }
+
+      async function enqueuePoint(point) {
+        const db = await openDb();
+        if (!db) return;
+
+        return new Promise((resolve) => {
+          const tx = db.transaction(STORE_NAME, 'readwrite');
+          const store = tx.objectStore(STORE_NAME);
+
+          const countReq = store.count();
+          countReq.onsuccess = () => {
+            const currentCount = countReq.result || 0;
+            if (currentCount >= CONFIG.MAX_QUEUE_CAP) {
+              // Delete oldest point to stay within cap
+              showNotice('Offline queue full (5000 points). Dropping oldest points to record latest location.', 'warning');
+              const cursorReq = store.openCursor();
+              cursorReq.onsuccess = (ev) => {
+                const cursor = ev.target.result;
+                if (cursor) {
+                  cursor.delete();
+                }
+              };
+            }
+            store.add({ point, createdAt: Date.now() });
+          };
+
+          tx.oncomplete = () => {
+            updateQueueCountUI();
+            resolve();
+          };
+          tx.onerror = () => resolve();
+        });
+      }
+
+      async function getQueuedChunks(limit = CONFIG.BATCH_CHUNK_SIZE) {
+        const db = await openDb();
+        if (!db) return [];
+
+        return new Promise((resolve) => {
+          const tx = db.transaction(STORE_NAME, 'readonly');
+          const store = tx.objectStore(STORE_NAME);
+          const items = [];
+          const cursorReq = store.openCursor();
+
+          cursorReq.onsuccess = (e) => {
+            const cursor = e.target.result;
+            if (cursor && items.length < limit) {
+              items.push({ id: cursor.key, point: cursor.value.point });
+              cursor.continue();
+            } else {
+              resolve(items);
+            }
+          };
+          cursorReq.onerror = () => resolve([]);
+        });
+      }
+
+      async function deleteQueuedKeys(keys) {
+        const db = await openDb();
+        if (!db || !keys || keys.length === 0) return;
+
+        return new Promise((resolve) => {
+          const tx = db.transaction(STORE_NAME, 'readwrite');
+          const store = tx.objectStore(STORE_NAME);
+          for (const key of keys) {
+            store.delete(key);
+          }
+          tx.oncomplete = () => {
+            updateQueueCountUI();
+            resolve();
+          };
+          tx.onerror = () => resolve();
+        });
+      }
+
+      async function updateQueueCountUI() {
+        const db = await openDb();
+        if (!db) return 0;
+        return new Promise((resolve) => {
+          const tx = db.transaction(STORE_NAME, 'readonly');
+          const countReq = tx.objectStore(STORE_NAME).count();
+          countReq.onsuccess = () => {
+            state.queueSize = countReq.result || 0;
+            safeSetText(el.textQueueCount, `${state.queueSize} pts`);
+            resolve(state.queueSize);
+          };
+          countReq.onerror = () => resolve(0);
+        });
+      }
+
+      // ==========================================
+      // SCREEN WAKE LOCK & VISIBILITY
+      // ==========================================
+      async function requestWakeLock() {
+        if ('wakeLock' in navigator) {
+          try {
+            state.wakeLock = await navigator.wakeLock.request('screen');
+            safeSetText(el.textWakeLockStatus, 'Active');
+            state.wakeLock.addEventListener('release', () => {
+              safeSetText(el.textWakeLockStatus, 'Released');
+            });
+          } catch (err) {
+            safeSetText(el.textWakeLockStatus, 'Unavailable');
+          }
+        } else {
+          safeSetText(el.textWakeLockStatus, 'Unsupported');
+        }
+      }
+
+      function releaseWakeLock() {
+        if (state.wakeLock) {
+          try { state.wakeLock.release(); } catch (_) {}
+          state.wakeLock = null;
+        }
+        safeSetText(el.textWakeLockStatus, 'Off');
+      }
+
+      // Visibility change monitor
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+          if (state.isTracking && el.bannerBackgroundWarning) {
+            el.bannerBackgroundWarning.classList.remove('banner-hidden');
+          }
+        } else {
+          if (el.bannerBackgroundWarning) {
+            el.bannerBackgroundWarning.classList.add('banner-hidden');
+          }
+          if (state.isTracking) {
+            requestWakeLock();
+            flushOfflineQueue();
+          }
+        }
+      });
+
+      // Network online/offline indicators
+      window.addEventListener('online', () => {
+        el.badgeNetwork.className = 'badge badge-online';
+        safeSetText(el.badgeNetwork, 'Online');
+        hideNotice();
+        flushOfflineQueue();
+      });
+
+      window.addEventListener('offline', () => {
+        el.badgeNetwork.className = 'badge badge-offline';
+        safeSetText(el.badgeNetwork, 'Offline');
+        showNotice('No Internet connection: GPS coordinates will be saved to the offline queue and uploaded when connection resumes.', 'info');
+      });
+
+      // ==========================================
+      // SERVER CLOCK SYNCHRONIZATION
+      // ==========================================
+      function updateClockOffset(res) {
+        if (!res) return;
+        const serverDateHeader = res.headers.get('Date');
+        if (serverDateHeader) {
+          const serverTime = new Date(serverDateHeader).getTime();
+          if (!isNaN(serverTime)) {
+            state.clockOffsetMs = serverTime - Date.now();
+          }
+        }
+      }
+
+      // ==========================================
+      // AUTHENTICATION & DRIVER TRIP SYNC
+      // ==========================================
+      async function fetchActiveTrip() {
+        if (!state.token) return;
+        try {
+          const res = await fetch('/api/gps/my-trip', {
+            headers: { Authorization: `Bearer ${state.token}` },
+          });
+
+          if (res.status === 401) {
+            handleAuthExpired();
+            return;
+          }
+
+          const data = await res.json();
+          if (data.success && data.hasActiveTrip && data.trip) {
+            state.activeTrip = data.trip;
+            el.viewHasTrip.classList.remove('banner-hidden');
+            el.viewNoTrip.classList.add('banner-hidden');
+
+            safeSetText(el.textSource, data.trip.source);
+            safeSetText(el.textDestination, data.trip.destination);
+            safeSetText(el.textTripId, data.trip.id);
+            safeSetText(el.textVehicleId, data.trip.vehicleId);
+            safeSetText(el.textVehicleType, data.trip.vehicleType);
+            safeSetText(el.textCommodity, data.trip.commodity);
+            safeSetText(el.textDriverName, data.trip.driverName);
+            hideNotice();
+          } else {
+            state.activeTrip = null;
+            el.viewHasTrip.classList.add('banner-hidden');
+            el.viewNoTrip.classList.remove('banner-hidden');
+            if (state.isTracking) {
+              stopTracking();
+              showNotice('Trip completed or no active trip found. Tracking stopped.', 'info');
+            }
+          }
+        } catch (err) {
+          showNotice('Could not load shipment details. Operating in offline mode.', 'info');
+        }
+      }
+
+      function handleAuthExpired() {
+        showNotice('Session expired. Please sign in again. (Queued GPS coordinates are safely preserved).', 'danger');
+        stopTracking();
+        state.token = null;
+        localStorage.removeItem(CONFIG.STORAGE_KEY);
+        el.sectionLogin.classList.remove('banner-hidden');
+        el.sectionDashboard.classList.add('banner-hidden');
+      }
+
+      // Login form submission
+      el.formLogin.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = el.inputUsername.value.trim();
+        const password = el.inputPassword.value.trim();
+        if (!username || !password) return;
+
+        try {
+          const res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password }),
+          });
+          const data = await res.json();
+
+          if (res.ok && data.token) {
+            const role = (data.user?.role || '').toUpperCase();
+            if (role !== 'DRIVER') {
+              showNotice('Only driver accounts can use this tracking interface.', 'danger');
+              return;
+            }
+
+            state.token = data.token;
+            localStorage.setItem(CONFIG.STORAGE_KEY, state.token);
+            el.sectionLogin.classList.add('banner-hidden');
+            el.sectionDashboard.classList.remove('banner-hidden');
+            hideNotice();
+            initSocketConnection();
+            await fetchActiveTrip();
+            updateQueueCountUI();
+          } else {
+            showNotice(data.message || 'Invalid username or password', 'danger');
+          }
+        } catch (err) {
+          showNotice('Login network error. Ensure server is online.', 'danger');
+        }
+      });
+
+      // Logout button
+      el.btnLogout.addEventListener('click', () => {
+        stopTracking();
+        if (state.socket) {
+          try { state.socket.disconnect(); } catch (_) {}
+          state.socket = null;
+        }
+        state.token = null;
+        localStorage.removeItem(CONFIG.STORAGE_KEY);
+        el.sectionLogin.classList.remove('banner-hidden');
+        el.sectionDashboard.classList.add('banner-hidden');
+        hideNotice();
+      });
+
+      el.btnRefreshTrip.addEventListener('click', () => fetchActiveTrip());
+
+      // ==========================================
+      // SOCKET.IO REAL-TIME LISTENER
+      // ==========================================
+      function initSocketConnection() {
+        if (!state.token || !window.io) return;
+        if (state.socket) {
+          try { state.socket.disconnect(); } catch (_) {}
+        }
+
+        try {
+          state.socket = io({ auth: { token: state.token } });
+
+          // Listen for Dispatcher "Request Location Now"
+          state.socket.on('request_location', async () => {
+            if (el.bannerDispatcherRequest) {
+              el.bannerDispatcherRequest.classList.remove('banner-hidden');
+              setTimeout(() => {
+                if (el.bannerDispatcherRequest) el.bannerDispatcherRequest.classList.add('banner-hidden');
+              }, 8000);
+            }
+
+            // Immediately request a high accuracy fix and transmit
+            if (navigator.geolocation) {
+              navigator.geolocation.getCurrentPosition(
+                async (pos) => {
+                  await transmitOrQueuePoint(pos, true);
+                },
+                (err) => console.warn('Could not acquire location for dispatcher request:', err.message),
+                { enableHighAccuracy: true, timeout: 7000, maximumAge: 0 }
+              );
+            }
+          });
+
+          state.socket.on('token_expired', () => handleAuthExpired());
+        } catch (err) {
+          console.warn('[Socket Init Warning]:', err.message);
+        }
+      }
+
+      // ==========================================
+      // GPS TELEMETRY TRANSMISSION & GATING
+      // ==========================================
+      async function transmitOrQueuePoint(pos, forceSend = false, isRetry = false) {
+        if (!pos || !pos.coords) return;
+
+        const coords = pos.coords;
+        const lat = coords.latitude;
+        const lng = coords.longitude;
+        const accuracy = coords.accuracy || 0;
+        const now = Date.now();
+
+        // 1. Calculate Speed & Distance
+        let speedKmh = 0;
+        let distanceMeters = 0;
+
+        if (coords.speed !== null && coords.speed !== undefined && !isNaN(coords.speed)) {
+          speedKmh = Math.max(0, Math.round(coords.speed * 3.6));
+        } else if (state.lastFix) {
+          distanceMeters = haversineMeters(state.lastFix.lat, state.lastFix.lng, lat, lng);
+          const elapsedSec = (now - state.lastFix.time) / 1000;
+          if (elapsedSec > 0) {
+            speedKmh = Math.round((distanceMeters / elapsedSec) * 3.6);
+          }
+        }
+
+        const heading = coords.heading !== null && coords.heading !== undefined && !isNaN(coords.heading) ? coords.heading : 0;
+        const isMoving = speedKmh >= CONFIG.SPEED_THRESHOLD_KMH || distanceMeters >= CONFIG.DISTANCE_THRESHOLD_M;
+        state.movementStatus = isMoving ? 'MOVING' : 'STOPPED';
+
+        // Update local state and UI
+        state.lastFix = { lat, lng, time: now, speedKmh };
+        safeSetText(el.textSpeed, `${speedKmh} km/h`);
+        safeSetText(el.textMovementStatus, state.movementStatus);
+        safeSetText(el.textAccuracy, `±${Math.round(accuracy)} m`);
+
+        // 2. Interval Transmission Gating (unless forced by dispatcher request)
+        const minInterval = isMoving ? CONFIG.MOVING_INTERVAL_MS : CONFIG.STOPPED_INTERVAL_MS;
+        const elapsedSinceLastSent = now - state.lastSentTime;
+
+        if (!forceSend) {
+          if (elapsedSinceLastSent < CONFIG.MIN_SEND_INTERVAL_MS) {
+            return; // strictly respect server 3s limit
+          }
+          if (elapsedSinceLastSent < minInterval) {
+            return;
+          }
+        }
+
+        state.lastSentTime = now;
+
+        // Apply server clock offset to prevent future timestamp rejection
+        const timestampIso = new Date(pos.timestamp + state.clockOffsetMs).toISOString();
+
+        const pointPayload = {
+          lat,
+          lng,
+          speedKmh,
+          heading,
+          accuracy,
+          recordedAt: timestampIso,
+        };
+
+        // 3. Online Check & Transmission
+        if (navigator.onLine && now >= state.backoffUntilMs) {
+          try {
+            const res = await fetch('/api/gps/update', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${state.token}`,
+              },
+              body: JSON.stringify(pointPayload),
+            });
+
+            updateClockOffset(res);
+
+            if (res.status === 200) {
+              const resData = await res.json();
+              const dateStr = new Date().toLocaleTimeString();
+              safeSetText(el.textLastSync, dateStr);
+              hideNotice();
+
+              // If offline queue has pending points, flush them
+              if (state.queueSize > 0 && !state.isFlushingQueue) {
+                flushOfflineQueue();
+              }
+              return;
+            }
+
+            if (res.status === 400) {
+              const errData = await res.json().catch(() => ({}));
+              if (errData.message && errData.message.toLowerCase().includes('future') && !isRetry) {
+                // Compute clock offset and retry once
+                const serverTimeStr = errData.serverTime || res.headers.get('Date');
+                if (serverTimeStr) {
+                  const sTime = new Date(serverTimeStr).getTime();
+                  if (!isNaN(sTime)) {
+                    state.clockOffsetMs = sTime - pos.timestamp - 500; // calibrate exactly to server clock with 500ms safety buffer
+                  }
+                }
+                return transmitOrQueuePoint(pos, true, true);
+              }
+              showNotice(`Transmission rejected: ${errData.message || 'Invalid data'}`, 'warning');
+              return;
+            }
+
+            if (res.status === 401) {
+              await enqueuePoint(pointPayload);
+              handleAuthExpired();
+              return;
+            }
+
+            if (res.status === 409) {
+              showNotice('No active shipment found in transit. GPS update declined.', 'warning');
+              stopTracking();
+              return;
+            }
+
+            if (res.status === 429) {
+              const retryData = await res.json().catch(() => ({}));
+              const retryAfterMs = retryData.retryAfterMs || 3000;
+              state.backoffUntilMs = Date.now() + retryAfterMs;
+              await enqueuePoint(pointPayload);
+              return;
+            }
+
+            // Other 4xx/5xx: save to queue
+            await enqueuePoint(pointPayload);
+          } catch (netErr) {
+            // Network failure: queue point
+            await enqueuePoint(pointPayload);
+          }
+        } else {
+          // Offline: queue point
+          await enqueuePoint(pointPayload);
+        }
+      }
+
+      // ==========================================
+      // OFFLINE QUEUE BATCH FLUSH
+      // ==========================================
+      async function flushOfflineQueue() {
+        if (!navigator.onLine || !state.token || state.isFlushingQueue) return;
+        if (Date.now() < state.backoffUntilMs) return;
+
+        state.isFlushingQueue = true;
+
+        try {
+          const chunk = await getQueuedChunks(CONFIG.BATCH_CHUNK_SIZE);
+          if (chunk.length === 0) {
+            state.isFlushingQueue = false;
+            return;
+          }
+
+          const points = chunk.map(c => c.point);
+          const keys = chunk.map(c => c.id);
+
+          const res = await fetch('/api/gps/batch', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${state.token}`,
+            },
+            body: JSON.stringify({ points }),
+          });
+
+          updateClockOffset(res);
+
+          if (res.status === 200) {
+            // Delete confirmed sent keys
+            await deleteQueuedKeys(keys);
+            safeSetText(el.textLastSync, `Batch synced (${points.length} pts)`);
+
+            // If more items exist in queue, schedule next batch respecting 10s batch limit
+            const remaining = await getQueuedChunks(1);
+            if (remaining.length > 0) {
+              setTimeout(() => flushOfflineQueue(), 10200);
+            }
+          } else if (res.status === 429) {
+            const data = await res.json().catch(() => ({}));
+            const retryMs = data.retryAfterMs || 10000;
+            state.backoffUntilMs = Date.now() + retryMs;
+            setTimeout(() => flushOfflineQueue(), retryMs + 200);
+          } else if (res.status === 401) {
+            handleAuthExpired();
+          }
+        } catch (err) {
+          console.warn('[Queue Flush Error]:', err.message);
+        } finally {
+          state.isFlushingQueue = false;
+        }
+      }
+
+      // ==========================================
+      // TRACKING CONTROLS (Start / Stop)
+      // ==========================================
+      function startTracking() {
+        if (!navigator.geolocation) {
+          showNotice('Geolocation is not supported by your browser.', 'danger');
+          return;
+        }
+
+        if (!state.activeTrip) {
+          showNotice('Cannot start tracking: No active shipment in transit assigned.', 'warning');
+          return;
+        }
+
+        state.isTracking = true;
+        el.badgeTracking.className = 'badge badge-active';
+        safeSetText(el.badgeTracking, 'Active');
+
+        el.btnToggleTracking.className = 'btn btn-stop';
+        safeSetText(el.textToggleTracking, 'Stop Tracking');
+
+        requestWakeLock();
+        hideNotice();
+
+        state.watchId = navigator.geolocation.watchPosition(
+          (pos) => transmitOrQueuePoint(pos, false),
+          (err) => {
+            console.warn('Geolocation Watch Error:', err.message);
+            if (err.code === 1) {
+              showNotice('Location access denied. Please enable Location Services in your browser settings.', 'danger');
+              stopTracking();
+            } else if (err.code === 2) {
+              showNotice('GPS signal unavailable. Trying to acquire satellite fix...', 'warning');
+            }
+          },
+          {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 10000,
+          }
+        );
+
+        // Continuous interval poll in case mobile browser throttles watchPosition
+        state.pollingTimer = setInterval(() => {
+          if (state.isTracking && navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => transmitOrQueuePoint(pos, false),
+              () => {},
+              { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+            );
+          }
+        }, 5000);
+      }
+
+      function stopTracking() {
+        state.isTracking = false;
+        if (state.watchId !== null) {
+          navigator.geolocation.clearWatch(state.watchId);
+          state.watchId = null;
+        }
+        if (state.pollingTimer) {
+          clearInterval(state.pollingTimer);
+          state.pollingTimer = null;
+        }
+
+        releaseWakeLock();
+
+        el.badgeTracking.className = 'badge badge-idle';
+        safeSetText(el.badgeTracking, 'Idle');
+
+        el.btnToggleTracking.className = 'btn btn-start';
+        safeSetText(el.textToggleTracking, 'Start GPS Tracking');
+      }
+
+      el.btnToggleTracking.addEventListener('click', () => {
+        if (state.isTracking) {
+          stopTracking();
+        } else {
+          startTracking();
+        }
+      });
+
+      // ==========================================
+      // INITIALIZATION
+      // ==========================================
+      async function init() {
+        if (state.token) {
+          el.sectionLogin.classList.add('banner-hidden');
+          el.sectionDashboard.classList.remove('banner-hidden');
+          initSocketConnection();
+          await fetchActiveTrip();
+          updateQueueCountUI();
+        } else {
+          el.sectionLogin.classList.remove('banner-hidden');
+          el.sectionDashboard.classList.add('banner-hidden');
+        }
+
+        // Periodic trip status check every 60 seconds
+        setInterval(() => {
+          if (state.token) fetchActiveTrip();
+        }, 60000);
+      }
+
+      // Test and debugging hook
+      window.__driverTracker = {
+        getState: () => state,
+        setToken: (t) => { state.token = t; },
+        transmitPoint: (p, force, isRetry) => transmitOrQueuePoint(p, force, isRetry),
+        handleAuthExpired: () => handleAuthExpired(),
+        flushQueue: () => flushOfflineQueue(),
+        enqueuePoint: (p) => enqueuePoint(p),
+        getQueuedChunks: (limit) => getQueuedChunks(limit),
+        openDb: () => openDb(),
+        updateQueueCountUI: () => updateQueueCountUI(),
+        stopTracking: () => stopTracking(),
+        startTracking: () => startTracking(),
+        fetchActiveTrip: () => fetchActiveTrip(),
+        initSocketConnection: () => initSocketConnection(),
+        CONFIG,
+        el,
+      };
+
+      init();
+    })();
+  </script>
+</body>
+</html>
