@@ -605,7 +605,7 @@ const LCOS_State = {
             const apiRes = await LCOS_API.addDriver(driver);
             if (apiRes && apiRes.success) {
                 await this.loadFromBackend();
-                return apiRes.driver;
+                return { ...apiRes.driver, credentials: apiRes.credentials };
             }
         } catch (err) {
             console.warn('API addDriver notice:', err.message);

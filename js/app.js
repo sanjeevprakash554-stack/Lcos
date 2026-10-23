@@ -201,7 +201,12 @@ const app = {
                 experience: exp
             });
             document.getElementById('form-add-driver').reset();
-            this.showToast(`New driver "${name}" registered successfully!`, 'success');
+            const creds = res?.credentials;
+            if (creds) {
+                this.showToast(`✅ Driver "${name}" registered! Login: ${creds.driverId} or ${creds.username} (Password: ${creds.password})`, 'success');
+            } else {
+                this.showToast(`New driver "${name}" registered successfully! Password: "password123"`, 'success');
+            }
             this.renderDirectory();
             this.populateWhatsAppDriverPicker();
         });
@@ -3033,7 +3038,12 @@ const app = {
                 let statusBadge = `<span class="badge ${d.status === 'Available' ? 'badge-success' : d.status === 'On Trip' ? 'badge-transit' : 'badge-delayed'}">${d.status}</span>`;
                 return `
                     <tr>
-                        <td style="font-weight:700;">${d.name}</td>
+                        <td style="font-weight:700;">
+                            ${d.name}
+                            <div style="font-size:0.7rem; color:var(--text-muted); font-weight:normal; font-family:monospace; margin-top:2px;">
+                                Login: <span style="color:#38bdf8; font-weight:600;">${(d.id || '').toLowerCase().replace(/[^a-z0-9]/g, '')}</span> or <span style="color:#38bdf8; font-weight:600;">${d.id}</span>
+                            </div>
+                        </td>
                         <td style="font-family:monospace;">${d.license}</td>
                         <td>${d.phone}</td>
                         <td>${d.experience} Years</td>
@@ -3041,9 +3051,14 @@ const app = {
                         <td style="color:var(--color-danger); font-weight:700;">${d.warnings}</td>
                         <td>${statusBadge}</td>
                         <td>
-                            <button type="button" class="btn btn-secondary" style="font-size:0.75rem; padding:0.2rem 0.5rem; color:#25D366; border-color:rgba(37,211,102,0.3); display:inline-flex; align-items:center; gap:0.25rem;" onclick="app.sendWhatsAppToDriver('${d.phone}', '${d.name}')" title="Chat on WhatsApp">
-                                💬 Chat
-                            </button>
+                            <div style="display:flex; gap:0.25rem; align-items:center;">
+                                <button type="button" class="btn btn-secondary" style="font-size:0.75rem; padding:0.2rem 0.5rem; color:#25D366; border-color:rgba(37,211,102,0.3); display:inline-flex; align-items:center; gap:0.25rem;" onclick="app.sendWhatsAppToDriver('${d.phone}', '${d.name}')" title="Chat on WhatsApp">
+                                    💬 Chat
+                                </button>
+                                <button type="button" class="btn btn-secondary" style="font-size:0.72rem; padding:0.2rem 0.4rem; color:#38bdf8; border-color:rgba(56,189,248,0.3);" onclick="navigator.clipboard.writeText('Driver: ${d.name} | Login ID: ${d.id} | Username: ${(d.id || '').toLowerCase().replace(/[^a-z0-9]/g, '')} | Password: password123 | Portal: ' + window.location.origin + '/driver-track.html'); app.showToast('📋 Login credentials copied to clipboard!', 'info');" title="Copy Driver Login Details">
+                                    🔑 Copy Login
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 `;

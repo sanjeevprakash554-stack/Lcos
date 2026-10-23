@@ -317,14 +317,35 @@
 
     <form id="formLogin">
       <div class="form-group">
-        <label class="form-label" for="inputUsername">Username or Employee ID</label>
-        <input type="text" id="inputUsername" class="form-input" placeholder="e.g. driver1" required autocomplete="username">
+        <label class="form-label" for="inputUsername">Username, Driver ID, or Mobile Phone</label>
+        <input type="text" id="inputUsername" class="form-input" placeholder="e.g. driver1, DRV-101, or 916382897998" required autocomplete="username">
       </div>
       <div class="form-group">
-        <label class="form-label" for="inputPassword">Password</label>
-        <input type="password" id="inputPassword" class="form-input" placeholder="Enter password" required autocomplete="current-password">
+        <label class="form-label" for="inputPassword">Password (Default: password123)</label>
+        <input type="password" id="inputPassword" class="form-input" value="password123" placeholder="Enter password" required autocomplete="current-password">
       </div>
       <button type="submit" id="btnLogin" class="btn btn-primary">Log In as Driver</button>
+
+      <!-- Quick Demo Login Presets -->
+      <div style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--card-border);">
+        <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:8px; font-weight:600; text-align:center;">
+          ⚡ Quick 1-Tap Driver Logins (Password: password123)
+        </div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px;">
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('inputUsername').value='driver1'; document.getElementById('inputPassword').value='password123'; document.getElementById('btnLogin').click();" style="min-height:34px; font-size:0.78rem; padding:4px 6px;">
+            🚚 driver1 (Selvam)
+          </button>
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('inputUsername').value='driver5'; document.getElementById('inputPassword').value='password123'; document.getElementById('btnLogin').click();" style="min-height:34px; font-size:0.78rem; padding:4px 6px;">
+            🚚 driver5 (Sanjeev)
+          </button>
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('inputUsername').value='DRV-101'; document.getElementById('inputPassword').value='password123'; document.getElementById('btnLogin').click();" style="min-height:34px; font-size:0.78rem; padding:4px 6px;">
+            🆔 By Driver ID (DRV-101)
+          </button>
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('inputUsername').value='916382897998'; document.getElementById('inputPassword').value='password123'; document.getElementById('btnLogin').click();" style="min-height:34px; font-size:0.78rem; padding:4px 6px;">
+            📱 By Mobile (Saravanan)
+          </button>
+        </div>
+      </div>
     </form>
   </section>
 

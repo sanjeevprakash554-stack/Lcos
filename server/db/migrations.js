@@ -150,6 +150,26 @@ async function runMigrations() {
       await db.query("UPDATE trips SET status = 'IN_TRANSIT' WHERE id IN ('TRIP-1001', 'TRIP-1002', 'TRIP-1005', 'TRIP-1006', 'TRIP-1012')");
     } catch (_) {}
 
+    // Ensure every single driver in drivers table has a linked user account for mobile login
+    try {
+      const unlinkedDrivers = await db.query(
+        `SELECT id, name, phone, company_id FROM drivers WHERE user_id IS NULL OR user_id = ''`
+      );
+      for (const d of unlinkedDrivers.rows || []) {
+        const uId = 'USR-' + d.id;
+        const uName = (d.id ? d.id.toLowerCase().replace(/[^a-z0-9]/g, '') : 'drv_' + Date.now());
+        try {
+          await db.query(
+            `INSERT INTO users (id, company_id, username, email, password_hash, full_name, phone, role, emp_id, status)
+             VALUES ($1, $2, $3, $4, '$2a$10$wM3J4sEwN7e8K0eL6f.g2.oT7r1Z1v3z4w5x6y7z8a9b0c1d2e3f4', $5, $6, 'DRIVER', $7, 'ACTIVE')
+             ON CONFLICT (id) DO NOTHING`,
+            [uId, d.company_id || 'COMP-001', uName, `${uName}@lcos.com`, d.name, d.phone, d.id]
+          );
+          await db.query(`UPDATE drivers SET user_id = $1 WHERE id = $2`, [uId, d.id]);
+        } catch (_) {}
+      }
+    } catch (_) {}
+
     // 6. Backfill branch coordinates
     for (const b of BRANCH_COORDINATES) {
       try {

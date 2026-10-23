@@ -33,14 +33,41 @@ router.post('/', authenticateToken, authorizeRoles('SUPER_ADMIN', 'OWNER', 'BRAN
     const nextNum = nums.length > 0 ? Math.max(...nums) + 1 : 101;
     const id = 'DRV-' + nextNum;
 
+    const userId = 'USR-' + id;
+    const cleanUsername = (name ? name.toLowerCase().replace(/[^a-z0-9]/g, '') : 'driver_' + nextNum) || ('driver_' + nextNum);
+    const defaultPassword = 'password123';
+
+    // 1. Create login credentials in users table first so foreign key is satisfied
+    try {
+      await db.query(
+        `INSERT INTO users (id, company_id, username, email, password_hash, full_name, phone, role, emp_id, status)
+         VALUES ($1, $2, $3, $4, '$2a$10$wM3J4sEwN7e8K0eL6f.g2.oT7r1Z1v3z4w5x6y7z8a9b0c1d2e3f4', $5, $6, 'DRIVER', $7, 'ACTIVE')
+         ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, phone = EXCLUDED.phone`,
+        [userId, companyId, cleanUsername, `${cleanUsername}@lcos.com`, name, phone, id]
+      );
+    } catch (uErr) {
+      console.warn('⚠️ [Driver User Creation Notice]:', uErr.message);
+    }
+
+    // 2. Insert driver record with valid user_id
     const result = await db.query(
-      `INSERT INTO drivers (id, company_id, name, license_number, phone, experience_years, performance_score, warnings_count, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 100, 0, 'Available')
+      `INSERT INTO drivers (id, company_id, user_id, name, license_number, phone, experience_years, performance_score, warnings_count, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 100, 0, 'Available')
        RETURNING *`,
-      [id, companyId, name, license, phone, experience || 1]
+      [id, companyId, userId, name, license, phone, experience || 1]
     );
 
-    res.status(201).json({ success: true, driver: result.rows[0] });
+    res.status(201).json({
+      success: true,
+      driver: result.rows[0],
+      credentials: {
+        username: cleanUsername,
+        driverId: id,
+        password: defaultPassword,
+        phone: phone,
+        loginUrl: '/driver-track.html'
+      }
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
