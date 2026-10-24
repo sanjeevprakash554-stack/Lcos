@@ -310,39 +310,69 @@
 
   <!-- SCREEN 1: LOGIN (When unauthenticated) -->
   <section id="sectionLogin" class="card">
-    <div class="card-title">Driver Authentication</div>
+    <div class="card-title">Driver Authentication & Live Tracking</div>
     <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">
-      Log in with your driver credentials to synchronize GPS telemetry with Central Operations.
+      Enter your Registered Mobile Number and Driver ID to connect your phone's GPS with Central Operations.
     </p>
 
     <form id="formLogin">
+      <!-- Select Any Driver Dropdown -->
       <div class="form-group">
-        <label class="form-label" for="inputUsername">Username, Driver ID, or Mobile Phone</label>
-        <input type="text" id="inputUsername" class="form-input" placeholder="e.g. driver1, DRV-101, or 916382897998" required autocomplete="username">
+        <label class="form-label" for="selectQuickDriver">🚚 Select Any Fleet Driver (Or enter custom below)</label>
+        <select id="selectQuickDriver" class="form-input" style="cursor:pointer; background:rgba(30,41,59,0.9); border-color:#3b82f6;">
+          <option value="">-- Choose Any Driver from Fleet --</option>
+          <option value="919884012345|DRV-101">🚚 DRV-101: Selvam R. (919884012345 - Lorry TN-01-AB-1234)</option>
+          <option value="919884023456|DRV-102">🚚 DRV-102: Kumaravel P. (919884023456 - Lorry TN-02-GH-3456)</option>
+          <option value="919884034567|DRV-103">🚚 DRV-103: Rajesh Nair (919884034567 - Container TN-37-CD-5678)</option>
+          <option value="919884045678|DRV-104">🚚 DRV-104: Murugan T. (919884045678 - Lorry TN-23-LM-1122)</option>
+          <option value="916382897998|DRV-105">🚚 DRV-105: Saravanan K. (916382897998 - Mini Truck TN-59-EF-9012)</option>
+          <option value="919884067890|DRV-106">🚚 DRV-106: Arumugam M. (919884067890 - Container TN-07-JK-7890)</option>
+          <option value="919884078901|DRV-107">🚚 DRV-107: Baskaran S. (919884078901 - Container TN-45-QR-5566)</option>
+          <option value="919884089012|DRV-108">🚚 DRV-108: Kathiravan G. (919884089012 - Lorry TN-45-KL-8899)</option>
+          <option value="919884090123|DRV-109">🚚 DRV-109: Paneerselvam K. (919884090123 - Lorry TN-69-ST-7788)</option>
+          <option value="919884001234|DRV-110">🚚 DRV-110: Vinoth Kumar (919884001234 - Mini Truck TN-72-UV-9900)</option>
+          <option value="919884099999|DRV-111">🚚 DRV-111: Teenu (919884099999 - Mini Truck TN-11-TE-1111)</option>
+          <option value="7904743468|DRV-112">🚚 DRV-112: Sanjeev (7904743468 - Mini Truck TN-30-NP-3344)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="inputPhone">📱 Driver Mobile Phone Number</label>
+        <input type="tel" id="inputPhone" class="form-input" placeholder="e.g. 916382897998, 7904743468, 9884023456" autocomplete="tel">
       </div>
       <div class="form-group">
-        <label class="form-label" for="inputPassword">Password (Default: password123)</label>
-        <input type="password" id="inputPassword" class="form-input" value="password123" placeholder="Enter password" required autocomplete="current-password">
+        <label class="form-label" for="inputUsername">🆔 Driver ID or Username</label>
+        <input type="text" id="inputUsername" class="form-input" placeholder="e.g. DRV-101, DRV-112, driver1, driver5" autocomplete="username">
       </div>
-      <button type="submit" id="btnLogin" class="btn btn-primary">Log In as Driver</button>
+      <div class="form-group">
+        <label class="form-label" for="inputPassword" style="display:flex; justify-content:space-between;">
+          <span>Password</span>
+          <span style="font-size:0.75rem; color:#60a5fa;">Default: password123</span>
+        </label>
+        <input type="password" id="inputPassword" class="form-input" value="password123" placeholder="Enter password" autocomplete="current-password">
+      </div>
+      <button type="submit" id="btnLogin" class="btn btn-primary" style="margin-top:4px;">
+        <span>📡</span>
+        <span>Start Live GPS Tracking</span>
+      </button>
 
       <!-- Quick Demo Login Presets -->
       <div style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--card-border);">
         <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:8px; font-weight:600; text-align:center;">
-          ⚡ Quick 1-Tap Driver Logins (Password: password123)
+          ⚡ Quick 1-Tap Driver Presets
         </div>
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px;">
-          <button type="button" class="btn btn-secondary" onclick="document.getElementById('inputUsername').value='driver1'; document.getElementById('inputPassword').value='password123'; document.getElementById('btnLogin').click();" style="min-height:34px; font-size:0.78rem; padding:4px 6px;">
-            🚚 driver1 (Selvam)
+          <button type="button" class="btn btn-secondary" onclick="fillDriverAndLogin('916382897998', 'DRV-101')" style="min-height:36px; font-size:0.78rem; padding:4px 6px;">
+            🚚 Selvam (DRV-101 / 916382897998)
           </button>
-          <button type="button" class="btn btn-secondary" onclick="document.getElementById('inputUsername').value='driver5'; document.getElementById('inputPassword').value='password123'; document.getElementById('btnLogin').click();" style="min-height:34px; font-size:0.78rem; padding:4px 6px;">
-            🚚 driver5 (Sanjeev)
+          <button type="button" class="btn btn-secondary" onclick="fillDriverAndLogin('7904743468', 'DRV-112')" style="min-height:36px; font-size:0.78rem; padding:4px 6px;">
+            🚚 Sanjeev (DRV-112 / 7904743468)
           </button>
-          <button type="button" class="btn btn-secondary" onclick="document.getElementById('inputUsername').value='DRV-101'; document.getElementById('inputPassword').value='password123'; document.getElementById('btnLogin').click();" style="min-height:34px; font-size:0.78rem; padding:4px 6px;">
-            🆔 By Driver ID (DRV-101)
+          <button type="button" class="btn btn-secondary" onclick="fillDriverAndLogin('919884023456', 'DRV-102')" style="min-height:36px; font-size:0.78rem; padding:4px 6px;">
+            🚚 Kumaravel (DRV-102 / 9884023456)
           </button>
-          <button type="button" class="btn btn-secondary" onclick="document.getElementById('inputUsername').value='916382897998'; document.getElementById('inputPassword').value='password123'; document.getElementById('btnLogin').click();" style="min-height:34px; font-size:0.78rem; padding:4px 6px;">
-            📱 By Mobile (Saravanan)
+          <button type="button" class="btn btn-secondary" onclick="fillDriverAndLogin('916382897998', 'DRV-105')" style="min-height:36px; font-size:0.78rem; padding:4px 6px;">
+            🚚 Saravanan (DRV-105 / 916382897998)
           </button>
         </div>
       </div>
@@ -423,11 +453,22 @@
     </div>
 
     <!-- Main Toggle Action -->
-    <div style="margin-top:6px; margin-bottom:14px;">
+    <div style="margin-top:6px; margin-bottom:14px; display:flex; flex-direction:column; gap:8px;">
       <button id="btnToggleTracking" class="btn btn-start">
         <span>▶</span>
         <span id="textToggleTracking">Start GPS Tracking</span>
       </button>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+        <button id="btnSendTestPing" type="button" class="btn btn-secondary" style="min-height:42px; font-size:0.82rem;">
+          📍 Transmit Fix Now
+        </button>
+        <button id="btnSimulateStep" type="button" class="btn btn-secondary" style="min-height:42px; font-size:0.82rem;">
+          🚗 Advance 100m (Sim)
+        </button>
+      </div>
+      <a href="/" target="_blank" class="btn btn-secondary" style="text-decoration:none; display:flex; align-items:center; justify-content:center; min-height:38px; font-size:0.82rem; background:rgba(59,130,246,0.18); border:1px solid #3b82f6; color:#93c5fd;">
+        🗺️ Open Operations Dashboard Map ↗
+      </a>
     </div>
   </section>
 
@@ -497,10 +538,13 @@
         bannerNoticeText: document.getElementById('bannerNoticeText'),
         sectionLogin: document.getElementById('sectionLogin'),
         formLogin: document.getElementById('formLogin'),
+        inputPhone: document.getElementById('inputPhone'),
         inputUsername: document.getElementById('inputUsername'),
         inputPassword: document.getElementById('inputPassword'),
         sectionDashboard: document.getElementById('sectionDashboard'),
         btnLogout: document.getElementById('btnLogout'),
+        btnSendTestPing: document.getElementById('btnSendTestPing'),
+        btnSimulateStep: document.getElementById('btnSimulateStep'),
         viewHasTrip: document.getElementById('viewHasTrip'),
         viewNoTrip: document.getElementById('viewNoTrip'),
         btnRefreshTrip: document.getElementById('btnRefreshTrip'),
@@ -919,18 +963,51 @@
         el.sectionDashboard.classList.add('banner-hidden');
       }
 
+      // Quick driver dropdown selection listener
+      const selectQuickDriver = document.getElementById('selectQuickDriver');
+      if (selectQuickDriver) {
+        selectQuickDriver.addEventListener('change', () => {
+          const val = selectQuickDriver.value;
+          if (val) {
+            const parts = val.split('|');
+            if (el.inputPhone) el.inputPhone.value = parts[0] || '';
+            if (el.inputUsername) el.inputUsername.value = parts[1] || '';
+          }
+        });
+      }
+
+      // Helper for 1-tap quick presets
+      window.fillDriverAndLogin = function(phone, id) {
+        if (el.inputPhone) el.inputPhone.value = phone || '';
+        if (el.inputUsername) el.inputUsername.value = id || '';
+        if (el.inputPassword) el.inputPassword.value = 'password123';
+        if (el.formLogin) {
+          el.formLogin.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+        }
+      };
+
       // Login form submission
       el.formLogin.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const username = el.inputUsername.value.trim();
-        const password = el.inputPassword.value.trim();
-        if (!username || !password) return;
+        const phone = (el.inputPhone ? el.inputPhone.value.trim() : '');
+        const username = (el.inputUsername ? el.inputUsername.value.trim() : '');
+        const password = (el.inputPassword ? el.inputPassword.value.trim() : '') || 'password123';
+        
+        if (!username && !phone) {
+          showNotice('Please enter your Driver Mobile Phone Number or Driver ID', 'warning');
+          return;
+        }
 
         try {
           const res = await fetch('/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password }),
+            body: JSON.stringify({ 
+              username: username || phone, 
+              phone: phone || undefined, 
+              driverId: username || undefined, 
+              password 
+            }),
           });
           const data = await res.json();
 
@@ -949,6 +1026,13 @@
             initSocketConnection();
             await fetchActiveTrip();
             updateQueueCountUI();
+
+            // Auto-start GPS tracking immediately upon login
+            if (state.activeTrip) {
+              startTracking();
+              showNotice('🛰️ GPS Tracking Active: Streaming your live location to Central Operations map.', 'info');
+              setTimeout(() => hideNotice(), 5000);
+            }
           } else {
             showNotice(data.message || 'Invalid username or password', 'danger');
           }
@@ -956,6 +1040,62 @@
           showNotice('Login network error. Ensure server is online.', 'danger');
         }
       });
+
+      // Manual / Simulated GPS triggers for easy testing
+      if (el.btnSendTestPing) {
+        el.btnSendTestPing.addEventListener('click', () => {
+          if (!navigator.geolocation) {
+            showNotice('Geolocation not available in this browser.', 'danger');
+            return;
+          }
+          showNotice('Acquiring high-accuracy GPS fix from device...', 'info');
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              transmitOrQueuePoint(pos, true);
+              showNotice('✅ Live GPS coordinates transmitted to Operations Map!', 'info');
+              setTimeout(() => hideNotice(), 4000);
+            },
+            (err) => {
+              showNotice(`GPS Error: ${err.message}. If testing on mobile, ensure location permissions are granted.`, 'danger');
+            },
+            { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
+          );
+        });
+      }
+
+      if (el.btnSimulateStep) {
+        el.btnSimulateStep.addEventListener('click', () => {
+          if (!state.token || !state.activeTrip) {
+            showNotice('Please log in with an active shipment to test movement simulation.', 'warning');
+            return;
+          }
+          let baseLat = 13.0827;
+          let baseLng = 80.2707;
+          if (state.lastFix && state.lastFix.lat) {
+            baseLat = state.lastFix.lat;
+            baseLng = state.lastFix.lng;
+          } else if (state.activeTrip.vehicleLat) {
+            baseLat = Number(state.activeTrip.vehicleLat);
+            baseLng = Number(state.activeTrip.vehicleLng);
+          }
+
+          // Advance by ~120m northeast
+          const nextLat = baseLat + 0.0011;
+          const nextLng = baseLng + 0.0011;
+          const fakePos = {
+            coords: {
+              latitude: nextLat,
+              longitude: nextLng,
+              accuracy: 5,
+              speed: 12, // ~43 km/h
+              heading: 45,
+            },
+            timestamp: Date.now(),
+          };
+          showNotice('🚗 Advanced vehicle +120m! Transmitting update to Central Dashboard map...', 'info');
+          transmitOrQueuePoint(fakePos, true);
+        });
+      }
 
       // Logout button
       el.btnLogout.addEventListener('click', () => {
@@ -1392,6 +1532,18 @@
         if (isStandalone) {
           if (el.bannerInstallApp) el.bannerInstallApp.classList.add('banner-hidden');
         }
+
+        // Dynamically load active fleet drivers for 1-click selection
+        try {
+          const dRes = await fetch('/api/drivers/active-list');
+          if (dRes.ok) {
+            const dData = await dRes.json();
+            if (dData.drivers && dData.drivers.length > 0 && selectQuickDriver) {
+              selectQuickDriver.innerHTML = '<option value="">-- Choose Any Driver from Fleet (' + dData.drivers.length + ' Drivers) --</option>' +
+                dData.drivers.map(d => `<option value="${d.phone || ''}|${d.id}">🚚 ${d.id}: ${d.name} (Ph: ${d.phone || 'N/A'} - ${d.vehicle_id || 'Assigned Lorry'})</option>`).join('');
+            }
+          }
+        } catch (_) {}
 
         if (state.token) {
           el.sectionLogin.classList.add('banner-hidden');

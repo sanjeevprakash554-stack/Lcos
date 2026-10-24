@@ -525,29 +525,53 @@ router.post('/assign-backload', authenticateToken, authorizeRoles('SUPER_ADMIN',
       return res.status(404).json({ success: false, message: 'Return trip not found' });
     }
 
-    const deliveryInfoPayload = JSON.stringify({ isBackload: true, pairedAt: new Date().toISOString() });
-    const checklistsPayload = JSON.stringify({ isBackload: true, dispatch: { loaded: true, verified: true } });
+    const trip = tripRes.rows[0];
+
+    // Safely parse and merge delivery_info and checklists in JavaScript
+    let deliveryInfo = {};
+    try {
+      deliveryInfo = typeof trip.delivery_info === 'string' ? JSON.parse(trip.delivery_info || '{}') : (trip.delivery_info || {});
+    } catch (_) {}
+    deliveryInfo.isBackload = true;
+    deliveryInfo.pairedAt = new Date().toISOString();
+
+    let checklists = {};
+    try {
+      checklists = typeof trip.checklists === 'string' ? JSON.parse(trip.checklists || '{}') : (trip.checklists || {});
+    } catch (_) {}
+    checklists.isBackload = true;
+    checklists.dispatch = { loaded: true, verified: true };
 
     const updatedTrip = await db.query(
       `UPDATE trips
        SET vehicle_id = $1, driver_id = $2, helper_id = $3, status = 'DISPATCH_APPROVED', 
-           delivery_info = COALESCE(delivery_info, '{}'::jsonb) || $5::jsonb,
-           checklists = COALESCE(checklists, '{}'::jsonb) || $6::jsonb,
+           delivery_info = $5,
+           checklists = $6,
            updated_at = NOW(), last_update_timestamp = NOW()
        WHERE id = $4
        RETURNING *`,
-      [vehicleId, driverId, helperId || null, tripId, deliveryInfoPayload, checklistsPayload]
+      [vehicleId, driverId, helperId || null, tripId, JSON.stringify(deliveryInfo), JSON.stringify(checklists)]
     );
 
     // Update parent closed trip for this vehicle if exists
-    await db.query(
-      `UPDATE trips
-       SET status = 'BACKLOAD_PAIRED',
-           delivery_info = jsonb_set(COALESCE(delivery_info, '{}'::jsonb), '{returnMatchingInfo}', $1::jsonb),
-           updated_at = NOW()
-       WHERE vehicle_id = $2 AND status = 'CLOSED'`,
-      [JSON.stringify({ hasReturnLoad: true, returnTripId: tripId, statusText: 'Paired & Dispatched' }), vehicleId]
+    const parentClosedRes = await db.query(
+      `SELECT id, delivery_info FROM trips WHERE vehicle_id = $1 AND status = 'CLOSED' ORDER BY updated_at DESC LIMIT 1`,
+      [vehicleId]
     );
+
+    if (parentClosedRes.rows.length > 0) {
+      const parentTrip = parentClosedRes.rows[0];
+      let pDeliv = {};
+      try {
+        pDeliv = typeof parentTrip.delivery_info === 'string' ? JSON.parse(parentTrip.delivery_info || '{}') : (parentTrip.delivery_info || {});
+      } catch (_) {}
+      pDeliv.returnMatchingInfo = { hasReturnLoad: true, returnTripId: tripId, statusText: 'Paired & Dispatched' };
+      
+      await db.query(
+        `UPDATE trips SET status = 'BACKLOAD_PAIRED', delivery_info = $1, updated_at = NOW() WHERE id = $2`,
+        [JSON.stringify(pDeliv), parentTrip.id]
+      );
+    }
 
     await db.query(`UPDATE vehicles SET status = 'In Transit', updated_at = NOW() WHERE id = $1`, [vehicleId]);
     await db.query(`UPDATE drivers SET status = 'On Trip', updated_at = NOW() WHERE id = $1`, [driverId]);
@@ -563,10 +587,10 @@ router.post('/assign-backload', authenticateToken, authorizeRoles('SUPER_ADMIN',
       trip: updatedTrip.rows[0],
     });
   } catch (err) {
+    console.error('Error assigning backload:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });
-
 
 module.exports = router;
 

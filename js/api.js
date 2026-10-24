@@ -42,10 +42,12 @@ class LCOS_API {
   }
 
   // --- Auth APIs ---
-  static async login(username, role) {
+  static async login(username, role, password = '') {
+    const body = { username, role };
+    if (password) body.password = password;
     const data = await this.request('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ username, role }),
+      body: JSON.stringify(body),
     });
     if (data.token) this.setToken(data.token);
     return data;

@@ -216,6 +216,12 @@ router.post('/:id/resolve', authenticateToken, async (req, res) => {
     );
 
     if (result.rows.length === 0) return res.status(404).json({ success: false, message: 'Alert not found' });
+    const alert = result.rows[0];
+
+    // Refresh vehicle heartbeat/ping so it does not immediately re-trigger a stale outage
+    if (alert.vehicle_id) {
+      await db.query(`UPDATE vehicles SET last_ping_at = NOW(), stoppage_start_time = NULL WHERE id = $1`, [alert.vehicle_id]);
+    }
 
     await db.query(
       `INSERT INTO alert_responses (alert_id, responder_user_id, action_taken, notes)

@@ -6,25 +6,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Logistics Operations Control System (LCOS)</title>
-    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="/css/styles.css?v=3.8">
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 <body>
     <div id="app-container" style="display: none;">
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
-            <div class="logo-container">
-                <div class="logo-icon">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                        <line x1="8" y1="21" x2="16" y2="21"></line>
-                        <line x1="12" y1="17" x2="12" y2="21"></line>
-                    </svg>
+            <div class="sidebar-header-row">
+                <div class="logo-container">
+                    <div class="logo-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                            <line x1="8" y1="21" x2="16" y2="21"></line>
+                            <line x1="12" y1="17" x2="12" y2="21"></line>
+                        </svg>
+                    </div>
+                    <div class="logo-text">
+                        <h1>LCOS</h1>
+                        <span id="sidebar-role-subtitle">Admin Operations</span>
+                    </div>
                 </div>
-                <div class="logo-text">
-                    <h1>LCOS</h1>
-                    <span>Admin Operations</span>
-                </div>
+                <button type="button" class="sidebar-mobile-close" id="btn-sidebar-mobile-close" aria-label="Close navigation" title="Close Drawer">&times;</button>
             </div>
             
             <nav style="flex-grow: 1;">
@@ -32,56 +35,56 @@
                     <li class="nav-item active" data-tab="dashboard">
                         <a href="#">
                             <svg><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-                            Dashboard
+                            <span class="nav-label">Dashboard</span>
                         </a>
                     </li>
                     <li class="nav-item" data-tab="operations">
                         <a href="#">
                             <svg><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-                            Operations Console
+                            <span class="nav-label">Operations Console</span>
                         </a>
                     </li>
                     <li class="nav-item" data-tab="trips">
                         <a href="#">
                             <svg><rect x="1" y="3" width="15" height="13" rx="2" ry="2"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
-                            Trips Tracker
+                            <span class="nav-label">Trips Tracker</span>
                         </a>
                     </li>
                     <li class="nav-item" data-tab="inventory">
                         <a href="#">
                             <svg><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-                            Inventory & Stock
+                            <span class="nav-label">Inventory & Stock</span>
                         </a>
                     </li>
                     <li class="nav-item" data-tab="directory">
                         <a href="#">
                             <svg><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                            LCOS Directory
+                            <span class="nav-label">LCOS Directory</span>
                         </a>
                     </li>
                     <li class="nav-item" data-tab="calllogs">
                         <a href="#">
                             <svg><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-                            Call Logs
+                            <span class="nav-label">Call Logs</span>
                         </a>
                     </li>
                     <li class="nav-item" data-tab="notifications" id="nav-item-notifications">
                         <a href="#">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-                            Notifications
+                            <span class="nav-label">Notifications</span>
                         </a>
                     </li>
                     <li class="nav-item" data-tab="whatsapp" id="nav-item-whatsapp">
                         <a href="#">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #25D366;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
-                            WhatsApp Hub
-                            <span class="badge" style="margin-left: auto; background: rgba(37, 211, 102, 0.2); color: #25D366; font-size: 0.65rem; padding: 2px 6px; border-radius: 10px; border: 1px solid rgba(37, 211, 102, 0.4);">Meta</span>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #25D366; flex-shrink: 0;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                            <span class="nav-label">WhatsApp Hub</span>
+                            <span class="nav-badge nav-badge-meta">META</span>
                         </a>
                     </li>
                     <li class="nav-item" data-tab="billing" id="nav-item-billing" style="display:none;">
                         <a href="#">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
-                            Billing & SaaS Plans
+                            <span class="nav-label">Billing & SaaS Plans</span>
                         </a>
                     </li>
                 </ul>
@@ -89,20 +92,28 @@
             
             <div class="sidebar-footer">
                 <div class="admin-profile">
-                    <div class="admin-avatar">ADM</div>
+                    <div class="admin-avatar" id="sidebar-avatar">ADM</div>
                     <div class="admin-info">
-                        <h4>Admin Control</h4>
-                        <p>Operations HQ</p>
+                        <h4 id="sidebar-user-name">Admin Control</h4>
+                        <p id="sidebar-user-role">Operations HQ</p>
                     </div>
                 </div>
             </div>
         </aside>
+        <div class="sidebar-overlay" id="sidebar-mobile-overlay"></div>
 
         <!-- Main Panel -->
         <main class="main-content">
             <!-- Header -->
             <header class="top-header">
                 <div class="header-title">
+                    <button type="button" class="mobile-nav-toggle" id="btn-mobile-nav-toggle" aria-label="Toggle navigation menu" title="Open Navigation Drawer">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="3" y1="12" x2="21" y2="12"></line>
+                            <line x1="3" y1="6" x2="21" y2="6"></line>
+                            <line x1="3" y1="18" x2="21" y2="18"></line>
+                        </svg>
+                    </button>
                     <h2 id="view-title">Dashboard</h2>
                 </div>
                 <div class="header-actions">
@@ -191,6 +202,7 @@
                                 <span>Tamil Nadu - Logistics Network Map</span>
                                 <span style="font-size: 0.78rem; display:inline-flex; align-items:center; gap:0.5rem;">
                                     <span style="color: var(--color-primary); font-weight: 600;">38 District Hubs</span>
+                                    <button type="button" class="btn btn-secondary" id="btn-toggle-district-list" style="font-size:0.72rem; padding:0.2rem 0.55rem; border-radius:6px; background:rgba(15,118,110,0.08); color:var(--color-primary); font-weight:600; cursor:pointer;" onclick="app.toggleMapDistrictsDrawer()">📍 View Districts List (38)</button>
                                 </span>
                             </div>
                             
@@ -217,7 +229,7 @@
                                 <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
                                     <label class="form-label" style="margin:0; font-size:0.75rem; color:var(--text-muted); white-space:nowrap;">District Wise:</label>
                                     <select class="form-control" id="map-filter-district" style="width:135px; font-size:0.75rem; padding:0.25rem 0.4rem; height:auto; background:var(--bg-glass);">
-                                        <option value="">-- All Districts --</option>
+                                        <option value="">-- All Districts (38) --</option>
                                     </select>
                                 </div>
                                 <div style="display:flex; align-items:center; gap:0.4rem; flex-shrink:0;">
@@ -232,6 +244,18 @@
                                     </button>
                                 </div>
                             </div>
+
+                            <!-- Expandable Districts in Map Drawer (4 items visible, scroll for all 38) -->
+                            <div id="map-districts-drawer" class="lcos-scroll-container" style="display:none; max-height: 185px; overflow-y: auto; margin-bottom: 0.75rem; background: #ffffff; border: 1px solid var(--border-glass); border-radius: 10px; padding: 0.6rem;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.4rem; padding-bottom:0.3rem; border-bottom:1px solid var(--border-glass);">
+                                    <strong style="font-size:0.78rem; color:var(--text-primary);">Tamil Nadu 38 District Hubs Directory</strong>
+                                    <span style="font-size:0.7rem; color:var(--text-muted);">4 Visible • Scroll down for all 38</span>
+                                </div>
+                                <div id="map-districts-list-content" style="display:flex; flex-direction:column; gap:0.35rem;">
+                                    <!-- Injected dynamically in app.js -->
+                                </div>
+                            </div>
+
                             <div class="map-visualizer" style="position:relative; width:100%; flex:1; min-height:clamp(540px, 62vh, 780px); height:100%; overflow:hidden; border-radius:12px; display:flex; flex-direction:column;">
                                 <div id="tn-real-map" style="width:100%; height:100%; min-height:clamp(540px, 62vh, 780px); flex:1; border-radius:12px; position:relative; z-index:1;"></div>
                             </div>
@@ -260,9 +284,14 @@
                                                     Live Vehicles
                                                 </span>
                                             </div>
-                                            <select id="sim-live-trip-select" class="form-control sim-control">
-                                                <option value="">-- Choose Live Running Vehicle (or use manual simulator below) --</option>
+                                            <select id="sim-live-trip-select" class="form-control sim-control" style="margin-bottom:0.6rem;">
+                                                <option value="">-- Choose Live Running Vehicle (or select from list below) --</option>
                                             </select>
+
+                                            <!-- 4-item scrollable live running vehicles list -->
+                                            <div id="sim-running-vehicles-scroll" class="lcos-scroll-container" style="max-height: 195px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.75rem;">
+                                                <!-- Injected dynamically in app.js -->
+                                            </div>
 
                                             <!-- Live Running Trip Identification Card (Tracking #, Trip ID, Log ID, Driver & Emp ID) -->
                                             <div id="sim-trip-meta-card" class="sim-trip-meta-box" style="display:none;">
@@ -643,25 +672,30 @@
                                 </form>
                             </div>
                             
-                            <div class="glass-card" style="overflow-x:auto;">
-                                <h4 style="font-family:var(--font-heading); margin-bottom:1rem;">Drivers List</h4>
-                                <table class="lcos-table" id="table-drivers">
-                                    <thead>
-                                        <tr>
-                                            <th>Name</th>
-                                            <th>License</th>
-                                            <th>Phone</th>
-                                            <th>Experience</th>
-                                            <th>Performance</th>
-                                            <th>Warnings</th>
-                                            <th>Status</th>
-                                            <th>WhatsApp</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <!-- Injected dynamically -->
-                                    </tbody>
-                                </table>
+                            <div class="glass-card">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+                                    <h4 style="font-family:var(--font-heading); margin:0;">Drivers List</h4>
+                                    <span class="badge" style="background:rgba(15, 118, 110, 0.1); color:var(--color-primary); font-size:0.72rem; padding:0.2rem 0.5rem;">4 Visible • Scroll for more</span>
+                                </div>
+                                <div class="table-container" style="max-height: 255px; overflow-y: auto; overflow-x: auto;">
+                                    <table class="lcos-table" id="table-drivers">
+                                        <thead>
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>License</th>
+                                                <th>Phone</th>
+                                                <th>Experience</th>
+                                                <th>Performance</th>
+                                                <th>Warnings</th>
+                                                <th>Status</th>
+                                                <th>WhatsApp</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Injected dynamically -->
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -701,22 +735,27 @@
                                 </form>
                             </div>
                             
-                            <div class="glass-card" style="overflow-x:auto;">
-                                <h4 style="font-family:var(--font-heading); margin-bottom:1rem;">Vehicles List</h4>
-                                <table class="lcos-table" id="table-vehicles">
-                                    <thead>
-                                        <tr>
-                                            <th>Reg No</th>
-                                            <th>Type</th>
-                                            <th>Capacity</th>
-                                            <th>Ownership</th>
-                                            <th>Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <!-- Injected dynamically -->
-                                    </tbody>
-                                </table>
+                            <div class="glass-card">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+                                    <h4 style="font-family:var(--font-heading); margin:0;">Vehicles List</h4>
+                                    <span class="badge" style="background:rgba(15, 118, 110, 0.1); color:var(--color-primary); font-size:0.72rem; padding:0.2rem 0.5rem;">4 Visible • Scroll for more</span>
+                                </div>
+                                <div class="table-container" style="max-height: 255px; overflow-y: auto; overflow-x: auto;">
+                                    <table class="lcos-table" id="table-vehicles">
+                                        <thead>
+                                            <tr>
+                                                <th>Reg No</th>
+                                                <th>Type</th>
+                                                <th>Capacity</th>
+                                                <th>Ownership</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Injected dynamically -->
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -743,21 +782,26 @@
                                 </form>
                             </div>
                             
-                            <div class="glass-card" style="overflow-x:auto;">
-                                <h4 style="font-family:var(--font-heading); margin-bottom:1rem;">Branches List</h4>
-                                <table class="lcos-table" id="table-branches">
-                                    <thead>
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Branch District</th>
-                                            <th>Manager</th>
-                                            <th>Contact Phone</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <!-- Injected dynamically -->
-                                    </tbody>
-                                </table>
+                            <div class="glass-card">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+                                    <h4 style="font-family:var(--font-heading); margin:0;">Branches & Districts Hub List (38)</h4>
+                                    <span class="badge" style="background:rgba(15, 118, 110, 0.1); color:var(--color-primary); font-size:0.72rem; padding:0.2rem 0.5rem;">4 Visible • Scroll for all 38</span>
+                                </div>
+                                <div class="table-container" style="max-height: 255px; overflow-y: auto; overflow-x: auto;">
+                                    <table class="lcos-table" id="table-branches">
+                                        <thead>
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>Branch District</th>
+                                                <th>Manager</th>
+                                                <th>Contact Phone</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Injected dynamically -->
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -765,20 +809,25 @@
                     <!-- 5d. Helpers Directory Subtab -->
                     <div class="dir-sub-content" id="dir-helpers" style="display:none;">
                         <div class="glass-card">
-                            <h4 style="font-family:var(--font-heading); margin-bottom:1rem;">Helpers Directory</h4>
-                            <table class="lcos-table" id="table-helpers">
-                                <thead>
-                                    <tr>
-                                        <th>Helper Name</th>
-                                        <th>Contact Number</th>
-                                        <th>Role Type</th>
-                                        <th>Availability</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <!-- Injected dynamically -->
-                                </tbody>
-                            </table>
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+                                <h4 style="font-family:var(--font-heading); margin:0;">Helpers Directory</h4>
+                                <span class="badge" style="background:rgba(15, 118, 110, 0.1); color:var(--color-primary); font-size:0.72rem; padding:0.2rem 0.5rem;">4 Visible • Scroll for more</span>
+                            </div>
+                            <div class="table-container" style="max-height: 255px; overflow-y: auto; overflow-x: auto;">
+                                <table class="lcos-table" id="table-helpers">
+                                    <thead>
+                                        <tr>
+                                            <th>Helper Name</th>
+                                            <th>Contact Number</th>
+                                            <th>Role Type</th>
+                                            <th>Availability</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Injected dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
 
@@ -810,21 +859,26 @@
                                 </form>
                             </div>
                             <div class="glass-card">
-                                <h4 style="font-family:var(--font-heading); margin-bottom:1rem;">Commodity Directory</h4>
-                                <table class="lcos-table" id="table-commodities">
-                                    <thead>
-                                        <tr>
-                                            <th>ID</th>
-                                            <th>Commodity</th>
-                                            <th>Unit</th>
-                                            <th>Weight</th>
-                                            <th>Value</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <!-- Injected dynamically -->
-                                    </tbody>
-                                </table>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+                                    <h4 style="font-family:var(--font-heading); margin:0;">Commodity Directory</h4>
+                                    <span class="badge" style="background:rgba(15, 118, 110, 0.1); color:var(--color-primary); font-size:0.72rem; padding:0.2rem 0.5rem;">4 Visible • Scroll for more</span>
+                                </div>
+                                <div class="table-container" style="max-height: 255px; overflow-y: auto; overflow-x: auto;">
+                                    <table class="lcos-table" id="table-commodities">
+                                        <thead>
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>Commodity</th>
+                                                <th>Unit</th>
+                                                <th>Weight</th>
+                                                <th>Value</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Injected dynamically -->
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1008,14 +1062,14 @@
 
                         <!-- Sub-tab 1: Operations Alerts Content -->
                         <div class="notif-sub-content" id="notif-sub-alerts" style="display:block;">
-                            <div id="full-alerts-feed-content" style="display:flex; flex-direction:column; gap:0.75rem; min-height:250px;">
+                            <div id="full-alerts-feed-content" class="lcos-scroll-container" style="display:flex; flex-direction:column; gap:0.75rem; max-height:380px; overflow-y:auto; padding-right:0.4rem;">
                                 <!-- Full alerts list renders here -->
                             </div>
                         </div>
 
                         <!-- Sub-tab 2: Supervisor Requests Content -->
                         <div class="notif-sub-content" id="notif-sub-requests" style="display:none;">
-                            <div id="full-requests-feed-content" style="display:flex; flex-direction:column; gap:0.75rem; min-height:250px;">
+                            <div id="full-requests-feed-content" class="lcos-scroll-container" style="display:flex; flex-direction:column; gap:0.75rem; max-height:380px; overflow-y:auto; padding-right:0.4rem;">
                                 <!-- Full requests list renders here -->
                             </div>
                         </div>
@@ -1159,6 +1213,29 @@
             </div>
         </main>
 
+        <!-- Mobile Quick Bottom Navigation Bar (Visible only on mobile/tablets <= 768px) -->
+        <nav class="mobile-bottom-nav" id="mobile-bottom-nav">
+            <button type="button" class="mobile-bottom-nav-item active" data-tab="dashboard">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                <span>Dashboard</span>
+            </button>
+            <button type="button" class="mobile-bottom-nav-item" data-tab="operations">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                <span>Console</span>
+            </button>
+            <button type="button" class="mobile-bottom-nav-item" data-tab="trips">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2" ry="2"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                <span>Trips</span>
+            </button>
+            <button type="button" class="mobile-bottom-nav-item" data-tab="notifications">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                <span>Alerts</span>
+            </button>
+            <button type="button" class="mobile-bottom-nav-item" id="btn-mobile-more-tabs">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                <span>Menu</span>
+            </button>
+        </nav>
 
     </div>
 
@@ -1835,7 +1912,7 @@
                 <!-- The 3 Cards -->
                 <div class="login-card-container">
                     <!-- Role Card 1: Tracking Team -->
-                    <div class="login-card card-tracking" id="card-login-tracking" onclick="window.app && window.app.login('tracking_team')" style="cursor:pointer;">
+                    <div class="login-card card-tracking" id="card-login-tracking" onclick="window.app && window.app.openPortalLoginModal('tracking_team')" style="cursor:pointer;">
                         <div class="role-gate-badge gate-unlocked" id="gate-badge-tracking">
                             <span class="gate-icon">🟢</span> <span class="gate-text">Access Unlocked</span>
                         </div>
@@ -1854,7 +1931,7 @@
                     </div>
 
                     <!-- Role Card 2: Branch Manager -->
-                    <div class="login-card card-manager" id="card-login-manager" onclick="window.app && window.app.login('branch_manager')" style="cursor:pointer;">
+                    <div class="login-card card-manager" id="card-login-manager" onclick="window.app && window.app.openPortalLoginModal('branch_manager')" style="cursor:pointer;">
                         <div class="role-gate-badge gate-unlocked" id="gate-badge-manager">
                             <span class="gate-icon">🟢</span> <span class="gate-text">Access Unlocked</span>
                         </div>
@@ -1873,7 +1950,7 @@
                     </div>
 
                     <!-- Role Card 3: 2 Owners -->
-                    <div class="login-card card-owner" id="card-login-owner" onclick="window.app && window.app.login('owner')" style="cursor:pointer;">
+                    <div class="login-card card-owner" id="card-login-owner" onclick="window.app && window.app.openPortalLoginModal('owner')" style="cursor:pointer;">
                         <div class="role-gate-badge gate-unlocked" id="gate-badge-owner">
                             <span class="gate-icon">🟢</span> <span class="gate-text">Access Unlocked</span>
                         </div>
@@ -1899,17 +1976,19 @@
                 <span class="tagline-line"></span>
             </div>
         </div>
-    <!-- Subscription Required Alert Modal -->
+    </div> <!-- Close #login-page -->
+
+    <!-- Subscription Required Alert Modal (Styled with Eco-Fleet Design System) -->
     <div id="sub-gate-modal" class="modal-backdrop" style="display: none; z-index: 99999;">
-        <div class="modal-container" style="max-width: 480px; text-align: center; background: #0b1329; border: 1px solid rgba(244,63,94,0.4); box-shadow: 0 25px 60px rgba(0,0,0,0.8), 0 0 40px rgba(244,63,94,0.25);">
+        <div class="portal-modal-card" style="max-width: 480px; text-align: center;">
             <div style="font-size: 2.8rem; margin-bottom: 0.5rem; animation: pulse 2s infinite;">🔒</div>
-            <h3 style="color: #f43f5e; font-size: 1.45rem; font-weight: 700; margin-bottom: 0.5rem;">Subscription Required</h3>
-            <p style="color: #94a3b8; font-size: 0.92rem; line-height: 1.5; margin-bottom: 1.25rem;">
+            <h3 style="font-family: var(--font-heading); color: var(--color-danger); font-size: 1.45rem; font-weight: 700; margin-bottom: 0.5rem;">Subscription Required</h3>
+            <p style="color: var(--text-secondary); font-size: 0.92rem; line-height: 1.5; margin-bottom: 1.25rem;">
                 Customers must purchase an active SaaS subscription before accessing the Logistics Operations Control System.
             </p>
-            <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem; text-align: left;">
-                <div style="color: #38bdf8; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.4rem;">Subscription Unlocks:</div>
-                <div style="color: #cbd5e1; font-size: 0.82rem; line-height: 1.5;">
+            <div style="background: #f8faf9; border: 1px solid rgba(15, 118, 110, 0.16); border-radius: 14px; padding: 1.15rem; margin-bottom: 1.5rem; text-align: left;">
+                <div style="color: var(--color-primary); font-size: 0.85rem; font-weight: 700; margin-bottom: 0.4rem;">Subscription Unlocks:</div>
+                <div style="color: var(--text-primary); font-size: 0.82rem; line-height: 1.6;">
                     • 🗺️ Real-Time Tamil Nadu GPS Highway Telemetry<br>
                     • 🚚 Fleet Operations & 38-District Tracking<br>
                     • ⚡ 20-Min Stoppage Detection & Approvals<br>
@@ -1917,19 +1996,100 @@
                 </div>
             </div>
             <div style="display: flex; gap: 0.75rem; justify-content: center;">
-                <button type="button" id="btn-close-sub-modal" class="btn btn-secondary" style="background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1;">Dismiss</button>
-                <button type="button" id="btn-goto-pricing" class="btn btn-primary" style="background: linear-gradient(135deg, #0284c7, #2563eb); color: #ffffff; font-weight: 600;">
+                <button type="button" id="btn-close-sub-modal" class="btn btn-secondary">Dismiss</button>
+                <button type="button" id="btn-goto-pricing" class="btn btn-primary" style="font-weight: 600;">
                     Choose Plan & Pay with Razorpay →
                 </button>
             </div>
         </div>
     </div>
 
+    <!-- Interactive Portal Login Modal (Eco-Fleet Theme & Clear Error Feedback) -->
+    <div id="portal-login-modal" class="modal-backdrop" style="display: none; z-index: 99999;">
+        <div class="portal-modal-card" id="portal-modal-card">
+            <!-- Close Button -->
+            <button type="button" id="btn-close-portal-modal" class="portal-modal-close" title="Close">✕</button>
+
+            <!-- Modal Header -->
+            <div style="text-align: center; margin-bottom: 1.5rem;">
+                <div id="portal-modal-icon-badge" class="portal-icon-wrapper">
+                    🎯
+                </div>
+                <div id="portal-modal-badge" class="portal-role-badge">
+                    TRACKING OPERATIONS
+                </div>
+                <h3 id="portal-modal-title" class="portal-modal-title">
+                    Tracking Team Portal
+                </h3>
+                <p id="portal-modal-subtitle" class="portal-modal-subtitle">
+                    Enter your operational credentials to access your workspace.
+                </p>
+            </div>
+
+            <!-- Error Banner -->
+            <div id="portal-login-error" class="portal-error-banner" role="alert">
+                <span style="font-size: 1.2rem; line-height: 1;">⚠️</span>
+                <div>
+                    <strong id="portal-login-error-title" style="display: block; font-weight: 700; margin-bottom: 0.15rem; color: #9f1239;">Authentication Failed</strong>
+                    <span id="portal-login-error-text" style="color: #881337;">Invalid username or password. Please verify credentials.</span>
+                </div>
+            </div>
+
+            <!-- Login Form -->
+            <form id="portal-login-form" autocomplete="on" novalidate>
+                <input type="hidden" id="portal-target-role" value="tracking_team" />
+
+                <!-- Username / Employee ID Input -->
+                <div class="portal-field-group">
+                    <label class="portal-field-label" for="portal-input-username">
+                        Username or Employee ID
+                    </label>
+                    <div class="portal-input-container">
+                        <span class="portal-input-icon">👤</span>
+                        <input type="text" id="portal-input-username" class="portal-text-input" placeholder="e.g. tracking or EMP-101" autocomplete="username" spellcheck="false" required />
+                    </div>
+                    <div id="portal-user-error" class="portal-field-error-msg"></div>
+                </div>
+
+                <!-- Password Input -->
+                <div class="portal-field-group">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                        <label class="portal-field-label" style="margin-bottom: 0;" for="portal-input-password">
+                            Password
+                        </label>
+                        <button type="button" id="portal-btn-autofill" class="portal-autofill-btn" title="Auto-populate sample demo credentials">
+                            ⚡ Fill Demo Credentials
+                        </button>
+                    </div>
+                    <div class="portal-input-container">
+                        <span class="portal-input-icon">🔒</span>
+                        <input type="password" id="portal-input-password" class="portal-text-input" style="padding-right: 2.6rem;" placeholder="••••••••" autocomplete="current-password" required />
+                        <button type="button" id="portal-toggle-pwd" class="portal-pwd-toggle-btn" title="Show/Hide Password">👁️</button>
+                    </div>
+                    <div id="portal-pass-error" class="portal-field-error-msg"></div>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" id="portal-btn-submit" class="portal-submit-btn">
+                    <span id="portal-btn-text">Sign In & Enter Portal →</span>
+                </button>
+            </form>
+
+            <!-- Portal Credentials Helper Info -->
+            <div class="portal-credentials-footer">
+                <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Default Demo Credentials:</div>
+                <div id="portal-credentials-hint" class="portal-credentials-box">
+                    Username: <span style="color: var(--color-primary); font-weight: 700;">tracking</span> | Password: <span style="color: var(--color-primary); font-weight: 700;">password123</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- SCRIPTS -->
     <script src="/socket.io/socket.io.js"></script>
-    <script type="module" src="/js/api.js?v=3.0"></script>
-    <script type="module" src="/js/state.js?v=3.0"></script>
-    <script type="module" src="/js/charts.js?v=3.0"></script>
-    <script type="module" src="/js/app.js?v=3.0"></script>
+    <script type="module" src="/js/api.js?v=3.6"></script>
+    <script type="module" src="/js/state.js?v=3.6"></script>
+    <script type="module" src="/js/charts.js?v=3.6"></script>
+    <script type="module" src="/js/app.js?v=3.8"></script>
 </body>
 </html>

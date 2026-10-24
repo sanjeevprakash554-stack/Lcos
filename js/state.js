@@ -36,16 +36,16 @@ const LCOS_State = {
     { id: 'BR-CBE', name: 'Coimbatore', lat: 11.0168, lng: 76.9558 },
     { id: 'BR-CUD', name: 'Cuddalore', lat: 11.7480, lng: 79.7714 },
     { id: 'BR-DHA', name: 'Dharmapuri', lat: 12.1277, lng: 78.1579 },
-    { id: 'BR-DIN', name: 'Dindigul', lat: 10.3673, lng: 77.9803 },
+    { id: 'BR-DGL', name: 'Dindigul', lat: 10.3673, lng: 77.9803 },
     { id: 'BR-ERD', name: 'Erode', lat: 11.3410, lng: 77.7172 },
     { id: 'BR-KAL', name: 'Kallakurichi', lat: 11.7384, lng: 78.9639 },
-    { id: 'BR-KAN', name: 'Kanchipuram', lat: 12.8342, lng: 79.7036 },
+    { id: 'BR-KNC', name: 'Kanchipuram', lat: 12.8342, lng: 79.7036 },
     { id: 'BR-KKI', name: 'Kanyakumari', lat: 8.1833, lng: 77.4119 },
     { id: 'BR-KAR', name: 'Karur', lat: 10.9601, lng: 78.0766 },
     { id: 'BR-KRI', name: 'Krishnagiri', lat: 12.5266, lng: 78.2146 },
     { id: 'BR-MDU', name: 'Madurai', lat: 9.9252, lng: 78.1198 },
     { id: 'BR-MAY', name: 'Mayiladuthurai', lat: 11.1018, lng: 79.6522 },
-    { id: 'BR-NAG', name: 'Nagapattinam', lat: 10.7672, lng: 79.8449 },
+    { id: 'BR-NGP', name: 'Nagapattinam', lat: 10.7672, lng: 79.8449 },
     { id: 'BR-NAM', name: 'Namakkal', lat: 11.2189, lng: 78.1674 },
     { id: 'BR-NIL', name: 'Nilgiris (Ooty)', lat: 11.4102, lng: 76.6950 },
     { id: 'BR-PER', name: 'Perambalur', lat: 11.2342, lng: 78.8820 },
@@ -54,12 +54,12 @@ const LCOS_State = {
     { id: 'BR-RAN', name: 'Ranipet', lat: 12.9296, lng: 79.3331 },
     { id: 'BR-SAL', name: 'Salem', lat: 11.6643, lng: 78.1460 },
     { id: 'BR-SIV', name: 'Sivaganga', lat: 9.8433, lng: 78.4800 },
-    { id: 'BR-TEN', name: 'Tenkasi', lat: 8.9597, lng: 77.3150 },
+    { id: 'BR-TKS', name: 'Tenkasi', lat: 8.9597, lng: 77.3150 },
     { id: 'BR-THA', name: 'Thanjavur', lat: 10.7870, lng: 79.1378 },
     { id: 'BR-THE', name: 'Theni', lat: 10.0104, lng: 77.4768 },
     { id: 'BR-TUT', name: 'Thoothukudi', lat: 8.7642, lng: 78.1348 },
     { id: 'BR-TRY', name: 'Tiruchirappalli', lat: 10.7905, lng: 78.7047 },
-    { id: 'BR-TNL', name: 'Tirunelveli', lat: 8.7139, lng: 77.7567 },
+    { id: 'BR-TEN', name: 'Tirunelveli', lat: 8.7139, lng: 77.7567 },
     { id: 'BR-TPR', name: 'Tirupathur', lat: 12.4950, lng: 78.5678 },
     { id: 'BR-TUP', name: 'Tiruppur', lat: 11.1085, lng: 77.3411 },
     { id: 'BR-TVL', name: 'Tiruvallur', lat: 13.1432, lng: 79.9079 },
@@ -401,7 +401,14 @@ const LCOS_State = {
     getBranches() { return this.data.branches; },
     getBranchCoordinates(id) {
         if (!id) return null;
-        const b = (this.data.branches || []).find(br => br.id === id || br.name?.toLowerCase() === id.toLowerCase());
+        const aliasMap = {
+            'BR-DIN': 'BR-DGL',
+            'BR-KAN': 'BR-KNC',
+            'BR-NAG': 'BR-NGP',
+            'BR-TNL': 'BR-TEN'
+        };
+        const targetId = aliasMap[id] || id;
+        const b = (this.data.branches || []).find(br => br.id === targetId || br.id === id || br.name?.toLowerCase() === id.toLowerCase());
         if (b && b.lat && b.lng) return { lat: Number(b.lat), lng: Number(b.lng) };
         return null;
     },
@@ -518,24 +525,26 @@ const LCOS_State = {
     async assignBackload(tripId, vehicleId, driverId, helperId) {
         try {
             const apiRes = await LCOS_API.assignBackload(tripId, vehicleId, driverId, helperId);
-            if (apiRes.success) {
+            if (apiRes && apiRes.success) {
                 await this.loadFromBackend();
             }
             return apiRes;
         } catch (err) {
             console.error('API assignBackload error:', err);
+            return { success: false, message: err.message || 'Error pairing backload.' };
         }
     },
 
     async recordReturnArrival(tripId) {
         try {
             const apiRes = await LCOS_API.recordReturnArrival(tripId);
-            if (apiRes.success) {
+            if (apiRes && apiRes.success) {
                 await this.loadFromBackend();
             }
             return apiRes;
         } catch (err) {
             console.error('API recordReturnArrival error:', err);
+            return { success: false, message: err.message || 'Error recording return arrival.' };
         }
     },
 

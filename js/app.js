@@ -46,16 +46,185 @@ const app = {
             });
         });
 
-        // Role switcher clicks
-        // Login Card clicks
+        // Mobile Navigation Drawer & Bottom Bar Bindings
+        document.getElementById('btn-mobile-nav-toggle')?.addEventListener('click', () => {
+            this.toggleMobileNav();
+        });
+        document.getElementById('btn-sidebar-mobile-close')?.addEventListener('click', () => {
+            this.closeMobileNav();
+        });
+        document.getElementById('sidebar-mobile-overlay')?.addEventListener('click', () => {
+            this.closeMobileNav();
+        });
+        document.getElementById('btn-mobile-more-tabs')?.addEventListener('click', () => {
+            this.openMobileNav();
+        });
+
+        // Mobile Bottom Navigation Bar Tab routing
+        document.querySelectorAll('.mobile-bottom-nav-item[data-tab]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const tab = btn.getAttribute('data-tab');
+                this.switchTab(tab);
+            });
+        });
+
+        // Login Card clicks -> Open Portal Login Modal with Credentials
         document.getElementById('card-login-tracking')?.addEventListener('click', () => {
-            this.login('tracking_team');
+            this.openPortalLoginModal('tracking_team');
         });
         document.getElementById('card-login-manager')?.addEventListener('click', () => {
-            this.login('branch_manager');
+            this.openPortalLoginModal('branch_manager');
         });
         document.getElementById('card-login-owner')?.addEventListener('click', () => {
-            this.login('owner');
+            this.openPortalLoginModal('owner');
+        });
+
+        // Portal Login Modal Bindings
+        document.getElementById('btn-close-portal-modal')?.addEventListener('click', () => {
+            this.closePortalLoginModal();
+        });
+
+        document.getElementById('portal-login-modal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'portal-login-modal') {
+                this.closePortalLoginModal();
+            }
+        });
+
+        document.getElementById('portal-btn-autofill')?.addEventListener('click', () => {
+            this.fillDemoCredentials();
+        });
+
+        document.getElementById('portal-toggle-pwd')?.addEventListener('click', () => {
+            const pwdInput = document.getElementById('portal-input-password');
+            if (pwdInput) {
+                pwdInput.type = (pwdInput.type === 'password' ? 'text' : 'password');
+            }
+        });
+
+        // Input real-time clearing of error states
+        document.getElementById('portal-input-username')?.addEventListener('input', () => {
+            document.getElementById('portal-input-username')?.classList.remove('input-invalid');
+            const uErr = document.getElementById('portal-user-error');
+            if (uErr) { uErr.textContent = ''; uErr.classList.remove('active'); }
+        });
+
+        document.getElementById('portal-input-password')?.addEventListener('input', () => {
+            document.getElementById('portal-input-password')?.classList.remove('input-invalid');
+            const pErr = document.getElementById('portal-pass-error');
+            if (pErr) { pErr.textContent = ''; pErr.classList.remove('active'); }
+        });
+
+        document.getElementById('portal-login-form')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const role = document.getElementById('portal-target-role')?.value || 'tracking_team';
+            const usernameInput = document.getElementById('portal-input-username');
+            const passwordInput = document.getElementById('portal-input-password');
+            const username = usernameInput?.value?.trim();
+            const password = passwordInput?.value;
+            const errorBanner = document.getElementById('portal-login-error');
+            const errorTitle = document.getElementById('portal-login-error-title');
+            const errorText = document.getElementById('portal-login-error-text');
+            const userError = document.getElementById('portal-user-error');
+            const passError = document.getElementById('portal-pass-error');
+            const submitBtn = document.getElementById('portal-btn-submit');
+            const btnText = document.getElementById('portal-btn-text');
+            const modalContainer = document.getElementById('portal-modal-card');
+
+            const triggerShake = () => {
+                if (modalContainer) {
+                    modalContainer.classList.remove('shake-error');
+                    void modalContainer.offsetWidth; // trigger reflow
+                    modalContainer.classList.add('shake-error');
+                    setTimeout(() => modalContainer.classList.remove('shake-error'), 450);
+                }
+            };
+
+            // Client-side validation
+            let hasValidationError = false;
+            if (!username) {
+                usernameInput?.classList.add('input-invalid');
+                if (userError) {
+                    userError.textContent = 'Please enter your Username or Employee ID.';
+                    userError.classList.add('active');
+                }
+                hasValidationError = true;
+            }
+            if (!password) {
+                passwordInput?.classList.add('input-invalid');
+                if (passError) {
+                    passError.textContent = 'Please enter your Password.';
+                    passError.classList.add('active');
+                }
+                hasValidationError = true;
+            }
+
+            if (hasValidationError) {
+                if (errorBanner) {
+                    if (errorTitle) errorTitle.textContent = 'Required Fields Missing';
+                    if (errorText) errorText.textContent = 'Please fill in both your Username/ID and Password.';
+                    errorBanner.classList.add('active');
+                }
+                triggerShake();
+                if (!username) usernameInput?.focus();
+                else passwordInput?.focus();
+                return;
+            }
+
+            try {
+                if (submitBtn) submitBtn.disabled = true;
+                if (btnText) btnText.innerHTML = '<span>Verifying credentials...</span>';
+                if (errorBanner) errorBanner.classList.remove('active');
+
+                await this.login(role, username, password);
+                this.closePortalLoginModal();
+            } catch (err) {
+                const errMsg = err.message || 'Authentication failed. Please verify credentials.';
+                const isPasswordError = /password/i.test(errMsg);
+                const isUserNotFoundError = /not found/i.test(errMsg) || /account/i.test(errMsg);
+                const isAccessDenied = /access denied/i.test(errMsg) || /authorized/i.test(errMsg);
+
+                if (errorBanner) {
+                    if (isPasswordError) {
+                        if (errorTitle) errorTitle.textContent = 'Incorrect Password';
+                        if (errorText) errorText.textContent = 'The password you entered is incorrect. Please check your password and try again.';
+                        passwordInput?.classList.add('input-invalid');
+                        if (passError) {
+                            passError.textContent = '❌ Incorrect password entered';
+                            passError.classList.add('active');
+                        }
+                        passwordInput?.focus();
+                        passwordInput?.select();
+                    } else if (isUserNotFoundError) {
+                        if (errorTitle) errorTitle.textContent = 'User ID Not Found';
+                        if (errorText) errorText.textContent = 'No account exists with this Username or Employee ID. Please verify your ID.';
+                        usernameInput?.classList.add('input-invalid');
+                        if (userError) {
+                            userError.textContent = '❌ User account not found';
+                            userError.classList.add('active');
+                        }
+                        usernameInput?.focus();
+                        usernameInput?.select();
+                    } else if (isAccessDenied) {
+                        if (errorTitle) errorTitle.textContent = 'Access Denied: Wrong Portal';
+                        if (errorText) errorText.textContent = errMsg;
+                        usernameInput?.classList.add('input-invalid');
+                        passwordInput?.classList.add('input-invalid');
+                    } else {
+                        if (errorTitle) errorTitle.textContent = 'Login Error';
+                        if (errorText) errorText.textContent = errMsg;
+                        usernameInput?.classList.add('input-invalid');
+                        passwordInput?.classList.add('input-invalid');
+                    }
+                    errorBanner.classList.add('active');
+                }
+
+                triggerShake();
+                this.showToast(`⚠️ ${errorTitle?.textContent || 'Login Error'}: ${errorText?.textContent || errMsg}`, 'danger');
+            } finally {
+                if (submitBtn) submitBtn.disabled = false;
+                if (btnText) btnText.innerHTML = '<span>Sign In & Enter Portal →</span>';
+            }
         });
 
         // Landing Page Razorpay Payment Triggers
@@ -597,7 +766,45 @@ const app = {
         };
         document.getElementById('view-title').textContent = titles[tabId] || 'LCOS Portal';
 
+        // Sync active state in Mobile Bottom Navigation Bar
+        document.querySelectorAll('.mobile-bottom-nav-item').forEach(btn => {
+            if (btn.getAttribute('data-tab') === tabId) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+
+        // Close mobile navigation drawer if open
+        this.closeMobileNav();
+
         this.renderActiveTab();
+    },
+
+    toggleMobileNav() {
+        const sidebar = document.querySelector('aside.sidebar');
+        if (!sidebar) return;
+        if (sidebar.classList.contains('mobile-open')) {
+            this.closeMobileNav();
+        } else {
+            this.openMobileNav();
+        }
+    },
+
+    openMobileNav() {
+        const sidebar = document.querySelector('aside.sidebar');
+        const overlay = document.getElementById('sidebar-mobile-overlay');
+        if (sidebar) sidebar.classList.add('mobile-open');
+        if (overlay) overlay.classList.add('active');
+        document.body.classList.add('mobile-nav-lock');
+    },
+
+    closeMobileNav() {
+        const sidebar = document.querySelector('aside.sidebar');
+        const overlay = document.getElementById('sidebar-mobile-overlay');
+        if (sidebar) sidebar.classList.remove('mobile-open');
+        if (overlay) overlay.classList.remove('active');
+        document.body.classList.remove('mobile-nav-lock');
     },
 
     getAllowedRolesForPlan(planId) {
@@ -606,7 +813,170 @@ const app = {
         return ['tracking_team', 'branch_manager', 'owner'];
     },
 
-    async login(role) {
+    openPortalLoginModal(role) {
+        if (!this.isSubscriptionActive) {
+            this.pendingPortalRole = role;
+            this.showSubscriptionRequiredModal();
+            return;
+        }
+
+        const modal = document.getElementById('portal-login-modal');
+        if (!modal) {
+            this.login(role);
+            return;
+        }
+
+        const roleMeta = {
+            tracking_team: {
+                title: 'Tracking Team Portal',
+                badge: 'TRACKING OPERATIONS',
+                subtitle: 'Operator View: Monitor highway telemetry, create shipments & verify dispatches.',
+                icon: '🎯',
+                bg: 'rgba(225, 29, 72, 0.08)',
+                border: 'rgba(225, 29, 72, 0.25)',
+                color: '#e11d48',
+                demoUser: 'tracking',
+                demoEmpId: 'EMP-101',
+                demoPass: 'password123'
+            },
+            branch_manager: {
+                title: 'Branch Manager Portal',
+                badge: 'BRANCH SUPERVISION',
+                subtitle: 'Supervisor View: Manage Tamil Nadu directories, add stock & approve dispatches.',
+                icon: '🏢',
+                bg: 'rgba(217, 119, 6, 0.08)',
+                border: 'rgba(217, 119, 6, 0.25)',
+                color: '#d97706',
+                demoUser: 'manager',
+                demoEmpId: 'MGR-101',
+                demoPass: 'password123'
+            },
+            owner: {
+                title: '2 Owners Executive Portal',
+                badge: 'EXECUTIVE INTELLIGENCE',
+                subtitle: 'Executive View: High-level financial reporting, statewide analytics & operational audit.',
+                icon: '👑',
+                bg: 'rgba(15, 118, 110, 0.08)',
+                border: 'rgba(15, 118, 110, 0.25)',
+                color: '#0f766e',
+                demoUser: 'owner',
+                demoEmpId: 'OWN-101',
+                demoPass: 'password123'
+            }
+        };
+
+        const config = roleMeta[role] || roleMeta.tracking_team;
+
+        const roleInput = document.getElementById('portal-target-role');
+        if (roleInput) roleInput.value = role;
+
+        const titleEl = document.getElementById('portal-modal-title');
+        if (titleEl) titleEl.textContent = config.title;
+
+        const badgeEl = document.getElementById('portal-modal-badge');
+        if (badgeEl) {
+            badgeEl.textContent = config.badge;
+            badgeEl.style.color = config.color;
+            badgeEl.style.background = config.bg;
+            badgeEl.style.borderColor = config.border;
+        }
+
+        const subtitleEl = document.getElementById('portal-modal-subtitle');
+        if (subtitleEl) subtitleEl.textContent = config.subtitle;
+
+        const iconBadge = document.getElementById('portal-modal-icon-badge');
+        if (iconBadge) {
+            iconBadge.textContent = config.icon;
+            iconBadge.style.background = config.bg;
+            iconBadge.style.borderColor = config.border;
+            iconBadge.style.color = config.color;
+        }
+
+        const hintEl = document.getElementById('portal-credentials-hint');
+        if (hintEl) {
+            hintEl.innerHTML = `Username: <strong style="color: ${config.color}; font-family: monospace;">${config.demoUser}</strong> (or <span style="color: var(--text-secondary);">${config.demoEmpId}</span>) &nbsp;|&nbsp; Password: <strong style="color: ${config.color}; font-family: monospace;">${config.demoPass}</strong>`;
+        }
+
+        const usernameInput = document.getElementById('portal-input-username');
+        const passwordInput = document.getElementById('portal-input-password');
+        const errorBanner = document.getElementById('portal-login-error');
+        const userErr = document.getElementById('portal-user-error');
+        const passErr = document.getElementById('portal-pass-error');
+        const modalCard = document.getElementById('portal-modal-card');
+
+        if (usernameInput) {
+            usernameInput.value = '';
+            usernameInput.classList.remove('input-invalid');
+        }
+        if (passwordInput) {
+            passwordInput.value = '';
+            passwordInput.type = 'password';
+            passwordInput.classList.remove('input-invalid');
+        }
+        if (userErr) {
+            userErr.textContent = '';
+            userErr.classList.remove('active');
+        }
+        if (passErr) {
+            passErr.textContent = '';
+            passErr.classList.remove('active');
+        }
+        if (errorBanner) {
+            errorBanner.classList.remove('active');
+        }
+        if (modalCard) {
+            modalCard.classList.remove('shake-error');
+        }
+
+        modal.style.display = 'flex';
+        modal.style.opacity = '1';
+        setTimeout(() => usernameInput?.focus(), 80);
+    },
+
+    closePortalLoginModal() {
+        const modal = document.getElementById('portal-login-modal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+        const errorBanner = document.getElementById('portal-login-error');
+        if (errorBanner) errorBanner.classList.remove('active');
+        const usernameInput = document.getElementById('portal-input-username');
+        const passwordInput = document.getElementById('portal-input-password');
+        if (usernameInput) usernameInput.classList.remove('input-invalid');
+        if (passwordInput) passwordInput.classList.remove('input-invalid');
+        const userErr = document.getElementById('portal-user-error');
+        const passErr = document.getElementById('portal-pass-error');
+        if (userErr) { userErr.textContent = ''; userErr.classList.remove('active'); }
+        if (passErr) { passErr.textContent = ''; passErr.classList.remove('active'); }
+    },
+
+    fillDemoCredentials() {
+        const role = document.getElementById('portal-target-role')?.value || 'tracking_team';
+        const demoMap = {
+            tracking_team: { user: 'tracking', pass: 'password123' },
+            branch_manager: { user: 'manager', pass: 'password123' },
+            owner: { user: 'owner', pass: 'password123' }
+        };
+        const creds = demoMap[role] || demoMap.tracking_team;
+        const uInput = document.getElementById('portal-input-username');
+        const pInput = document.getElementById('portal-input-password');
+        if (uInput) {
+            uInput.value = creds.user;
+            uInput.classList.remove('input-invalid');
+        }
+        if (pInput) {
+            pInput.value = creds.pass;
+            pInput.classList.remove('input-invalid');
+        }
+        const errorBanner = document.getElementById('portal-login-error');
+        if (errorBanner) errorBanner.classList.remove('active');
+        const userErr = document.getElementById('portal-user-error');
+        const passErr = document.getElementById('portal-pass-error');
+        if (userErr) { userErr.textContent = ''; userErr.classList.remove('active'); }
+        if (passErr) { passErr.textContent = ''; passErr.classList.remove('active'); }
+    },
+
+    async login(role, customUsername = null, customPassword = null) {
         if (this._isLoggingIn) return;
         this._isLoggingIn = true;
 
@@ -635,18 +1005,24 @@ const app = {
 
             LCOS_State.setCurrentRole(role);
             
-            let username = 'tracking';
-            if (role === 'branch_manager') username = 'manager';
-            else if (role === 'owner') username = 'owner';
+            let username = customUsername;
+            if (!username) {
+                if (role === 'branch_manager') username = 'manager';
+                else if (role === 'owner') username = 'owner';
+                else username = 'tracking';
+            }
+            const password = customPassword || 'password123';
 
             try {
                 if (window.LCOS_API) {
-                    await LCOS_API.login(username, role);
+                    await LCOS_API.login(username, role, password);
                     await LCOS_State.loadFromBackend();
                     this.initSocketTelemetryListener();
                 }
             } catch (e) {
                 console.warn('Backend login notice:', e.message);
+                this._isLoggingIn = false;
+                throw e;
             }
 
             const loginPage = document.getElementById('login-page');
@@ -664,6 +1040,7 @@ const app = {
                     appContainer.style.display = 'flex';
                     appContainer.style.opacity = '1';
                 }
+                window.scrollTo(0, 0);
                 
                 try {
                     // Switch to Dashboard tab by default on login to any portal
@@ -725,6 +1102,7 @@ const app = {
             loginPage.style.display = 'flex';
             loginPage.style.opacity = '1';
             loginPage.style.transform = 'scale(1)';
+            window.scrollTo(0, 0);
             
             this.activeConsoleTripId = null;
             await this.initLandingSubscription();
@@ -785,6 +1163,33 @@ const app = {
                 roleIndicator.innerHTML = `<span class="badge badge-pending" style="padding: 0.35rem 0.75rem; border-radius: 8px;">💼 Branch Manager (Supervisor)</span>`;
             } else {
                 roleIndicator.innerHTML = `<span class="badge badge-transit" style="padding: 0.35rem 0.75rem; border-radius: 8px;">📞 Tracking Team (Operator)</span>`;
+            }
+        }
+
+        // Update sidebar header & footer role profile dynamically
+        const sidebarRoleSub = document.getElementById('sidebar-role-subtitle');
+        const sidebarAvatar = document.getElementById('sidebar-avatar');
+        const sidebarUserName = document.getElementById('sidebar-user-name');
+        const sidebarUserRole = document.getElementById('sidebar-user-role');
+
+        if (sidebarRoleSub) {
+            if (role === 'owner') sidebarRoleSub.textContent = 'Owner Operations';
+            else if (role === 'branch_manager') sidebarRoleSub.textContent = 'Manager Operations';
+            else sidebarRoleSub.textContent = 'Tracking Desk';
+        }
+        if (sidebarAvatar && sidebarUserName && sidebarUserRole) {
+            if (role === 'owner') {
+                sidebarAvatar.textContent = 'OWN';
+                sidebarUserName.textContent = 'Executive Owner';
+                sidebarUserRole.textContent = 'Operations HQ';
+            } else if (role === 'branch_manager') {
+                sidebarAvatar.textContent = 'MGR';
+                sidebarUserName.textContent = 'Branch Manager';
+                sidebarUserRole.textContent = 'Depot Operations';
+            } else {
+                sidebarAvatar.textContent = 'TRK';
+                sidebarUserName.textContent = 'Tracking Operator';
+                sidebarUserRole.textContent = 'Central Dispatch Desk';
             }
         }
 
@@ -1420,6 +1825,34 @@ const app = {
         }
     },
 
+    showDashboardAlerts() {
+        this.switchTab('dashboard');
+        const alertFeedEl = document.getElementById('dashboard-alerts-feed') || document.getElementById('alerts-feed');
+        if (alertFeedEl) {
+            alertFeedEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            alertFeedEl.style.transition = 'box-shadow 0.4s ease';
+            alertFeedEl.style.boxShadow = '0 0 0 4px rgba(225, 29, 72, 0.35)';
+            setTimeout(() => { alertFeedEl.style.boxShadow = ''; }, 2200);
+        }
+    },
+
+    async dismissAlert(alertId) {
+        try {
+            if (alertId) {
+                await LCOS_State.resolveAlert(alertId);
+                this.showToast('Alert resolved and dismissed.', 'success');
+            }
+            const banner = document.getElementById('alerts-banner');
+            if (banner) banner.style.display = 'none';
+            await LCOS_State.loadFromBackend();
+            this.renderAll();
+        } catch (err) {
+            console.error('Error dismissing alert:', err);
+            const banner = document.getElementById('alerts-banner');
+            if (banner) banner.style.display = 'none';
+        }
+    },
+
     sendWhatsAppToDriver(phone, driverName) {
         this.switchTab('whatsapp');
         const phoneInput = document.getElementById('wa-send-phone');
@@ -1486,128 +1919,8 @@ const app = {
         document.getElementById('stat-alerts').textContent = alertsCount;
         document.getElementById('stat-delivered').textContent = deliveredToday;
 
-        // 2. Active alerts ticker & box
-        const alertsBanner = document.getElementById('alerts-banner');
-        const ticker = document.getElementById('alerts-ticker-content');
-        const alertsFeed = document.getElementById('alerts-feed-content');
-        const bannerBadge = document.getElementById('alert-banner-badge');
-        const bannerActions = document.getElementById('alerts-banner-actions');
-        
-        if (alertsCount > 0) {
-            if (alertsBanner) alertsBanner.style.display = 'flex';
-
-            // Find stoppage, driver delay, or emergency breakdown alert
-            const stoppageAlert = alerts.find(a => (
-                a.type === 'Stoppage Detected' || 
-                a.type === 'Driver Delay Report' || 
-                a.type === 'Emergency Breakdown' ||
-                (a.message && (
-                    a.message.toLowerCase().includes('halted >20') || 
-                    a.message.toLowerCase().includes('whatsapp report') || 
-                    a.message.toLowerCase().includes('stoppage') ||
-                    a.message.toLowerCase().includes('breakdown') ||
-                    a.message.toLowerCase().includes('transit delay')
-                ))
-            ));
-
-            if (stoppageAlert) {
-                if (bannerBadge) {
-                    bannerBadge.textContent = '🚨 STOPPAGE';
-                    bannerBadge.style.background = '#ef4444';
-                }
-                if (ticker) {
-                    ticker.style.animation = 'none';
-                    ticker.style.position = 'static';
-                    ticker.innerHTML = `<div class="ticker-item" style="color:#fef08a; font-weight:700; font-size:0.92rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">🚨 ${stoppageAlert.message}</div>`;
-                }
-                if (bannerActions) {
-                    const phone = stoppageAlert.driverPhone || stoppageAlert.driver_phone || '916382897998';
-                    const vehId = stoppageAlert.vehicleId || stoppageAlert.vehicle_id || 'TN-59-EF-9012';
-                    bannerActions.innerHTML = `
-                        <button class="btn btn-success" style="padding:0.3rem 0.75rem; font-size:0.8rem; background:#10b981; border:1px solid #059669; font-weight:700; color:#fff; border-radius:6px; cursor:pointer;" onclick="app.acceptCurrentStoppageReason('${vehId}', '${stoppageAlert.id}')">✅ Accept</button>
-                        <button class="btn btn-danger" style="padding:0.3rem 0.75rem; font-size:0.8rem; background:#ef4444; border:1px solid #dc2626; font-weight:700; color:#fff; border-radius:6px; cursor:pointer;" onclick="app.declineAndCallDriver('${vehId}', '${phone}', '${stoppageAlert.id}')">📞 Decline & Call</button>
-                        <button class="btn btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="app.showDashboardAlerts()">View All</button>
-                    `;
-                }
-            } else {
-                if (bannerBadge) {
-                    bannerBadge.textContent = 'Alert';
-                    bannerBadge.style.background = 'var(--color-danger)';
-                }
-                if (ticker) {
-                    if (alerts.length <= 1) {
-                        ticker.style.animation = 'none';
-                        ticker.style.position = 'static';
-                    } else {
-                        ticker.style.animation = 'scroll-alerts 12s infinite';
-                        ticker.style.position = 'absolute';
-                    }
-                    ticker.innerHTML = alerts.map(a => `<div class="ticker-item">⚠️ ${a.message}</div>`).join('');
-                }
-                if (bannerActions) {
-                    bannerActions.innerHTML = `<button class="btn btn-secondary" style="padding:0.2rem 0.5rem; font-size:0.75rem;" onclick="app.showDashboardAlerts()">View Alerts</button>`;
-                }
-            }
-            
-            if (alertsFeed) {
-                alertsFeed.innerHTML = alerts.map(a => {
-                    let badgeClass = a.severity === 'danger' || a.severity === 'critical' ? 'badge-delayed' : 'badge-pending';
-                    let actionBtn = '';
-                    const role = LCOS_State.getCurrentRole();
-
-                    if (a.type === 'Stoppage Detected' || a.type === 'Driver Delay Report' || a.type === 'Emergency Breakdown' || (a.message && a.message.toLowerCase().includes('stoppage'))) {
-                        const phone = a.driverPhone || a.driver_phone || '916382897998';
-                        const vehId = a.vehicleId || a.vehicle_id || 'TN-59-EF-9012';
-                        actionBtn = `
-                            <button class="btn btn-success" style="padding:0.25rem 0.6rem; font-size:0.75rem; background:#10b981; border:1px solid #059669; font-weight:700; color:#fff; border-radius:4px; cursor:pointer;" onclick="app.acceptCurrentStoppageReason('${vehId}', '${a.id}')">✅ Accept</button>
-                            <button class="btn btn-danger" style="padding:0.25rem 0.6rem; font-size:0.75rem; background:#ef4444; border:1px solid #dc2626; font-weight:700; color:#fff; border-radius:4px; cursor:pointer;" onclick="app.declineAndCallDriver('${vehId}', '${phone}', '${a.id}')">📞 Decline & Call</button>
-                        `;
-                    } else if (role === 'owner') {
-                        actionBtn = `<span class="badge badge-draft" style="font-size:0.7rem; padding:0.15rem 0.35rem;">Owner Monitoring</span>`;
-                    } else if (a.type === 'Incoming Call') {
-                        actionBtn = `<button class="btn btn-primary" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="app.answerSimulatedCall('${a.id}')">Answer</button>`;
-                    } else if (a.type === 'No Update' || a.type === 'Unreachable' || a.type === 'Breakdown') {
-                        if (role === 'tracking_team') {
-                            if (a.escalated) {
-                                actionBtn = `<span class="badge badge-escalated" style="font-size:0.7rem; padding:0.15rem 0.35rem;">Escalated to Mgr</span>`;
-                            } else {
-                                actionBtn = `<button class="btn btn-warning" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="app.escalateAlertToManager('${a.id}')">Escalate to Manager</button>`;
-                            }
-                        } else {
-                            if (a.type === 'Breakdown') {
-                                actionBtn = `<button class="btn btn-danger" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="app.resolveBreakdownAlert('${a.id}')">Resolve Breakdown</button>`;
-                            } else {
-                                actionBtn = `<button class="btn btn-warning" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="app.startEscalationCall('${a.id}')">Call Driver</button>`;
-                            }
-                        }
-                    }
-
-                    let cardClass = "flex justify-between align-center";
-                    if (a.escalated) {
-                        cardClass += " alert-escalated-card";
-                    }
-
-                    return `
-                        <div class="${cardClass}" style="padding:0.5rem; border-radius:6px; background:rgba(239,68,68,0.06); border:1px solid rgba(239,68,68,0.15); margin-bottom:0.25rem;">
-                            <div style="font-size:0.8rem; max-width:70%;">
-                                <span class="badge ${badgeClass}" style="padding:0.1rem 0.3rem; font-size:0.65rem;">${a.type}</span>
-                                ${a.escalated ? `<span class="badge badge-escalated" style="font-size:0.6rem; padding:0 0.2rem; margin-left:0.25rem;">ESCALATED</span>` : ''}
-                                <span style="margin-left:0.25rem; font-weight:500;">${a.message}</span>
-                            </div>
-                            <div class="flex gap-2">
-                                ${actionBtn}
-                                ${(role === 'branch_manager' || role === 'super_admin') ? `<button class="btn btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="app.dismissAlert('${a.id}')">Dismiss</button>` : ''}
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            }
-        } else {
-            if (alertsBanner) alertsBanner.style.display = 'none';
-            if (alertsFeed) {
-                alertsFeed.innerHTML = `<div style="text-align:center; padding:1rem; color:var(--text-muted); font-size:0.85rem;">All systems operational. No active alerts.</div>`;
-            }
-        }
+        // 2. Active alerts ticker banner rotator (One clean line at a time, counter pill, smooth 4s rotation)
+        this.renderAlertBanner(alerts);
 
         // 3. Interactive Route & Telemetry Simulator Cockpit
         this.renderInteractiveSimulator();
@@ -1662,6 +1975,281 @@ const app = {
 
         // 6. Update Map active routes & reports
         this.updateMapReport();
+    },
+
+    renderAlertBanner(alerts) {
+        const alertsBanner = document.getElementById('alerts-banner');
+        const ticker = document.getElementById('alerts-ticker-content');
+        const bannerBadge = document.getElementById('alert-banner-badge');
+        const bannerActions = document.getElementById('alerts-banner-actions');
+        
+        if (!alertsBanner || !ticker) return;
+
+        if (!alerts || alerts.length === 0) {
+            alertsBanner.style.display = 'none';
+            if (this._alertBannerTimer) {
+                clearInterval(this._alertBannerTimer);
+                this._alertBannerTimer = null;
+            }
+            return;
+        }
+
+        alertsBanner.style.display = 'flex';
+        this._currentAlertsList = alerts;
+        if (typeof this._alertBannerIndex !== 'number' || this._alertBannerIndex >= alerts.length) {
+            this._alertBannerIndex = 0;
+        }
+
+        const renderAlertItem = (idx) => {
+            if (!this._currentAlertsList || this._currentAlertsList.length === 0) return;
+            const currentIdx = idx % this._currentAlertsList.length;
+            const alert = this._currentAlertsList[currentIdx];
+            if (!alert) return;
+
+            const isStoppage = alert.type === 'Stoppage Detected' || 
+                alert.type === 'Driver Delay Report' || 
+                alert.type === 'Emergency Breakdown' ||
+                (alert.message && (
+                    alert.message.toLowerCase().includes('halted >20') || 
+                    alert.message.toLowerCase().includes('whatsapp report') || 
+                    alert.message.toLowerCase().includes('stoppage') ||
+                    alert.message.toLowerCase().includes('breakdown') ||
+                    alert.message.toLowerCase().includes('transit delay')
+                ));
+
+            if (bannerBadge) {
+                if (isStoppage) {
+                    bannerBadge.textContent = '🚨 STOPPAGE';
+                    bannerBadge.style.background = '#e11d48';
+                } else if (alert.severity === 'critical' || alert.severity === 'danger') {
+                    bannerBadge.textContent = 'CRITICAL';
+                    bannerBadge.style.background = '#e11d48';
+                } else {
+                    bannerBadge.textContent = 'ALERT';
+                    bannerBadge.style.background = '#d97706';
+                }
+            }
+
+            const counterPill = this._currentAlertsList.length > 1 
+                ? `<span class="ticker-counter-pill">${currentIdx + 1}/${this._currentAlertsList.length}</span>` 
+                : '';
+
+            ticker.style.animation = 'none';
+            ticker.style.position = 'static';
+            ticker.style.width = '100%';
+            
+            const rawMsg = alert.message || '';
+            const icon = rawMsg.startsWith('🚨') || rawMsg.startsWith('⚠️') ? '' : (isStoppage ? '🚨 ' : '⚠️ ');
+            ticker.innerHTML = `
+                <div class="ticker-item">
+                    ${counterPill}
+                    <span class="ticker-text">${icon}${rawMsg}</span>
+                </div>
+            `;
+
+            if (bannerActions) {
+                const phone = alert.driverPhone || alert.driver_phone || '916382897998';
+                const vehId = alert.vehicleId || alert.vehicle_id || 'TN-59-EF-9012';
+
+                if (isStoppage) {
+                    bannerActions.innerHTML = `
+                        <button class="btn btn-success" style="padding:0.25rem 0.65rem; font-size:0.75rem; background:#10b981; border:1px solid #059669; font-weight:700; color:#fff; border-radius:6px; cursor:pointer;" onclick="app.acceptCurrentStoppageReason('${vehId}', '${alert.id}')">✅ Accept</button>
+                        <button class="btn btn-danger" style="padding:0.25rem 0.65rem; font-size:0.75rem; background:#ef4444; border:1px solid #dc2626; font-weight:700; color:#fff; border-radius:6px; cursor:pointer;" onclick="app.declineAndCallDriver('${vehId}', '${phone}', '${alert.id}')">📞 Decline & Call</button>
+                        <button class="btn btn-secondary" style="background:#ffffff; border:1px solid #fca5a5; color:#9f1239; font-weight:700; padding:0.25rem 0.6rem; font-size:0.75rem; border-radius:6px; cursor:pointer;" onclick="app.dismissAlert('${alert.id}')">✓ Dismiss</button>
+                        <button class="btn btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="app.showDashboardAlerts()">View All (${this._currentAlertsList.length})</button>
+                    `;
+                } else {
+                    bannerActions.innerHTML = `
+                        <button class="btn btn-secondary" style="background:#ffffff; border:1px solid #fca5a5; color:#9f1239; font-weight:700; padding:0.25rem 0.6rem; font-size:0.75rem; border-radius:6px; cursor:pointer;" onclick="app.dismissAlert('${alert.id}')">✓ Dismiss</button>
+                        <button class="btn btn-secondary" style="background:rgba(15, 118, 110, 0.08); border:1px solid rgba(15, 118, 110, 0.2); color:var(--color-primary); font-weight:600; padding:0.25rem 0.6rem; font-size:0.75rem; border-radius:6px; cursor:pointer;" onclick="app.showDashboardAlerts()">View Alerts (${this._currentAlertsList.length})</button>
+                    `;
+                }
+            }
+        };
+
+        renderAlertItem(this._alertBannerIndex);
+
+        if (this._alertBannerTimer) {
+            clearInterval(this._alertBannerTimer);
+            this._alertBannerTimer = null;
+        }
+
+        if (this._currentAlertsList.length > 1) {
+            this._alertBannerTimer = setInterval(() => {
+                if (this._alertBannerPaused) return;
+                this._alertBannerIndex = (this._alertBannerIndex + 1) % this._currentAlertsList.length;
+                renderAlertItem(this._alertBannerIndex);
+            }, 4000);
+
+            if (!alertsBanner._hoverBound) {
+                alertsBanner._hoverBound = true;
+                alertsBanner.addEventListener('mouseenter', () => { this._alertBannerPaused = true; });
+                alertsBanner.addEventListener('mouseleave', () => { this._alertBannerPaused = false; });
+            }
+        }
+    },
+
+    toggleMapDistrictsDrawer() {
+        const drawer = document.getElementById('map-districts-drawer');
+        const btn = document.getElementById('btn-toggle-district-list');
+        if (!drawer) return;
+        const isHidden = drawer.style.display === 'none' || !drawer.style.display;
+        if (isHidden) {
+            drawer.style.display = 'block';
+            if (btn) btn.innerHTML = '✕ Close Districts (38)';
+            this.renderMapDistrictsList();
+        } else {
+            drawer.style.display = 'none';
+            if (btn) btn.innerHTML = '📍 View Districts List (38)';
+        }
+    },
+
+    renderMapDistrictsList() {
+        const content = document.getElementById('map-districts-list-content');
+        if (!content) return;
+        const branches = LCOS_State.getBranches() || [];
+        if (branches.length === 0) {
+            content.innerHTML = '<div style="font-size:0.75rem; color:var(--text-muted); text-align:center; padding:0.5rem;">No district branches loaded</div>';
+            return;
+        }
+
+        content.innerHTML = branches.map(b => {
+            const gps = this.getBranchGPS(b);
+            return `
+                <div class="map-district-item" onclick="app.focusDistrictFromDrawer('${b.id}')"
+                     style="display:flex; align-items:center; justify-content:space-between; padding:0.35rem 0.6rem; border-radius:6px; background:#f9fbfa; border:1px solid rgba(15,118,110,0.12); cursor:pointer; transition:all 0.15s ease;">
+                    <div style="display:flex; align-items:center; gap:0.45rem;">
+                        <span style="font-size:0.85rem;">📍</span>
+                        <div>
+                            <strong style="font-size:0.78rem; color:var(--text-primary);">${b.name}</strong>
+                            <span style="font-size:0.7rem; color:var(--text-muted); margin-left:0.3rem;">Mgr: ${b.manager || 'Assigned'}</span>
+                        </div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:0.4rem;">
+                        <span style="font-size:0.68rem; color:#0d9488; font-family:monospace; background:rgba(15,118,110,0.08); padding:0.1rem 0.35rem; border-radius:4px;">
+                            ${gps.lat.toFixed(2)}°N, ${gps.lng.toFixed(2)}°E
+                        </span>
+                        <button type="button" class="btn btn-secondary" style="font-size:0.68rem; padding:0.15rem 0.45rem; border-radius:4px; background:rgba(15,118,110,0.1); color:var(--color-primary); font-weight:600; border:none;" onclick="event.stopPropagation(); app.focusDistrictFromDrawer('${b.id}')">
+                            Fly
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    },
+
+    focusDistrictFromDrawer(branchId) {
+        const b = (LCOS_State.getBranches() || []).find(br => br.id === branchId);
+        if (!b) return;
+        const gps = this.getBranchGPS(b);
+        if (this.leafletMap) {
+            this.leafletMap.flyTo([gps.lat, gps.lng], 12, { duration: 1.2 });
+            const marker = this.districtMarkers && this.districtMarkers[b.id];
+            if (marker) {
+                setTimeout(() => marker.openPopup(), 800);
+            }
+        }
+        const distSelect = document.getElementById('map-filter-district');
+        if (distSelect) {
+            distSelect.value = b.id;
+        }
+        this.showToast(`Centered on ${b.name} District Hub (${gps.lat.toFixed(4)}°N, ${gps.lng.toFixed(4)}°E)`, 'info');
+    },
+
+    renderLiveRunningVehiclesList(runningTrips) {
+        const scrollContainer = document.getElementById('sim-running-vehicles-scroll');
+        if (!scrollContainer) return;
+
+        if (!runningTrips || runningTrips.length === 0) {
+            scrollContainer.innerHTML = '<div style="font-size:0.75rem; color:var(--text-muted); text-align:center; padding:0.75rem; background:rgba(15,118,110,0.03); border-radius:8px;">No active running trucks at the moment</div>';
+            return;
+        }
+
+        const liveTripSelect = document.getElementById('sim-live-trip-select');
+        const selectedId = liveTripSelect ? liveTripSelect.value : '';
+
+        const statusMap = {
+            CREATED: 'Draft',
+            DISPATCH_APPROVED: 'Approved',
+            DRIVER_CALLED: 'Called',
+            DRIVER_CONFIRMED: 'Ready',
+            IN_TRANSIT: 'In Transit',
+            DELAYED: 'Delayed',
+            ARRIVED: 'Arrived',
+            DELIVERY_CONFIRMED: 'Delivering',
+            CLOSED: 'Delivered'
+        };
+
+        scrollContainer.innerHTML = runningTrips.map(t => {
+            const driver = (LCOS_State.getDrivers() || []).find(d => d.id === t.driverId);
+            const driverName = t.driver_name || (driver ? driver.name : (t.driverId || 'Driver'));
+            const empId = t.created_by_emp_id || t.driverId || 'EMP';
+            const srcB = (LCOS_State.getBranches() || []).find(b => b.id === t.sourceBranchId);
+            const destB = (LCOS_State.getBranches() || []).find(b => b.id === t.destinationBranchId);
+            const routeText = `${srcB?.name || t.sourceBranchId} → ${destB?.name || t.destinationBranchId}`;
+            const isSelected = selectedId === t.id;
+
+            let badgeBg = 'rgba(15,118,110,0.12)';
+            let badgeColor = '#0f766e';
+            let badgeBorder = '1px solid rgba(15,118,110,0.3)';
+            if (t.status === 'DELAYED') {
+                badgeBg = 'rgba(225,29,72,0.12)';
+                badgeColor = '#e11d48';
+                badgeBorder = '1px solid rgba(225,29,72,0.3)';
+            } else if (t.status === 'IN_TRANSIT') {
+                badgeBg = 'rgba(16,185,129,0.14)';
+                badgeColor = '#059669';
+                badgeBorder = '1px solid rgba(16,185,129,0.3)';
+            }
+
+            const cardBorder = isSelected ? '1.5px solid var(--color-primary)' : '1px solid rgba(15,118,110,0.15)';
+            const cardBg = isSelected ? 'rgba(15,118,110,0.08)' : '#ffffff';
+
+            return `
+                <div class="sim-running-card" id="sim-running-card-${t.id}"
+                     onclick="app.selectRunningTruckCard('${t.id}')"
+                     style="display:flex; align-items:center; justify-content:space-between; padding:0.42rem 0.65rem; border-radius:8px; border:${cardBorder}; background:${cardBg}; cursor:pointer; transition:all 0.15s ease; box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+                    <div style="display:flex; flex-direction:column; gap:0.1rem; min-width:0; flex:1; padding-right:0.4rem;">
+                        <div style="display:flex; align-items:center; gap:0.4rem;">
+                            <strong style="font-size:0.8rem; color:var(--color-primary);">${t.vehicleId}</strong>
+                            <span style="font-size:0.68rem; color:var(--text-muted); font-family:monospace; background:rgba(15,118,110,0.06); padding:0.05rem 0.3rem; border-radius:3px;">${t.id}</span>
+                        </div>
+                        <div style="font-size:0.72rem; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                            ${routeText} • <span style="color:var(--text-muted);">${driverName}</span>
+                        </div>
+                    </div>
+                    <span class="badge" style="background:${badgeBg}; color:${badgeColor}; border:${badgeBorder}; font-size:0.65rem; font-weight:700; padding:0.15rem 0.4rem; border-radius:4px; flex-shrink:0;">
+                        ${statusMap[t.status] || t.status}
+                    </span>
+                </div>
+            `;
+        }).join('');
+    },
+
+    selectRunningTruckCard(tripId) {
+        const liveTripSelect = document.getElementById('sim-live-trip-select');
+        if (liveTripSelect) {
+            liveTripSelect.value = tripId;
+        }
+        this.handleLiveTripSelection(tripId);
+
+        // Highlight active truck card
+        document.querySelectorAll('.sim-running-card').forEach(el => {
+            el.style.border = '1px solid rgba(15,118,110,0.15)';
+            el.style.background = '#ffffff';
+        });
+        const card = document.getElementById(`sim-running-card-${tripId}`);
+        if (card) {
+            card.style.border = '1.5px solid var(--color-primary)';
+            card.style.background = 'rgba(15,118,110,0.08)';
+        }
+
+        // Also sync map vehicle filter if available and highlight on map
+        const mapVehSelect = document.getElementById('map-filter-vehicle');
+        if (mapVehSelect) {
+            mapVehSelect.value = tripId;
+            this.updateMapHighlights();
+        }
     },
 
     renderDashboardCharts() {
@@ -1764,6 +2352,9 @@ const app = {
                 countBadge.textContent = `${runningTrips.length} Running Trucks`;
             }
 
+            // Populate 4-item visible running trucks list with down-scroll
+            this.renderLiveRunningVehiclesList(runningTrips);
+
             if (!this._simTripSelectBound) {
                 this._simTripSelectBound = true;
                 liveTripSelect.addEventListener('change', (e) => {
@@ -1781,7 +2372,7 @@ const app = {
                 // Fallback 38 districts
                 const districtNames = [
                     'Ariyalur', 'Chengalpattu', 'Chennai', 'Coimbatore', 'Cuddalore', 'Dharmapuri', 'Dindigul',
-                    'Erode', 'Kallakurichi', 'Kancheepuram', 'Karur', 'Krishnagiri', 'Madurai', 'Mayiladuthurai',
+                    'Erode', 'Kallakurichi', 'Kancheepuram', 'Kanyakumari', 'Karur', 'Krishnagiri', 'Madurai', 'Mayiladuthurai',
                     'Nagapattinam', 'Namakkal', 'Nilgiris', 'Perambalur', 'Pudukkottai', 'Ramanathapuram',
                     'Ranipet', 'Salem', 'Sivaganga', 'Tenkasi', 'Thanjavur', 'Theni', 'Thoothukudi',
                     'Tiruchirappalli', 'Tirunelveli', 'Tirupathur', 'Tiruppur', 'Tiruvallur', 'Tiruvannamalai',
@@ -3194,7 +3785,9 @@ const app = {
             'BR-RAN': { lat: 12.9296, lng: 79.3331 },
             'BR-SAL': { lat: 11.6643, lng: 78.1460 },
             'BR-SIV': { lat: 9.8433, lng: 78.4800 },
-            'BR-TEN': { lat: 8.9597, lng: 77.3150 },
+            'BR-TKS': { lat: 8.9597, lng: 77.3150 },
+            'BR-TEN': { lat: 8.7139, lng: 77.7567 },
+            'BR-TNL': { lat: 8.7139, lng: 77.7567 },
             'BR-THA': { lat: 10.7870, lng: 79.1378 },
             'BR-THE': { lat: 10.0104, lng: 77.4768 },
             'BR-TUT': { lat: 8.7642, lng: 78.1348 },
@@ -3284,6 +3877,7 @@ const app = {
 
         if (this.branchLayerGroup) {
             this.branchLayerGroup.clearLayers();
+            this.districtMarkers = {};
             const branches = LCOS_State.getBranches();
             branches.forEach(b => {
                 const gps = this.getBranchGPS(b);
@@ -3297,11 +3891,26 @@ const app = {
                     popupAnchor: [0, -7]
                 });
                 const marker = L.marker([gps.lat, gps.lng], { icon: branchIcon });
+                marker.bindTooltip(`📍 ${b.name}`, {
+                    permanent: false,
+                    direction: 'top',
+                    offset: [0, -8],
+                    className: 'district-hub-tooltip'
+                });
                 marker.bindPopup(`
-                    <div style="font-size:0.82rem; font-family:sans-serif; color:#1e293b; padding:2px;">
-                        <b>📍 ${b.name} District Hub</b><br>
-                        <span style="font-size:0.75rem; color:#64748b;">Manager: ${b.manager || 'Assigned'} | Tel: ${b.phone || 'N/A'}</span><br>
-                        <span style="font-size:0.72rem; color:#0284c7;">Coords: ${gps.lat.toFixed(4)}°N, ${gps.lng.toFixed(4)}°E</span>
+                    <div style="font-size:0.85rem; font-family:var(--font-body, sans-serif); color:#132a24; padding:4px 6px; min-width:180px;">
+                        <div style="font-weight:700; color:#0f766e; font-size:0.95rem; margin-bottom:4px; display:flex; align-items:center; gap:4px;">
+                            <span>📍</span> ${b.name} District Hub
+                        </div>
+                        <div style="font-size:0.75rem; color:#4b6358; margin-bottom:2px;">
+                            <strong>Manager:</strong> ${b.manager || 'Assigned'}
+                        </div>
+                        <div style="font-size:0.75rem; color:#4b6358; margin-bottom:4px;">
+                            <strong>Contact:</strong> ${b.phone || '+91 94412 00000'}
+                        </div>
+                        <div style="font-size:0.72rem; color:#0d9488; font-family:monospace; background:rgba(15,118,110,0.08); padding:2px 6px; border-radius:4px;">
+                            ${gps.lat.toFixed(4)}°N, ${gps.lng.toFixed(4)}°E
+                        </div>
                     </div>
                 `);
                 marker.on('click', () => {
@@ -3309,7 +3918,9 @@ const app = {
                     marker.openPopup();
                 });
                 this.branchLayerGroup.addLayer(marker);
+                this.districtMarkers[b.id] = marker;
             });
+            this.renderMapDistrictsList();
         }
 
         // Force Leaflet to recalculate container bounds after rendering
@@ -3993,6 +4604,10 @@ const app = {
             const b = LCOS_State.getBranches().find(br => br.id === selectedDistrict);
             if (b && b.lat && b.lng) {
                 this.leafletMap.flyTo([b.lat, b.lng], 11, { duration: 1 });
+                const marker = this.districtMarkers && this.districtMarkers[b.id];
+                if (marker) {
+                    setTimeout(() => marker.openPopup(), 600);
+                }
             }
         } else if (!selectedVehTripId) {
             this.leafletMap.fitBounds([[8.05, 76.2], [13.55, 80.35]], { padding: [15, 15] });
@@ -4185,9 +4800,18 @@ const app = {
                     }
                 }
 
-                // 3. Pan to vehicle if operator explicitly focused it
-                if (this.activeSelectedVehicleId === data.vehicleId && this.leafletMap) {
-                    this.leafletMap.panTo([data.lat, data.lng]);
+                // 3. Pan or fly to vehicle so live telemetry is immediately in view
+                if (this.leafletMap) {
+                    if (this.activeSelectedVehicleId === data.vehicleId) {
+                        this.leafletMap.panTo([data.lat, data.lng]);
+                    } else if (!this._lastAutoFocusedVeh || this._lastAutoFocusedVeh === data.vehicleId) {
+                        this._lastAutoFocusedVeh = data.vehicleId;
+                        this.leafletMap.flyTo([data.lat, data.lng], 14, { duration: 1.2 });
+                        const entry = this.vehicleMarkerRegistry.get(data.vehicleId);
+                        if (entry && entry.marker) {
+                            setTimeout(() => entry.marker.openPopup(), 600);
+                        }
+                    }
                 }
 
                 // 4. Update Running Trucks filter count if newly active
@@ -4553,17 +5177,6 @@ const app = {
         LCOS_State.save();
         this.showToast('Vehicle breakdown resolved. Shipments back in transit.', 'success');
         this.renderAll();
-    },
-
-    dismissAlert(alertId) {
-        const role = LCOS_State.getCurrentRole();
-        if (role !== 'branch_manager' && role !== 'super_admin') {
-            this.showToast('Access Denied: Only Branch Managers can dismiss operations alerts.', 'warning');
-            return;
-        }
-        LCOS_State.resolveAlert(alertId);
-        this.renderDashboard();
-        this.showToast('Alert dismissed.', 'info');
     },
 
     viewReceipt(tripId) {
@@ -5455,17 +6068,17 @@ const app = {
 
         document.getElementById('btn-enter-pay-tracking')?.addEventListener('click', () => {
             document.getElementById('payment-success-modal')?.remove();
-            this.login('tracking_team');
+            this.openPortalLoginModal('tracking_team');
         });
 
         document.getElementById('btn-enter-pay-manager')?.addEventListener('click', () => {
             document.getElementById('payment-success-modal')?.remove();
-            this.login('branch_manager');
+            this.openPortalLoginModal('branch_manager');
         });
 
         document.getElementById('btn-enter-pay-owner')?.addEventListener('click', () => {
             document.getElementById('payment-success-modal')?.remove();
-            this.login('owner');
+            this.openPortalLoginModal('owner');
         });
     },
 
