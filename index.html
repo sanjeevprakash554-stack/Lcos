@@ -6,7 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Logistics Operations Control System (LCOS)</title>
-    <link rel="stylesheet" href="/css/styles.css?v=4.6">
+    <link rel="stylesheet" href="/css/styles.css?v=4.7">
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 <body>
@@ -297,27 +297,27 @@
                                             <div id="sim-trip-meta-card" class="sim-trip-meta-box" style="display:none;">
                                                 <div class="sim-trip-meta-top">
                                                     <div class="sim-meta-tags">
-                                                        <span class="badge sim-meta-id-badge" id="sim-badge-trip-id">TRIP-1002</span>
-                                                        <span class="sim-meta-log-text" id="sim-badge-dispatch-id">Log ID: DISP-2002</span>
+                                                        <span class="badge sim-meta-id-badge" id="sim-badge-trip-id">--</span>
+                                                        <span class="sim-meta-log-text" id="sim-badge-dispatch-id">Log ID: --</span>
                                                     </div>
                                                     <span class="badge sim-meta-status-badge" id="sim-badge-trip-status" style="background:rgba(16,185,129,0.14); color:#059669; border:1px solid rgba(16,185,129,0.3);">IN_TRANSIT</span>
                                                 </div>
                                                 <div class="sim-meta-details-grid">
                                                     <div class="sim-meta-cell">
                                                         <span class="sim-meta-cell-label">Vehicle Reg</span>
-                                                        <strong id="sim-meta-veh" class="sim-meta-cell-val" style="color:var(--color-primary);">TN-59-EF-9012</strong>
+                                                        <strong id="sim-meta-veh" class="sim-meta-cell-val" style="color:var(--color-primary);">--</strong>
                                                     </div>
                                                     <div class="sim-meta-cell">
                                                         <span class="sim-meta-cell-label">Cargo</span>
-                                                        <strong id="sim-meta-cargo" class="sim-meta-cell-val">Cement (300 Bags)</strong>
+                                                        <strong id="sim-meta-cargo" class="sim-meta-cell-val">--</strong>
                                                     </div>
                                                     <div class="sim-meta-cell">
                                                         <span class="sim-meta-cell-label">Assigned Driver</span>
-                                                        <strong id="sim-meta-driver" class="sim-meta-cell-val">Saravanan K.</strong>
+                                                        <strong id="sim-meta-driver" class="sim-meta-cell-val">--</strong>
                                                     </div>
                                                     <div class="sim-meta-cell">
                                                         <span class="sim-meta-cell-label">Driver / Emp ID</span>
-                                                        <strong id="sim-meta-emp" class="sim-meta-cell-val" style="color:var(--color-warning); font-family:monospace;">DRV-105</strong>
+                                                        <strong id="sim-meta-emp" class="sim-meta-cell-val" style="color:var(--color-warning); font-family:monospace;">--</strong>
                                                     </div>
                                                 </div>
                                             </div>
@@ -475,12 +475,12 @@
                         <div id="console-active-trip" style="display:none;">
                             <div class="flex justify-between align-center" style="border-bottom:1px solid var(--border-glass); padding-bottom:1rem;">
                                 <div>
-                                    <h3 id="c-trip-id" style="font-family:var(--font-heading); font-size:1.25rem;">TRIP-1002</h3>
-                                    <p id="c-trip-route" style="color:var(--text-secondary); font-size:0.85rem;">Chennai to Madurai</p>
+                                    <h3 id="c-trip-id" style="font-family:var(--font-heading); font-size:1.25rem;">--</h3>
+                                    <p id="c-trip-route" style="color:var(--text-secondary); font-size:0.85rem;">--</p>
                                 </div>
                                 <div class="text-right">
                                     <span class="badge badge-transit" id="c-trip-status">In Transit</span>
-                                    <p id="c-dispatch-id" style="color:var(--text-muted); font-size:0.75rem; margin-top:0.25rem;">DISP-2002</p>
+                                    <p id="c-dispatch-id" style="color:var(--text-muted); font-size:0.75rem; margin-top:0.25rem;">--</p>
                                 </div>
                             </div>
 
@@ -497,21 +497,21 @@
                                         <div class="form-row margin-bottom-1">
                                             <div>
                                                 <span style="font-size:0.75rem; color:var(--text-muted); display:block;">COMMODITY</span>
-                                                <span id="c-detail-commodity" style="font-weight:700;">Rice (200 Bags)</span>
+                                                <span id="c-detail-commodity" style="font-weight:700;">--</span>
                                             </div>
                                             <div>
                                                 <span style="font-size:0.75rem; color:var(--text-muted); display:block;">VEHICLE</span>
-                                                <span id="c-detail-vehicle" style="font-weight:700;">TN-01-AB-1234 (Lorry)</span>
+                                                <span id="c-detail-vehicle" style="font-weight:700;">--</span>
                                             </div>
                                         </div>
                                         <div class="form-row margin-bottom-1">
                                             <div>
                                                 <span style="font-size:0.75rem; color:var(--text-muted); display:block;">DRIVER ASSIGNED</span>
-                                                <span id="c-detail-driver" style="font-weight:700;">Selvam R. (+91 98840 12345)</span>
+                                                <span id="c-detail-driver" style="font-weight:700;">--</span>
                                             </div>
                                             <div>
                                                 <span style="font-size:0.75rem; color:var(--text-muted); display:block;">HELPER ASSIGNED</span>
-                                                <span id="c-detail-helper" style="font-weight:700;">Mani G. (Senior Helper)</span>
+                                                <span id="c-detail-helper" style="font-weight:700;">--</span>
                                             </div>
                                         </div>
                                         <div class="form-row margin-bottom-1">
@@ -1791,7 +1791,7 @@
                     <span class="status-pill-badge pill-active" id="status-pill-badge">ACTIVE</span>
                 </div>
                 <div class="sub-status-desc" id="sub-status-desc">
-                    ✅ Company <strong>Vattara Logistics Pvt Ltd</strong> is active on <strong>Professional Plan</strong>. All operational portals (Tracking Team, Branch Manager, 2 Owners) are fully unlocked.
+                    ✅ Company <strong>LCOS Central Logistics</strong> is active on <strong>Professional Plan</strong>. All operational portals (Tracking Team, Branch Manager, 2 Owners) are fully unlocked.
                 </div>
                 <div class="sub-demo-controls" style="display: none;">
                     <button type="button" class="btn-demo-sub-toggle" id="btn-toggle-demo-expired" title="Test Gating by Simulating Expired Status" onclick="window.app && window.app.simulateSubscriptionStatus('EXPIRED')">
@@ -2057,9 +2057,7 @@
                         <label class="portal-field-label" style="margin-bottom: 0;" for="portal-input-password">
                             Password
                         </label>
-                        <button type="button" id="portal-btn-autofill" class="portal-autofill-btn" style="display: none;" title="Auto-populate sample demo credentials">
-                            ⚡ Fill Demo Credentials
-                        </button>
+                        
                     </div>
                     <div class="portal-input-container">
                         <span class="portal-input-icon">🔒</span>
@@ -2075,21 +2073,15 @@
                 </button>
             </form>
 
-            <!-- Portal Credentials Helper Info -->
-            <div class="portal-credentials-footer">
-                <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Default Demo Credentials:</div>
-                <div id="portal-credentials-hint" class="portal-credentials-box">
-                    Username: <span style="color: var(--color-primary); font-weight: 700;">tracking</span> | Password: <span style="color: var(--color-primary); font-weight: 700;">password123</span>
-                </div>
-            </div>
+            
         </div>
     </div>
 
     <!-- SCRIPTS -->
     <script src="/socket.io/socket.io.js"></script>
     <script type="module" src="/js/api.js?v=4.2"></script>
-    <script type="module" src="/js/state.js?v=4.6"></script>
-    <script type="module" src="/js/charts.js?v=4.6"></script>
-    <script type="module" src="/js/app.js?v=4.6"></script>
+    <script type="module" src="/js/state.js?v=4.7"></script>
+    <script type="module" src="/js/charts.js?v=4.7"></script>
+    <script type="module" src="/js/app.js?v=4.7"></script>
 </body>
 </html>

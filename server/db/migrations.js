@@ -121,70 +121,28 @@ async function runMigrations() {
       // Index might already exist
     }
 
-    // 9. Purge legacy dummy operational records (trips, alerts, call logs, gps tracking crumbs, dummy stock)
+    // 9. Full Production Purge of all dummy data (trips, alerts, call logs, gps crumbs, dummy stock, fake fleets, fake drivers)
     try {
-      const dummyTrips = await db.query("SELECT COUNT(*) AS c FROM trips WHERE id LIKE 'TRIP-%'");
-      const tripCount = Number(dummyTrips.rows[0]?.c || 0);
-      if (tripCount > 0) {
-        console.log(`[Migration] Purging ${tripCount} dummy trips and related operational records...`);
-        await db.query("DELETE FROM call_logs WHERE trip_id LIKE 'TRIP-%'");
-        await db.query("DELETE FROM alerts WHERE trip_id LIKE 'TRIP-%' OR id LIKE 'ALT-%'");
-        await db.query("DELETE FROM gps_tracking_records WHERE trip_id LIKE 'TRIP-%'");
-        await db.query("DELETE FROM trips WHERE id LIKE 'TRIP-%'");
-        await db.query("DELETE FROM stock");
-        await db.query("DELETE FROM manager_requests");
-        await db.query("DELETE FROM invoices WHERE id = 'INV-1001'");
-        await db.query("DELETE FROM payments WHERE id = 'PAY-1001'");
-        await db.query("UPDATE vehicles SET status = 'Available', movement_status = 'STOPPED', speed_kmh = 0");
-        await db.query("UPDATE drivers SET status = 'Available'");
-        await db.query("UPDATE helpers SET status = 'Available'");
-        console.log('✅ [Migration] Dummy operational records successfully purged.');
-      }
+      console.log('[Migration] Running complete dummy data purge on database...');
+      await db.query("DELETE FROM call_logs");
+      await db.query("DELETE FROM alerts");
+      await db.query("DELETE FROM gps_tracking_records");
+      await db.query("DELETE FROM trips");
+      await db.query("DELETE FROM stock");
+      await db.query("DELETE FROM manager_requests");
+      await db.query("DELETE FROM invoices");
+      await db.query("DELETE FROM payments");
+      await db.query("DELETE FROM whatsapp_logs");
+      await db.query("DELETE FROM helpers");
+      await db.query("DELETE FROM drivers");
+      await db.query("DELETE FROM vehicles");
+      await db.query("DELETE FROM users WHERE role = 'DRIVER' OR username LIKE 'driver%' OR username LIKE 'drv%'");
+      await db.query("UPDATE branches SET manager_name = NULL, phone = NULL");
+      await db.query("UPDATE companies SET name = 'LCOS Central Logistics', email = 'admin@lcos.internal', phone = NULL, address = NULL WHERE id = 'COMP-001'");
+      console.log('✅ [Migration] All dummy operational data, fleets, and drivers purged cleanly.');
     } catch (purgeErr) {
       console.warn('[Migration Purge Notice]:', purgeErr.message);
     }
-
-    // 10. Ensure multiple driver accounts exist for concurrent mobile tracking testing
-    const extraDrivers = [
-      { id: 'USR-DRIVER2', username: 'driver2', empId: 'DRV-102', fullName: 'Kumaravel P.', phone: '+91 98840 23456' },
-      { id: 'USR-DRIVER3', username: 'driver3', empId: 'DRV-104', fullName: 'Murugan T.', phone: '+91 98840 45678' },
-      { id: 'USR-DRIVER4', username: 'driver4', empId: 'DRV-105', fullName: 'Saravanan K.', phone: '+91 98840 56789' },
-      { id: 'USR-DRIVER5', username: 'driver5', empId: 'DRV-112', fullName: 'Sanjeev', phone: '+91 79047 43468' }
-    ];
-
-    for (const d of extraDrivers) {
-      try {
-        await db.query(
-          `INSERT INTO users (id, company_id, username, email, password_hash, full_name, phone, role, emp_id, status)
-           VALUES ($1, 'COMP-001', $2, $3, '$2a$10$wM3J4sEwN7e8K0eL6f.g2.oT7r1Z1v3z4w5x6y7z8a9b0c1d2e3f4', $4, $5, 'DRIVER', $6, 'ACTIVE')
-           ON CONFLICT (id) DO NOTHING`,
-          [d.id, d.username, `${d.username}@lcos.com`, d.fullName, d.phone, d.empId]
-        );
-        await db.query(`UPDATE drivers SET user_id = $1 WHERE id = $2`, [d.id, d.empId]);
-      } catch (_) {}
-    }
-
-    // Legacy test trip overrides removed
-
-    // Ensure every single driver in drivers table has a linked user account for mobile login
-    try {
-      const unlinkedDrivers = await db.query(
-        `SELECT id, name, phone, company_id FROM drivers WHERE user_id IS NULL OR user_id = ''`
-      );
-      for (const d of unlinkedDrivers.rows || []) {
-        const uId = 'USR-' + d.id;
-        const uName = (d.id ? d.id.toLowerCase().replace(/[^a-z0-9]/g, '') : 'drv_' + Date.now());
-        try {
-          await db.query(
-            `INSERT INTO users (id, company_id, username, email, password_hash, full_name, phone, role, emp_id, status)
-             VALUES ($1, $2, $3, $4, '$2a$10$wM3J4sEwN7e8K0eL6f.g2.oT7r1Z1v3z4w5x6y7z8a9b0c1d2e3f4', $5, $6, 'DRIVER', $7, 'ACTIVE')
-             ON CONFLICT (id) DO NOTHING`,
-            [uId, d.company_id || 'COMP-001', uName, `${uName}@lcos.com`, d.name, d.phone, d.id]
-          );
-          await db.query(`UPDATE drivers SET user_id = $1 WHERE id = $2`, [uId, d.id]);
-        } catch (_) {}
-      }
-    } catch (_) {}
 
     // 6. Backfill branch coordinates
     for (const b of BRANCH_COORDINATES) {

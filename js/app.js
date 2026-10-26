@@ -1833,7 +1833,7 @@ const app = {
                     value: {
                         messaging_product: 'whatsapp',
                         metadata: { display_phone_number: '1555000', phone_number_id: '1246879781843655' },
-                        contacts: [{ profile: { name: 'Saravanan K.' }, wa_id: '916382897998' }],
+                        contacts: [],
                         messages: [{
                             from: '916382897998',
                             id: 'wamid.sim_' + Date.now(),
@@ -2606,7 +2606,7 @@ const app = {
             metaCard.style.display = 'block';
 
             const driver = (LCOS_State.getDrivers() || []).find(d => d.id === trip.driverId);
-            const driverName = trip.driver_name || (driver ? driver.name : (trip.driverId || 'Selvam R.'));
+            const driverName = trip.driver_name || (driver ? driver.name : (trip.driverId || 'Assigned Driver'));
             const commodity = (LCOS_State.getCommodities() || []).find(c => c.id === trip.commodityId);
             const cargoName = trip.commodity_name || (commodity ? commodity.name : 'Goods');
             const empId = trip.created_by_emp_id || trip.driverId || 'EMP-101';
@@ -2827,8 +2827,8 @@ const app = {
             const vehId = trip ? trip.vehicleId : 'TN-30-SIM-99';
             const dispatchId = trip ? (trip.dispatchId || trip.dispatch_id || `LOG-${trip.id}`) : 'DISP-2002';
             const driver = trip ? ((LCOS_State.getDrivers() || []).find(d => d.id === trip.driverId)) : null;
-            const driverName = trip ? (trip.driver_name || (driver ? driver.name : 'Selvam R.')) : 'Selvam R.';
-            const empId = trip ? (trip.created_by_emp_id || trip.driverId || 'EMP-101') : 'EMP-DRV-101';
+            const driverName = trip ? (trip.driver_name || (driver ? driver.name : 'Assigned Driver')) : 'Selvam R.';
+            const empId = trip ? (trip.created_by_emp_id || trip.driverId || 'EMP-101') : '--';
             const titleText = trip ? `🚚 Live Running Truck Tracking` : `🚀 Simulated Express Dispatch`;
 
             // Generate curved road waypoints from origin to destination for lively realistic transit
@@ -2933,7 +2933,7 @@ const app = {
         const vehId = trip ? trip.vehicleId : 'TN-37-CD-5678';
         const driver = trip ? ((LCOS_State.getDrivers() || []).find(d => d.id === trip.driverId)) : null;
         const driverName = trip ? (trip.driver_name || (driver ? driver.name : 'Rajesh Nair')) : 'Rajesh Nair';
-        const empId = trip ? (trip.created_by_emp_id || trip.driverId || 'EMP-101') : 'EMP-DRV-101';
+        const empId = trip ? (trip.created_by_emp_id || trip.driverId || 'EMP-101') : '--';
 
         const alertItem = {
             id: `ALT-SIM-${Date.now()}`,
@@ -2958,8 +2958,8 @@ const app = {
         const tripId = trip ? trip.id : 'TRIP-1002';
         const vehId = trip ? trip.vehicleId : 'TN-59-EF-9012';
         const driver = trip ? ((LCOS_State.getDrivers() || []).find(d => d.id === trip.driverId)) : null;
-        const driverName = trip ? (trip.driver_name || (driver ? driver.name : 'Saravanan K.')) : 'Saravanan K.';
-        const empId = trip ? (trip.created_by_emp_id || trip.driverId || 'EMP-101') : 'EMP-DRV-101';
+        const driverName = trip ? (trip.driver_name || (driver ? driver.name : 'Assigned Driver')) : 'Saravanan K.';
+        const empId = trip ? (trip.created_by_emp_id || trip.driverId || 'EMP-101') : '--';
 
         this.showToast(`📡 Pinging vehicle ${vehId} [Trip: ${tripId}, Emp ID: ${empId}]... 4G-LTE Lock OK (Latency: 34ms)`, 'info');
         setTimeout(() => {
@@ -5792,7 +5792,7 @@ const app = {
                 } catch(e) {}
             }
             if (!this.currentSubscription) {
-                this.currentSubscription = { plan_id: 'PLAN-PRO', plan_name: 'Professional', status: 'ACTIVE', company_name: 'Vattara Logistics Pvt Ltd' };
+                this.currentSubscription = { plan_id: 'PLAN-PRO', plan_name: 'Professional', status: 'ACTIVE', company_name: 'LCOS Central Logistics' };
             }
             this.isSubscriptionActive = cachedActive !== 'false';
         }
@@ -5839,7 +5839,7 @@ const app = {
                     ? new Date(this.currentSubscription.expiry_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
                     : 'Active';
 
-                desc.innerHTML = `✅ Company <strong>${this.currentSubscription.company_name || 'Vattara Logistics Pvt Ltd'}</strong> is active on <strong>${planName} Plan</strong> until <strong>${expDate}</strong>. All operational portals (Tracking Team, Branch Manager, 2 Owners) are fully unlocked.`;
+                desc.innerHTML = `✅ Company <strong>${this.currentSubscription.company_name || 'LCOS Central Logistics'}</strong> is active on <strong>${planName} Plan</strong> until <strong>${expDate}</strong>. All operational portals (Tracking Team, Branch Manager, 2 Owners) are fully unlocked.`;
             }
             if (roleHint) {
                 roleHint.innerHTML = `🟢 <strong>${planName} Plan Active:</strong> All 3 portals are unlocked. Click any designated role card below to enter operations.`;

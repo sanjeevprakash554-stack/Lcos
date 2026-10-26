@@ -77,22 +77,9 @@ const LCOS_State = {
             { id: 'COM-CEM', name: 'Cement', unit: 'Bags', weight: 50, value: 450 },
             { id: 'COM-STE', name: 'Steel', unit: 'Tons', weight: 1000, value: 65000 }
         ],
-        vehicles: [
-            { id: 'TN-01-AB-1234', type: 'Lorry', capacity: 15, owner: 'Self Owned', status: 'Available' },
-            { id: 'TN-37-CD-5678', type: 'Container', capacity: 25, owner: 'Logistics Partners', status: 'Available' },
-            { id: 'TN-59-EF-9012', type: 'Mini Truck', capacity: 5, owner: 'Self Owned', status: 'Available' },
-            { id: 'TN-02-GH-3456', type: 'Lorry', capacity: 15, owner: 'Self Owned', status: 'Available' },
-            { id: 'TN-07-JK-7890', type: 'Container', capacity: 22, owner: 'Logistics Partners', status: 'Available' }
-        ],
-        drivers: [
-            { id: 'DRV-101', name: 'Selvam R.', license: 'DL-TN012015001', phone: '+91 98840 12345', experience: 8, performance: 98, warnings: 0, status: 'Available' },
-            { id: 'DRV-102', name: 'Kumaravel P.', license: 'DL-TN372018002', phone: '+91 98840 23456', experience: 5, performance: 92, warnings: 0, status: 'Available' },
-            { id: 'DRV-104', name: 'Murugan T.', license: 'DL-TN022014004', phone: '+91 98840 45678', experience: 10, performance: 95, warnings: 0, status: 'Available' }
-        ],
-        helpers: [
-            { id: 'HLP-201', name: 'Mani G.', phone: '+91 97760 11223', role: 'Senior Helper', status: 'Available' },
-            { id: 'HLP-203', name: 'Loganathan S.', phone: '+91 97760 33445', role: 'Senior Helper', status: 'Available' }
-        ],
+        vehicles: [],
+        drivers: [],
+        helpers: [],
         trips: [],
         callLogs: [],
         stock: {},
@@ -194,21 +181,21 @@ const LCOS_State = {
                 }));
             }
 
-            if (vehiclesRes.status === 'fulfilled' && vehiclesRes.value && vehiclesRes.value.vehicles && vehiclesRes.value.vehicles.length > 0) {
+            if (vehiclesRes.status === 'fulfilled' && vehiclesRes.value && Array.isArray(vehiclesRes.value.vehicles)) {
                 this.data.vehicles = vehiclesRes.value.vehicles.map(v => ({
                     id: v.id, type: v.type, capacity: Number(v.capacity_tons), owner: v.ownership, status: v.status,
                     currentLat: (v.current_lat !== null && v.current_lat !== undefined) ? Number(v.current_lat) : null, currentLng: (v.current_lng !== null && v.current_lng !== undefined) ? Number(v.current_lng) : null, speedKmh: v.speed_kmh !== undefined ? Number(v.speed_kmh) : 0, heading: v.heading !== undefined ? Number(v.heading) : 0, movementStatus: v.movement_status || 'STOPPED', lastGpsUpdate: v.last_gps_update || null, lastPingAt: v.last_ping_at || null
                 }));
             }
 
-            if (driversRes.status === 'fulfilled' && driversRes.value && driversRes.value.drivers && driversRes.value.drivers.length > 0) {
+            if (driversRes.status === 'fulfilled' && driversRes.value && Array.isArray(driversRes.value.drivers)) {
                 this.data.drivers = driversRes.value.drivers.map(d => ({
                     id: d.id, name: d.name, license: d.license_number, phone: d.phone, experience: d.experience_years,
                     performance: d.performance_score, warnings: d.warnings_count, status: d.status
                 }));
             }
 
-            if (helpersRes.status === 'fulfilled' && helpersRes.value && helpersRes.value.helpers && helpersRes.value.helpers.length > 0) {
+            if (helpersRes.status === 'fulfilled' && helpersRes.value && Array.isArray(helpersRes.value.helpers)) {
                 this.data.helpers = helpersRes.value.helpers.map(h => ({
                     id: h.id, name: h.name, phone: h.phone, role: h.role_type, status: h.status
                 }));

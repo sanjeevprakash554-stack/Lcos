@@ -135,7 +135,7 @@ router.post('/login', async (req, res) => {
             phone: d.phone,
             role: 'DRIVER',
             emp_id: d.id,
-            company_name: d.company_name || 'Vattara Logistics Pvt Ltd'
+            company_name: d.company_name || 'LCOS Logistics Central'
           };
         }
       }
@@ -204,7 +204,7 @@ router.post('/login', async (req, res) => {
         phone: autoPhone,
         role: 'DRIVER',
         emp_id: autoId,
-        company_name: 'Vattara Logistics Pvt Ltd'
+        company_name: 'LCOS Logistics Central'
       };
     }
 
