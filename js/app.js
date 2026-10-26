@@ -14,6 +14,7 @@ const app = {
     async init() {
         // Ensure desktop & mobile scrolling is fully unlocked on boot
         try {
+            document.body.classList.remove('dashboard-active');
             document.documentElement.style.overflowY = 'auto';
             document.documentElement.style.height = 'auto';
             document.body.style.overflowY = 'auto';
@@ -757,6 +758,11 @@ const app = {
         document.getElementById(`tab-${tabId}`).classList.add('active');
         this.activeTab = tabId;
 
+        // Reset scroll position to top of main workspace on tab change
+        const mainEl = document.querySelector('main.main-content');
+        if (mainEl) mainEl.scrollTop = 0;
+        window.scrollTo(0, 0);
+
         if (tabId === 'dashboard') {
             this.renderMap();
         }
@@ -1052,6 +1058,7 @@ const app = {
                     appContainer.style.display = 'flex';
                     appContainer.style.opacity = '1';
                 }
+                document.body.classList.add('dashboard-active');
                 window.scrollTo(0, 0);
                 
                 try {
@@ -1076,6 +1083,7 @@ const app = {
                         appContainer.style.display = 'flex';
                         appContainer.style.opacity = '1';
                     }
+                    document.body.classList.add('dashboard-active');
                     this._isLoggingIn = false;
                 }
 
@@ -1098,6 +1106,7 @@ const app = {
     },
 
     logout() {
+        document.body.classList.remove('dashboard-active');
         if (this.socket) {
             try { this.socket.disconnect(); } catch (e) {}
             this.socket = null;
@@ -3841,9 +3850,23 @@ const app = {
                     zoom: 7,
                     zoomControl: true,
                     minZoom: 6,
-                    maxZoom: 18
+                    maxZoom: 18,
+                    scrollWheelZoom: false
                 });
                 window.leafletMap = this.leafletMap;
+
+                // Re-enable mouse wheel zoom when user clicks to interact with the map,
+                // and restore smooth page/dashboard scrolling when mouse leaves map bounds
+                mapEl.addEventListener('click', () => {
+                    if (this.leafletMap && this.leafletMap.scrollWheelZoom) {
+                        this.leafletMap.scrollWheelZoom.enable();
+                    }
+                });
+                mapEl.addEventListener('mouseleave', () => {
+                    if (this.leafletMap && this.leafletMap.scrollWheelZoom) {
+                        this.leafletMap.scrollWheelZoom.disable();
+                    }
+                });
 
                 // 1. Detailed Tamil Nadu District & Highway Map View (OpenStreetMap - 100% Free)
                 const districtMapLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {

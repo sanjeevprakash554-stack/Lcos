@@ -3649,6 +3649,7 @@ aside.sim-panel.collapsed {
    DESKTOP VIEW (> 992px)
    ========================================== */
 @media (min-width: 993px) {
+    /* 1. Landing Page / Public View (window body scrolls smoothly) */
     html, body {
         height: auto !important;
         min-height: 100% !important;
@@ -3678,13 +3679,52 @@ aside.sim-panel.collapsed {
         padding: 1.5rem;
         position: relative;
     }
+
+    /* 2. Operations Dashboard Shell (Pinned sidebar + independently scrolling main workspace) */
+    body.dashboard-active,
+    body:has(#app-container:not([style*="display: none"])) {
+        height: 100vh !important;
+        height: 100dvh !important;
+        overflow: hidden !important;
+    }
+
+    body.dashboard-active #app-container,
+    body:has(#app-container:not([style*="display: none"])) #app-container {
+        height: 100vh !important;
+        height: 100dvh !important;
+        max-height: 100vh !important;
+        max-height: 100dvh !important;
+        overflow: hidden !important;
+    }
+
+    body.dashboard-active aside.sidebar,
+    body:has(#app-container:not([style*="display: none"])) aside.sidebar {
+        height: 100vh !important;
+        height: 100dvh !important;
+        overflow-y: auto !important;
+        flex-shrink: 0;
+    }
+
+    body.dashboard-active main.main-content,
+    body:has(#app-container:not([style*="display: none"])) main.main-content {
+        height: 100vh !important;
+        height: 100dvh !important;
+        max-height: 100vh !important;
+        max-height: 100dvh !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-y: contain;
+        padding-bottom: 5rem !important;
+    }
 }
 
 /* ==========================================
    BREAKPOINT: <= 992px (Tablets & Landscape)
    ========================================== */
 @media (max-width: 992px) {
-    body {
+    body,
+    body.dashboard-active {
         height: auto !important;
         min-height: 100% !important;
         min-height: 100dvh !important;
@@ -3693,11 +3733,13 @@ aside.sim-panel.collapsed {
         -webkit-overflow-scrolling: touch !important;
     }
 
-    #app-container {
+    #app-container,
+    body.dashboard-active #app-container {
         display: flex !important;
         flex-direction: column !important;
         width: 100% !important;
         height: auto !important;
+        max-height: none !important;
         min-height: 100% !important;
         min-height: 100dvh !important;
         overflow: visible !important;
@@ -3738,9 +3780,11 @@ aside.sim-panel.collapsed {
         display: inline-flex;
     }
 
-    main.main-content {
+    main.main-content,
+    body.dashboard-active main.main-content {
         width: 100% !important;
         height: auto !important;
+        max-height: none !important;
         min-height: auto !important;
         flex: 1 1 auto !important;
         padding: 0.85rem 0.75rem 6.5rem 0.75rem !important;
