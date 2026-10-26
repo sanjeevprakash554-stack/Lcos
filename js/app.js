@@ -5692,6 +5692,13 @@ const app = {
                 throw new Error(orderRes?.message || 'Failed to create payment order with gateway');
             }
 
+            const isSimulated = !orderRes.orderId || orderRes.orderId.startsWith('order_LCOS_') || !orderRes.keyId || orderRes.keyId.includes('rzp_test_TCr9Me1AydiZMF');
+            if (isSimulated) {
+                this._isPaying = false;
+                this.openInAppRazorpayModal(orderRes, planId);
+                return;
+            }
+
             let nativeOpened = false;
             try {
                 await this.ensureRazorpay();
@@ -6104,6 +6111,12 @@ const app = {
             const orderRes = await LCOS_API.createPaymentOrder(planId);
             if (!orderRes || !orderRes.success) {
                 this.showToast(orderRes?.message || 'Error creating payment order.', 'danger');
+                return;
+            }
+
+            const isSimulated = !orderRes.orderId || orderRes.orderId.startsWith('order_LCOS_') || !orderRes.keyId || orderRes.keyId.includes('rzp_test_TCr9Me1AydiZMF');
+            if (isSimulated) {
+                this.openInAppRazorpayModal(orderRes, planId);
                 return;
             }
 
