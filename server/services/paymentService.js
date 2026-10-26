@@ -28,11 +28,17 @@ async function createOrder(amountInr, currency = 'INR') {
       });
     } catch (apiErr) {
       console.warn('⚠️ [Razorpay API Notice]: Gateway order creation failed:', apiErr.message);
-      // Fallback to simulated order so UI doesn't crash if test keys are expired
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('Razorpay gateway error: ' + apiErr.message);
+      }
     }
   }
 
-  // Simulated fallback order creation for zero-friction demo testing
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Razorpay keys not configured or gateway unavailable in production mode.');
+  }
+
+  // Simulated fallback order creation for zero-friction demo testing in non-production
   const orderId = 'order_LCOS_' + Math.floor(100000 + Math.random() * 900000);
   return {
     id: orderId,
@@ -48,8 +54,14 @@ async function createOrder(amountInr, currency = 'INR') {
 }
 
 function verifySignature(orderId, paymentId, signature) {
-  if (!signature || signature === 'simulated_valid_signature_hash' || !RAZORPAY_SECRET || RAZORPAY_SECRET.includes('simulated')) {
-    return true;
+  if (process.env.NODE_ENV === 'production') {
+    if (!signature || !RAZORPAY_SECRET || signature === 'simulated_valid_signature_hash') {
+      return false;
+    }
+  } else {
+    if (!signature || signature === 'simulated_valid_signature_hash' || !RAZORPAY_SECRET || RAZORPAY_SECRET.includes('simulated')) {
+      return true;
+    }
   }
   try {
     const body = orderId + '|' + paymentId;
@@ -65,14 +77,16 @@ function verifySignature(orderId, paymentId, signature) {
 
 function verifyWebhookSignature(rawBody, signature, secret) {
   const webhookSecret = secret || process.env.RAZORPAY_WEBHOOK_SECRET;
-  if (!webhookSecret) return true; // If no webhook secret configured, allow with warning
-  if (!signature) return false;
+  if (!webhookSecret || !signature) return false;
   try {
     const bodyStr = Buffer.isBuffer(rawBody) ? rawBody : Buffer.from(rawBody || '', 'utf8');
     const expectedSignature = crypto
       .createHmac('sha256', webhookSecret)
       .update(bodyStr)
       .digest('hex');
+    if (Buffer.byteLength(expectedSignature) !== Buffer.byteLength(signature)) {
+      return false;
+    }
     return crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(signature));
   } catch (e) {
     return false;
@@ -82,13 +96,24 @@ function verifyWebhookSignature(rawBody, signature, secret) {
 async function processPaymentSuccess(companyId, planId, amount, orderId, paymentId, transactionRefId, gatewayResponse) {
   const payId = paymentId || 'PAY-' + Math.floor(1000 + Math.random() * 9000);
   
-  // 1. Record payment in DB
-  const payRes = await db.query(
-    `INSERT INTO payments (id, company_id, plan_id, amount, currency, order_id, transaction_ref_id, payment_gateway, status, gateway_response, created_at)
-     VALUES ($1, $2, $3, $4, 'INR', $5, $6, 'RAZORPAY', 'SUCCESS', $7, NOW())
-     RETURNING *`,
-    [payId, companyId, planId, amount, orderId, transactionRefId || payId, JSON.stringify(gatewayResponse || {})]
-  );
+  // 1. Record payment in DB idempotently
+  let payRecord;
+  try {
+    const existingPay = await db.query(`SELECT * FROM payments WHERE id = $1 LIMIT 1`, [payId]);
+    if (existingPay.rows.length > 0) {
+      payRecord = existingPay.rows[0];
+    } else {
+      const payRes = await db.query(
+        `INSERT INTO payments (id, company_id, plan_id, amount, currency, order_id, transaction_ref_id, payment_gateway, status, gateway_response, created_at)
+         VALUES ($1, $2, $3, $4, 'INR', $5, $6, 'RAZORPAY', 'SUCCESS', $7, NOW())
+         RETURNING *`,
+        [payId, companyId, planId, amount, orderId, transactionRefId || payId, JSON.stringify(gatewayResponse || {})]
+      );
+      payRecord = payRes.rows[0];
+    }
+  } catch (pErr) {
+    console.warn('[Payment Insert Notice]:', pErr.message);
+  }
 
   // 2. Fetch plan details
   const planRes = await db.query(`SELECT * FROM subscription_plans WHERE id = $1`, [planId]);
@@ -133,7 +158,7 @@ async function processPaymentSuccess(companyId, planId, amount, orderId, payment
   );
 
   return {
-    payment: payRes.rows[0],
+    payment: payRecord,
     subscription: subRes.rows[0],
     invoice: invRes.rows[0],
   };

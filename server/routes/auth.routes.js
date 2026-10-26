@@ -6,8 +6,41 @@ const db = require('../config/db');
 const { JWT_SECRET, authenticateToken } = require('../middleware/auth');
 const { logAudit } = require('../middleware/auditLogger');
 
+// In-memory rate limiter for authentication: max 10 failed attempts per 5 minutes per IP
+const loginAttempts = new Map();
+
+function checkLoginRateLimit(ip) {
+  const now = Date.now();
+  const windowMs = 5 * 60 * 1000;
+  const maxAttempts = 10;
+
+  const record = loginAttempts.get(ip);
+  if (!record || (now - record.firstAttempt) > windowMs) {
+    loginAttempts.set(ip, { count: 1, firstAttempt: now });
+    return true;
+  }
+
+  if (record.count >= maxAttempts) {
+    return false;
+  }
+
+  record.count += 1;
+  return true;
+}
+
+function resetLoginRateLimit(ip) {
+  loginAttempts.delete(ip);
+}
+
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
+    const clientIp = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
+    if (!checkLoginRateLimit(clientIp)) {
+      return res.status(429).json({
+        success: false,
+        message: 'Too many login attempts. Please wait 5 minutes before trying again.'
+      });
+    }
   try {
     const phoneInput = (req.body.phone || req.body.phoneNumber || req.body.mobile || '').trim();
     const driverIdInput = (req.body.driverId || req.body.driver_id || '').trim();
@@ -181,22 +214,31 @@ router.post('/login', async (req, res) => {
 
     // Credential Verification (Password Check)
     const password = (req.body.password || '').trim();
-    const isPortalLogin = Boolean(req.body.portalLogin || password || (role && role.toLowerCase() !== 'driver'));
+    const isPortalLogin = Boolean(req.body.portalLogin || password || (role && role.toLowerCase() !== 'driver') || (user && user.role !== 'DRIVER'));
 
-    if (isPortalLogin && user.role !== 'DRIVER') {
-      if (!password) {
+    if (isPortalLogin || (user && user.role !== 'DRIVER')) {
+      if (user.role !== 'DRIVER' && !password) {
         return res.status(400).json({ success: false, message: 'Password is required to access this portal.' });
       }
 
-      let isPasswordValid = (password === 'password123');
-      if (!isPasswordValid && user.password_hash) {
-        try {
-          isPasswordValid = bcrypt.compareSync(password, user.password_hash);
-        } catch (_) {}
-      }
+      if (password) {
+        let isPasswordValid = false;
+        if (user.password_hash) {
+          try {
+            isPasswordValid = bcrypt.compareSync(password, user.password_hash);
+          } catch (_) {}
+        }
 
-      if (!isPasswordValid) {
-        return res.status(401).json({ success: false, message: 'Invalid password. Please check your credentials and try again.' });
+        // Support seed accounts initialized with default mock hash
+        if (!isPasswordValid && (user.password_hash === '$2a$10$wM3J4sEwN7e8K0eL6f.g2.oT7r1Z1v3z4w5x6y7z8a9b0c1d2e3f4' || !user.password_hash)) {
+          if (password === 'password123') {
+            isPasswordValid = true;
+          }
+        }
+
+        if (!isPasswordValid) {
+          return res.status(401).json({ success: false, message: 'Invalid password. Please check your credentials and try again.' });
+        }
       }
     }
 
@@ -275,6 +317,7 @@ router.post('/login', async (req, res) => {
       driverId: driverId || undefined,
     };
 
+    resetLoginRateLimit(clientIp);
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
 
     // Update last login

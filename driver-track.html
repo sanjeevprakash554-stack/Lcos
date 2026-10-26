@@ -321,7 +321,7 @@
         <label class="form-label" for="selectQuickDriver">🚚 Select Any Fleet Driver (Or enter custom below)</label>
         <select id="selectQuickDriver" class="form-input" style="cursor:pointer; background:rgba(30,41,59,0.9); border-color:#3b82f6;">
           <option value="">-- Choose Any Driver from Fleet --</option>
-          <option value="919884012345|DRV-101">🚚 DRV-101: Selvam R. (919884012345 - Lorry TN-01-AB-1234)</option>
+          <option value="DRV-101">🚚 DRV-101: Selvam R. (Lorry TN-01-AB-1234)</option>
           <option value="919884023456|DRV-102">🚚 DRV-102: Kumaravel P. (919884023456 - Lorry TN-02-GH-3456)</option>
           <option value="919884034567|DRV-103">🚚 DRV-103: Rajesh Nair (919884034567 - Container TN-37-CD-5678)</option>
           <option value="919884045678|DRV-104">🚚 DRV-104: Murugan T. (919884045678 - Lorry TN-23-LM-1122)</option>
@@ -347,9 +347,9 @@
       <div class="form-group">
         <label class="form-label" for="inputPassword" style="display:flex; justify-content:space-between;">
           <span>Password</span>
-          <span style="font-size:0.75rem; color:#60a5fa;">Default: password123</span>
+          
         </label>
-        <input type="password" id="inputPassword" class="form-input" value="password123" placeholder="Enter password" autocomplete="current-password">
+        <input type="password" id="inputPassword" class="form-input" value="" placeholder="Enter password" autocomplete="current-password">
       </div>
       <button type="submit" id="btnLogin" class="btn btn-primary" style="margin-top:4px;">
         <span>📡</span>
@@ -980,7 +980,7 @@
       window.fillDriverAndLogin = function(phone, id) {
         if (el.inputPhone) el.inputPhone.value = phone || '';
         if (el.inputUsername) el.inputUsername.value = id || '';
-        if (el.inputPassword) el.inputPassword.value = 'password123';
+        // Password entered by driver
         if (el.formLogin) {
           el.formLogin.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
         }
@@ -991,7 +991,7 @@
         e.preventDefault();
         const phone = (el.inputPhone ? el.inputPhone.value.trim() : '');
         const username = (el.inputUsername ? el.inputUsername.value.trim() : '');
-        const password = (el.inputPassword ? el.inputPassword.value.trim() : '') || 'password123';
+        const password = (el.inputPassword ? el.inputPassword.value.trim() : '');
         
         if (!username && !phone) {
           showNotice('Please enter your Driver Mobile Phone Number or Driver ID', 'warning');
@@ -1541,7 +1541,7 @@
               const dData = await dRes.json();
               if (dData.drivers && dData.drivers.length > 0 && selectQuickDriver) {
                 selectQuickDriver.innerHTML = '<option value="">-- Choose Any Driver from Fleet (' + dData.drivers.length + ' Drivers) --</option>' +
-                  dData.drivers.map(d => `<option value="${d.phone || ''}|${d.id}">🚚 ${d.id}: ${d.name} (Ph: ${d.phone || 'N/A'} - ${d.vehicle_id || 'Assigned Lorry'})</option>`).join('');
+                  dData.drivers.map(d => `<option value="${d.id}">🚚 ${d.id}: ${d.name} (${d.vehicle_id || 'Assigned Lorry'})</option>`).join('');
               }
               return;
             }

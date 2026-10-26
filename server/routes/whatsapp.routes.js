@@ -4,6 +4,7 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 const db = require('../config/db');
+const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 const whatsappService = require('../services/whatsappService');
 const stoppageDetector = require('../services/stoppageDetector');
 const {
@@ -745,7 +746,7 @@ async function triggerEmergencyAlert(toNumber, driver, trip, messageText, explic
  * GET /api/whatsapp/status
  * Get connection & configuration status
  */
-router.get('/status', async (req, res) => {
+router.get('/status', authenticateToken, async (req, res) => {
   try {
     const config = whatsappService.getConfig();
     const countRes = await db.query(`SELECT COUNT(*) as total FROM whatsapp_logs`);
@@ -777,7 +778,7 @@ router.get('/status', async (req, res) => {
  * POST /api/whatsapp/config
  * Save Meta for Developers WhatsApp Credentials
  */
-router.post('/config', async (req, res) => {
+router.post('/config', authenticateToken, authorizeRoles('SUPER_ADMIN', 'OWNER'), async (req, res) => {
   try {
     const { phoneNumberId, accessToken, businessAccountId, verifyToken, apiVersion, higherOfficialPhone } = req.body;
 
@@ -830,7 +831,7 @@ router.post('/config', async (req, res) => {
  * POST /api/whatsapp/send
  * Send a custom WhatsApp message to any driver or client
  */
-router.post('/send', async (req, res) => {
+router.post('/send', authenticateToken, authorizeRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'TRACKING_TEAM'), async (req, res) => {
   try {
     const { to, type, message, header, buttons } = req.body;
 
@@ -857,7 +858,7 @@ router.post('/send', async (req, res) => {
  * POST /api/whatsapp/notify-trip
  * Notify assigned driver of a specific trip
  */
-router.post('/notify-trip', async (req, res) => {
+router.post('/notify-trip', authenticateToken, authorizeRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'TRACKING_TEAM'), async (req, res) => {
   try {
     const { tripId } = req.body;
     if (!tripId) return res.status(400).json({ success: false, message: 'tripId is required' });
@@ -893,7 +894,7 @@ router.post('/notify-trip', async (req, res) => {
  * POST /api/whatsapp/simulate-incoming
  * Test helper: Simulates an incoming WhatsApp message (great for local sandbox testing!)
  */
-router.post('/simulate-incoming', async (req, res) => {
+router.post('/simulate-incoming', authenticateToken, authorizeRoles('SUPER_ADMIN', 'OWNER'), async (req, res) => {
   try {
     const { from, text, location, buttonId } = req.body;
     const senderNumber = from || '919884012345';
@@ -944,7 +945,7 @@ router.post('/simulate-incoming', async (req, res) => {
  * Test helper: Simulates a vehicle stopped for >20 minutes, creates a system alert,
  * and automatically fires live WhatsApp alerts to both Driver & Higher Official.
  */
-router.post('/test-stoppage-alert', async (req, res) => {
+router.post('/test-stoppage-alert', authenticateToken, authorizeRoles('SUPER_ADMIN', 'OWNER'), async (req, res) => {
   try {
     const { vehicleId, tripId, testPhone, minutes } = req.body || {};
     const stoppageMins = parseInt(minutes, 10) || 25;
@@ -1049,7 +1050,7 @@ router.post('/test-stoppage-alert', async (req, res) => {
  * POST /api/whatsapp/accept-reason
  * Allows Higher Official / Operations Manager to accept driver stoppage reason and clear alert
  */
-router.post('/accept-reason', async (req, res) => {
+router.post('/accept-reason', authenticateToken, authorizeRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'TRACKING_TEAM'), async (req, res) => {
   try {
     const { vehicleId, alertId, tripId, reason } = req.body || {};
     const vehId = vehicleId || 'TN-59-EF-9012';
@@ -1118,7 +1119,7 @@ router.post('/accept-reason', async (req, res) => {
  * POST /api/whatsapp/decline-reason
  * Higher Official rejects/declines the driver's reported stoppage reason
  */
-router.post('/decline-reason', async (req, res) => {
+router.post('/decline-reason', authenticateToken, authorizeRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'TRACKING_TEAM'), async (req, res) => {
   try {
     const { vehicleId, alertId, reason } = req.body || {};
     const vehId = vehicleId || 'TN-59-EF-9012';
@@ -1206,7 +1207,7 @@ router.get('/active-stoppage', async (req, res) => {
  * GET /api/whatsapp/logs
  * Retrieve recent WhatsApp communication logs
  */
-router.get('/logs', async (req, res) => {
+router.get('/logs', authenticateToken, authorizeRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'TRACKING_TEAM'), async (req, res) => {
   try {
     const limit = parseInt(req.query.limit, 10) || 50;
     const result = await db.query(

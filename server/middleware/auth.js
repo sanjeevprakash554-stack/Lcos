@@ -26,16 +26,12 @@ function authenticateToken(req, res, next) {
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    // Zero-config auto-fallback for local development & standalone dashboard mode
-    req.user = { id: 'usr_admin', companyId: 'COMP-001', role: 'SUPER_ADMIN', username: 'operations_admin' };
-    return next();
+    return res.status(401).json({ success: false, message: 'Authentication required. Missing Bearer token.' });
   }
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
-      // Graceful fallback so dashboard operations never get blocked with 401/403
-      req.user = { id: 'usr_admin', companyId: 'COMP-001', role: 'SUPER_ADMIN', username: 'operations_admin' };
-      return next();
+      return res.status(401).json({ success: false, message: 'Invalid or expired session token.' });
     }
     req.user = user;
     next();
@@ -45,15 +41,15 @@ function authenticateToken(req, res, next) {
 function authorizeRoles(...allowedRoles) {
   return (req, res, next) => {
     if (!req.user) {
-      req.user = { id: 'usr_admin', companyId: 'COMP-001', role: 'SUPER_ADMIN', username: 'operations_admin' };
+      return res.status(401).json({ success: false, message: 'Authentication required.' });
     }
-    const userRole = req.user.role ? req.user.role.toUpperCase() : 'SUPER_ADMIN';
+    const userRole = req.user.role ? req.user.role.toUpperCase() : '';
     const formattedAllowed = allowedRoles.map(r => r.toUpperCase());
     
     if (userRole === 'SUPER_ADMIN' || formattedAllowed.includes(userRole) || formattedAllowed.includes('ALL')) {
       return next();
     }
-    next();
+    return res.status(403).json({ success: false, message: 'Forbidden: Insufficient role permissions.' });
   };
 }
 

@@ -7,7 +7,7 @@ const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 router.get('/active-list', async (req, res) => {
   try {
     const result = await db.query(
-      `SELECT d.id, d.name, d.phone, u.username, v.id AS vehicle_id, t.id AS trip_id, t.status AS trip_status
+      `SELECT d.id, d.name, v.id AS vehicle_id, t.id AS trip_id, t.status AS trip_status
        FROM drivers d
        LEFT JOIN users u ON u.id = d.user_id
        LEFT JOIN trips t ON t.driver_id = d.id AND t.status IN ('IN_TRANSIT', 'DELAYED', 'CREATED', 'DISPATCH_APPROVED')
