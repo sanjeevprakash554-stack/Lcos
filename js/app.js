@@ -12,6 +12,15 @@ const app = {
     currentSubscription: null,
 
     async init() {
+        // Ensure desktop & mobile scrolling is fully unlocked on boot
+        try {
+            document.documentElement.style.overflowY = 'auto';
+            document.documentElement.style.height = 'auto';
+            document.body.style.overflowY = 'auto';
+            document.body.style.height = 'auto';
+            document.body.classList.remove('mobile-nav-lock');
+        } catch (_) {}
+
         // 1. Immediately bind all UI click events synchronously
         this.bindEvents();
         this.setupSimulation();
@@ -938,6 +947,9 @@ const app = {
         if (modal) {
             modal.style.display = 'none';
         }
+        document.body.classList.remove('mobile-nav-lock');
+        document.body.style.overflow = '';
+        document.documentElement.style.overflow = '';
         const errorBanner = document.getElementById('portal-login-error');
         if (errorBanner) errorBanner.classList.remove('active');
         const usernameInput = document.getElementById('portal-input-username');
@@ -5629,6 +5641,9 @@ const app = {
         if (inAppModal) inAppModal.remove();
         const gateModal = document.getElementById('sub-gate-modal');
         if (gateModal) gateModal.style.display = 'none';
+        document.body.classList.remove('mobile-nav-lock');
+        document.body.style.overflow = '';
+        document.documentElement.style.overflow = '';
     },
 
     showSubscriptionRequiredModal() {
