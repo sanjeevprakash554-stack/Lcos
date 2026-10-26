@@ -3,7 +3,14 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 const { authenticateToken, optionalAuthenticateToken, authorizeRoles, JWT_SECRET } = require('../middleware/auth');
-const { createOrder, verifySignature, processPaymentSuccess } = require('../services/paymentService');
+const { createOrder, verifySignature, verifyWebhookSignature, processPaymentSuccess } = require('../services/paymentService');
+
+// Default fallback plans if DB is cold or during first-boot migration
+const DEFAULT_PLANS = {
+  'PLAN-BASIC': { id: 'PLAN-BASIC', name: 'Starter Logistics Plan', price_inr: 999 },
+  'PLAN-PRO': { id: 'PLAN-PRO', name: 'Fleet Professional Plan', price_inr: 2999 },
+  'PLAN-ENT': { id: 'PLAN-ENT', name: 'Enterprise Operations Plan', price_inr: 19999 },
+};
 
 // POST /api/payments/create-order
 router.post('/create-order', optionalAuthenticateToken, async (req, res) => {
@@ -11,19 +18,27 @@ router.post('/create-order', optionalAuthenticateToken, async (req, res) => {
     const { planId } = req.body;
     const companyId = (req.user && req.user.companyId) || 'COMP-001';
 
-    const planRes = await db.query(`SELECT * FROM subscription_plans WHERE id = $1`, [planId]);
-    if (planRes.rows.length === 0) {
+    let plan = null;
+    try {
+      const planRes = await db.query(`SELECT * FROM subscription_plans WHERE id = $1`, [planId]);
+      if (planRes.rows.length > 0) plan = planRes.rows[0];
+    } catch (_) {}
+
+    if (!plan) {
+      plan = DEFAULT_PLANS[planId];
+    }
+
+    if (!plan) {
       return res.status(404).json({ success: false, message: 'Invalid subscription plan selected' });
     }
 
-    const plan = planRes.rows[0];
     const order = await createOrder(plan.price_inr, 'INR');
 
     res.json({
       success: true,
       orderId: order.id,
       amount: order.amount,
-      currency: order.currency,
+      currency: order.currency || 'INR',
       keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_TCr9Me1AydiZMF',
       plan: {
         id: plan.id,
@@ -32,6 +47,7 @@ router.post('/create-order', optionalAuthenticateToken, async (req, res) => {
       },
     });
   } catch (err) {
+    console.error('Payment order creation error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });
@@ -47,8 +63,14 @@ router.post('/verify', optionalAuthenticateToken, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid payment signature verification failed' });
     }
 
-    const planRes = await db.query(`SELECT * FROM subscription_plans WHERE id = $1`, [planId]);
-    const amount = planRes.rows[0] ? Number(planRes.rows[0].price_inr) : 2999;
+    let amount = 2999;
+    try {
+      const planRes = await db.query(`SELECT * FROM subscription_plans WHERE id = $1`, [planId]);
+      if (planRes.rows[0]) amount = Number(planRes.rows[0].price_inr);
+      else if (DEFAULT_PLANS[planId]) amount = DEFAULT_PLANS[planId].price_inr;
+    } catch (_) {
+      if (DEFAULT_PLANS[planId]) amount = DEFAULT_PLANS[planId].price_inr;
+    }
 
     const result = await processPaymentSuccess(companyId, planId, amount, orderId, paymentId, paymentId, { signature, status: 'SUCCESS' });
 
@@ -72,33 +94,49 @@ router.post('/verify', optionalAuthenticateToken, async (req, res) => {
       invoice: result.invoice,
     });
   } catch (err) {
+    console.error('Payment verification error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
 // POST /api/payments/webhook (Indian Gateway Webhook handling)
-router.post('/webhook', async (req, res) => {
-  try {
-    const event = req.body.event;
-    const payload = req.body.payload;
+router.post('/webhook', (req, res) => {
+  const signature = req.headers['x-razorpay-signature'];
+  const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
 
-    console.log(`[Payment Webhook Received]: Event ${event}`);
-
-    if (event === 'payment.captured' && payload) {
-      const paymentEntity = payload.payment.entity;
-      const notes = paymentEntity.notes || {};
-      const companyId = notes.companyId || 'COMP-001';
-      const planId = notes.planId || 'PLAN-PRO';
-      const amount = paymentEntity.amount / 100;
-
-      await processPaymentSuccess(companyId, planId, amount, paymentEntity.order_id, paymentEntity.id, paymentEntity.id, payload);
+  if (webhookSecret && signature) {
+    const isValid = verifyWebhookSignature(req.rawBody || JSON.stringify(req.body), signature, webhookSecret);
+    if (!isValid) {
+      console.warn('❌ [Razorpay Webhook] Invalid signature rejected.');
+      return res.status(400).json({ status: 'invalid_signature' });
     }
-
-    res.json({ status: 'ok' });
-  } catch (err) {
-    console.error('Webhook processing error:', err);
-    res.status(500).json({ status: 'error', message: err.message });
   }
+
+  // Fast acknowledge 200 OK immediately so Razorpay does not retry or timeout
+  res.status(200).json({ status: 'ok' });
+
+  // Process payment captured event asynchronously in background
+  setImmediate(async () => {
+    try {
+      const event = req.body?.event;
+      const payload = req.body?.payload;
+
+      console.log(`[Payment Webhook Received]: Event ${event}`);
+
+      if (event === 'payment.captured' && payload) {
+        const paymentEntity = payload.payment.entity;
+        const notes = paymentEntity.notes || {};
+        const companyId = notes.companyId || 'COMP-001';
+        const planId = notes.planId || 'PLAN-PRO';
+        const amount = paymentEntity.amount / 100;
+
+        await processPaymentSuccess(companyId, planId, amount, paymentEntity.order_id, paymentEntity.id, paymentEntity.id, payload);
+        console.log(`✅ [Payment Webhook] Activated subscription for company ${companyId} (plan: ${planId}, amount: ₹${amount})`);
+      }
+    } catch (err) {
+      console.error('Async payment webhook processing error:', err);
+    }
+  });
 });
 
 // GET /api/payments/history

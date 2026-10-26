@@ -19,11 +19,11 @@ class WhatsAppService {
   }
 
   getConfig() {
-    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || '1246879781843655';
-    const accessToken = process.env.WHATSAPP_ACCESS_TOKEN || 'EAAQeAI63VoYBSw60w5C4LZBBg4AXIipaVBK8MZA8c9uFZBoPqXf426GgnMwbp9JcvXQaCBFvmhItuWcO2NFAJ7azzZAIe9jzrNXHXhuA2UNPZCoxykaSjruteZCxYyLvkZCiwnAgAwxuMWLF5u9xEAulduVqTMfQOL857HnURSJgYXI9KiDuun0y7vKhkgjGqFbWwZDZD';
-    const businessAccountId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '2546380309167877';
+    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
+    const accessToken = process.env.WHATSAPP_ACCESS_TOKEN || '';
+    const businessAccountId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '';
     const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN || 'lcos_meta_verify_token_2026';
-    const higherOfficialPhone = process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
+    const higherOfficialPhone = process.env.HIGHER_OFFICIAL_PHONE || '';
 
     return {
       apiVersion: process.env.WHATSAPP_API_VERSION || 'v21.0',

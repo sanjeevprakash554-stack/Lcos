@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const express = require('express');
 const router = express.Router();
 const fs = require('fs');
@@ -53,46 +54,64 @@ router.get('/webhook', (req, res) => {
  * 2. META INCOMING WEBHOOK HANDLER (POST /api/whatsapp/webhook)
  * Receives messages, status updates, and location pins from WhatsApp users.
  */
-router.post('/webhook', async (req, res) => {
-  // Always acknowledge webhook immediately with 200 OK as required by Meta
+router.post('/webhook', (req, res) => {
+  // 1. Verify Meta Hub Signature if App Secret is configured
+  const appSecret = process.env.WHATSAPP_APP_SECRET || process.env.META_APP_SECRET;
+  const signature = req.headers['x-hub-signature-256'];
+  if (appSecret && signature && req.rawBody) {
+    try {
+      const expected = 'sha256=' + crypto.createHmac('sha256', appSecret).update(req.rawBody).digest('hex');
+      if (!crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature))) {
+        console.warn('❌ [WhatsApp Webhook] Invalid Meta Hub signature rejected.');
+        return res.sendStatus(401);
+      }
+    } catch (sigErr) {
+      console.warn('Signature verification warning:', sigErr.message);
+    }
+  }
+
+  // 2. Always acknowledge webhook immediately with 200 OK as required by Meta within 15s
   res.status(200).json({ status: 'EVENT_RECEIVED' });
 
-  try {
-    const body = req.body;
-    if (body.object !== 'whatsapp_business_account') return;
+  // 3. Process payload asynchronously in background
+  setImmediate(async () => {
+    try {
+      const body = req.body;
+      if (body.object !== 'whatsapp_business_account') return;
 
-    for (const entry of body.entry || []) {
-      for (const change of entry.changes || []) {
-        const value = change.value;
-        if (!value) continue;
+      for (const entry of body.entry || []) {
+        for (const change of entry.changes || []) {
+          const value = change.value;
+          if (!value) continue;
 
-        // Process Incoming Messages
-        const messages = value.messages;
-        if (messages && messages.length > 0) {
-          for (const msg of messages) {
-            await handleIncomingMessage(msg, value.contacts?.[0] || null);
+          // Process Incoming Messages
+          const messages = value.messages;
+          if (messages && messages.length > 0) {
+            for (const msg of messages) {
+              await handleIncomingMessage(msg, value.contacts?.[0] || null);
+            }
           }
-        }
 
-        // Process Message Status Receipts (SENT, DELIVERED, READ, FAILED)
-        const statuses = value.statuses;
-        if (statuses && statuses.length > 0) {
-          for (const st of statuses) {
-            try {
-              await db.query(
-                `UPDATE whatsapp_logs SET status = $1 WHERE meta_message_id = $2`,
-                [st.status.toUpperCase(), st.id]
-              );
-            } catch (err) {
-              // Non-blocking status receipt update
+          // Process Message Status Receipts (SENT, DELIVERED, READ, FAILED)
+          const statuses = value.statuses;
+          if (statuses && statuses.length > 0) {
+            for (const st of statuses) {
+              try {
+                await db.query(
+                  `UPDATE whatsapp_logs SET status = $1 WHERE meta_message_id = $2`,
+                  [st.status.toUpperCase(), st.id]
+                );
+              } catch (err) {
+                // Non-blocking status receipt update
+              }
             }
           }
         }
       }
+    } catch (err) {
+      console.error('❌ [WhatsApp Webhook Processing Error]:', err);
     }
-  } catch (err) {
-    console.error('❌ [WhatsApp Webhook Processing Error]:', err);
-  }
+  });
 });
 
 /**

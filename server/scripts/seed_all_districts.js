@@ -104,9 +104,13 @@ async function seedAllDistricts() {
   console.log(`📍 Total Branches in Database: ${finalCheck.rows[0].total}`);
 }
 
-seedAllDistricts()
-  .then(() => process.exit(0))
-  .catch(err => {
-    console.error('Fatal error:', err);
-    process.exit(1);
-  });
+if (require.main === module) {
+  seedAllDistricts()
+    .then(() => process.exit(0))
+    .catch(err => {
+      console.error('Fatal error:', err);
+      process.exit(1);
+    });
+}
+
+module.exports = { seedAllDistricts, ALL_TAMIL_NADU_DISTRICTS };

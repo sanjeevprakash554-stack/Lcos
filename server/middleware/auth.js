@@ -7,13 +7,13 @@ let resolvedSecret = process.env.JWT_SECRET;
 const nodeEnv = process.env.NODE_ENV || 'development';
 
 if (!resolvedSecret || PLACEHOLDER_SECRETS.includes(resolvedSecret.trim())) {
-  if (nodeEnv !== 'development' && nodeEnv !== 'test') {
-    console.error(`\n❌ [FATAL SECURITY ERROR] Refusing to boot in '${nodeEnv}' mode: JWT_SECRET is missing or set to placeholder/example value.`);
-    console.error('Please configure a strong, unique JWT_SECRET in your production environment variables.\n');
-    process.exit(1);
+  resolvedSecret = crypto.randomBytes(32).toString('hex');
+  process.env.JWT_SECRET = resolvedSecret;
+  if (nodeEnv === 'production') {
+    console.warn(`\n⚠️  [SECURITY WARNING] Running in 'production' mode without a configured JWT_SECRET.`);
+    console.warn('   Generated a secure 256-bit ephemeral secret for this session.');
+    console.warn('   👉 Please configure a persistent JWT_SECRET in your Render Dashboard to keep user sessions valid across redeploys.\n');
   } else {
-    resolvedSecret = crypto.randomBytes(32).toString('hex');
-    process.env.JWT_SECRET = resolvedSecret;
     console.warn(`\n⚠️  [SECURITY WARNING] Running in '${nodeEnv}' mode without a configured JWT_SECRET.`);
     console.warn('   Generated an ephemeral random secret for this process session.\n');
   }

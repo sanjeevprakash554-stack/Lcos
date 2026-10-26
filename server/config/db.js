@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const { Pool } = require('pg');
 const embeddedDb = require('./embeddedDb');
 
@@ -74,6 +76,54 @@ const db = {
 // Export early to avoid circular dependency with migrations.js
 module.exports = db;
 
+// Auto-seed and initialize tables on PostgreSQL if brand new database
+async function autoInitPostgres(client) {
+  try {
+    const checkRes = await client.query(`
+      SELECT to_regclass('public.users') as users_table,
+             to_regclass('public.subscription_plans') as plans_table
+    `);
+
+    const hasUsers = Boolean(checkRes.rows[0]?.users_table);
+    const hasPlans = Boolean(checkRes.rows[0]?.plans_table);
+
+    if (!hasUsers || !hasPlans) {
+      console.log('⚡ [PostgreSQL Auto-Init] First-time setup detected. Initializing tables & seed data...');
+      const schemaPath = path.join(__dirname, '../db/schema.sql');
+      const seedPath = path.join(__dirname, '../db/seed.sql');
+
+      if (fs.existsSync(schemaPath)) {
+        const schemaSql = fs.readFileSync(schemaPath, 'utf8');
+        await client.query(schemaSql);
+        console.log('✅ [PostgreSQL Schema] Successfully created tables and foreign keys.');
+      }
+
+      if (fs.existsSync(seedPath)) {
+        const seedSql = fs.readFileSync(seedPath, 'utf8');
+        await client.query(seedSql);
+        console.log('✅ [PostgreSQL Seed] Successfully seeded default company, users, branches, commodities.');
+      }
+
+      // Seed 38 Tamil Nadu districts and driver assignments
+      try {
+        const { seedAllDistricts } = require('../scripts/seed_all_districts');
+        if (typeof seedAllDistricts === 'function') await seedAllDistricts();
+      } catch (dErr) {
+        console.warn('Note on districts seeding:', dErr.message);
+      }
+
+      try {
+        const { seedAllDriversTrips } = require('../scripts/seed_drivers_trips');
+        if (typeof seedAllDriversTrips === 'function') await seedAllDriversTrips();
+      } catch (tErr) {
+        console.warn('Note on driver trips seeding:', tErr.message);
+      }
+    }
+  } catch (initErr) {
+    console.error('⚠️ [PostgreSQL Auto-Init Notice]:', initErr.message);
+  }
+}
+
 // Auto-detect PostgreSQL availability on boot
 (async () => {
   if (useEmbedded) {
@@ -94,12 +144,14 @@ module.exports = db;
 
   try {
     const client = await pool.connect();
-    client.release();
     pgConnected = true;
-    console.log('✅ [Database] PostgreSQL connected successfully on port ' + (process.env.DB_PORT || 5434));
+    console.log('✅ [Database] PostgreSQL connected successfully.');
+
+    // Auto-initialize schema & seed data if PostgreSQL database is empty
+    await autoInitPostgres(client);
 
     // Ensure WhatsApp communication logs table exists in PostgreSQL
-    await pool.query(`
+    await client.query(`
       CREATE TABLE IF NOT EXISTS whatsapp_logs (
         id VARCHAR(50) PRIMARY KEY,
         company_id VARCHAR(50) REFERENCES companies(id) ON DELETE SET NULL,
@@ -114,10 +166,12 @@ module.exports = db;
       );
       CREATE INDEX IF NOT EXISTS idx_whatsapp_logs_time ON whatsapp_logs(created_at DESC);
     `);
+
+    client.release();
   } catch (err) {
     useEmbedded = true;
     console.log('========================================================================');
-    console.log('💡 [Database Notice] External PostgreSQL is not running or not found.');
+    console.log('💡 [Database Notice] External PostgreSQL is not running or not found: ' + err.message);
     console.log('⚡ [Auto-Fallback] Activated Built-in Zero-Config Embedded Database!');
     console.log('📦 Embedded SQLite file: ' + embeddedDb.getDbFilePath());
     console.log('✨ All tables, trips, vehicles, drivers & stock are ready with zero setup!');

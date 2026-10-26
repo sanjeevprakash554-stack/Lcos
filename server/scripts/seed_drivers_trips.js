@@ -1,6 +1,6 @@
 const db = require('../config/db');
 
-async function seedAll() {
+async function seedAllDriversTrips() {
   console.log('Seeding trips and vehicle assignments for all registered drivers...');
 
   const vehicles = [
@@ -58,16 +58,21 @@ async function seedAll() {
   for (const t of trips) {
     await db.query(`
       INSERT INTO trips (id, company_id, dispatch_id, commodity_id, quantity, source_branch_id, destination_branch_id, vehicle_id, driver_id, status, checklists, transit_updates, created_at, updated_at)
-      VALUES ($1, 'COMP-001', $2, $3, $4, $5, $6, $7, $8, 'IN_TRANSIT', '{}', '[]', datetime('now'), datetime('now'))
+      VALUES ($1, 'COMP-001', $2, $3, $4, $5, $6, $7, $8, 'IN_TRANSIT', '{}', '[]', NOW(), NOW())
       ON CONFLICT (id) DO UPDATE SET vehicle_id = EXCLUDED.vehicle_id, driver_id = EXCLUDED.driver_id, status = 'IN_TRANSIT', source_branch_id = EXCLUDED.source_branch_id, destination_branch_id = EXCLUDED.destination_branch_id
     `, [t.id, t.disp, t.com, t.qty, t.src, t.dest, t.veh, t.drv]);
   }
 
   console.log('✅ Successfully assigned all drivers to their distinct vehicles, trips, and routes!');
-  process.exit(0);
 }
 
-seedAll().catch(err => {
-  console.error('Seed error:', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  seedAllDriversTrips()
+    .then(() => process.exit(0))
+    .catch(err => {
+      console.error('Seed error:', err);
+      process.exit(1);
+    });
+}
+
+module.exports = { seedAllDriversTrips };

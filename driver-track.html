@@ -1533,17 +1533,24 @@
           if (el.bannerInstallApp) el.bannerInstallApp.classList.add('banner-hidden');
         }
 
-        // Dynamically load active fleet drivers for 1-click selection
-        try {
-          const dRes = await fetch('/api/drivers/active-list');
-          if (dRes.ok) {
-            const dData = await dRes.json();
-            if (dData.drivers && dData.drivers.length > 0 && selectQuickDriver) {
-              selectQuickDriver.innerHTML = '<option value="">-- Choose Any Driver from Fleet (' + dData.drivers.length + ' Drivers) --</option>' +
-                dData.drivers.map(d => `<option value="${d.phone || ''}|${d.id}">🚚 ${d.id}: ${d.name} (Ph: ${d.phone || 'N/A'} - ${d.vehicle_id || 'Assigned Lorry'})</option>`).join('');
+        // Dynamically load active fleet drivers for 1-click selection (with auto-retry on cold-start)
+        async function loadDriverList(retries = 4) {
+          try {
+            const dRes = await fetch('/api/drivers/active-list');
+            if (dRes.ok) {
+              const dData = await dRes.json();
+              if (dData.drivers && dData.drivers.length > 0 && selectQuickDriver) {
+                selectQuickDriver.innerHTML = '<option value="">-- Choose Any Driver from Fleet (' + dData.drivers.length + ' Drivers) --</option>' +
+                  dData.drivers.map(d => `<option value="${d.phone || ''}|${d.id}">🚚 ${d.id}: ${d.name} (Ph: ${d.phone || 'N/A'} - ${d.vehicle_id || 'Assigned Lorry'})</option>`).join('');
+              }
+              return;
             }
+          } catch (_) {}
+          if (retries > 0) {
+            setTimeout(() => loadDriverList(retries - 1), 3000);
           }
-        } catch (_) {}
+        }
+        loadDriverList();
 
         if (state.token) {
           el.sectionLogin.classList.add('banner-hidden');

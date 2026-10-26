@@ -2,9 +2,67 @@
  * Logistics Operations Control System (LCOS) - API Client Module
  * Connects the existing frontend components to the Node.js / Express / PostgreSQL Backend API.
  */
-const API_BASE_URL = (typeof window !== 'undefined' && window.location)
-  ? (window.location.protocol === 'file:' ? 'http://localhost:5000/api' : '/api')
-  : 'http://localhost:5000/api';
+const API_BASE_URL = (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin !== 'null')
+  ? `${window.location.origin}/api`
+  : '/api';
+
+// Render Cold-Start UI Banner Helper
+function showColdStartBanner(msg = 'Server is waking up (Render free-tier cold start takes ~30s). Please hold on...') {
+  if (typeof document === 'undefined') return;
+  let banner = document.getElementById('render-cold-start-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'render-cold-start-banner';
+    banner.style.cssText = `
+      position: fixed;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.94);
+      backdrop-filter: blur(8px);
+      border: 1px solid #0284c7;
+      color: #38bdf8;
+      padding: 10px 18px;
+      border-radius: 9999px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 999999;
+      box-shadow: 0 10px 25px -5px rgba(2, 132, 199, 0.35);
+      animation: fadeInDown 0.3s ease;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    `;
+    banner.innerHTML = `
+      <span class="render-spin-loader" style="display:inline-block; width:14px; height:14px; border:2px solid #38bdf8; border-top-color:transparent; border-radius:50%; animation: spin 1s linear infinite;"></span>
+      <span id="render-cold-start-text">${msg}</span>
+    `;
+    document.body.appendChild(banner);
+  } else {
+    const textEl = document.getElementById('render-cold-start-text');
+    if (textEl) textEl.textContent = msg;
+    banner.style.display = 'flex';
+  }
+}
+
+function hideColdStartBanner() {
+  if (typeof document === 'undefined') return;
+  const banner = document.getElementById('render-cold-start-banner');
+  if (banner) {
+    banner.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+    banner.style.opacity = '0';
+    banner.style.transform = 'translateX(-50%) translateY(-10px)';
+    setTimeout(() => banner.remove(), 400);
+  }
+}
+
+// Background initial ping to warm up backend on initial page hit
+if (typeof window !== 'undefined') {
+  fetch('/health', { method: 'GET' })
+    .then(r => r.ok && console.log('💚 [LCOS] Server is awake and healthy'))
+    .catch(() => console.log('⏳ [LCOS] Server spinning up...'));
+}
 
 class LCOS_API {
   static getToken() {

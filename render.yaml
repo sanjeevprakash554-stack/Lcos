@@ -1,20 +1,26 @@
 services:
   - type: web
-    name: lcos-operations-system
+    name: lcos
     runtime: node
     plan: free
     region: singapore
     buildCommand: npm install
     startCommand: npm start
-    healthCheckPath: /api/health
+    healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
         value: 22.14.0
       - key: NODE_ENV
         value: production
-      - key: USE_EMBEDDED_DB
-        value: "true"
+      - key: PORT
+        value: 3000
       - key: JWT_SECRET
         generateValue: true
+      - key: USE_EMBEDDED_DB
+        value: "true"
+      - key: ENABLE_KEEP_ALIVE
+        value: "true"
+      - key: WHATSAPP_VERIFY_TOKEN
+        value: lcos_meta_verify_token_2026
       - key: WHATSAPP_ENABLED
-        value: "false"
+        value: "true"

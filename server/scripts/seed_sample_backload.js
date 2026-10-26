@@ -36,9 +36,13 @@ async function seedSampleBackloads() {
   console.log(' - Coimbatore: Lorry TN-59-EF-9012 (Saravanan K.) + 220 Bags Sugar -> Chennai');
 }
 
-seedSampleBackloads()
-  .then(() => process.exit(0))
-  .catch(err => {
-    console.error('Error seeding backloads:', err);
-    process.exit(1);
-  });
+if (require.main === module) {
+  seedSampleBackloads()
+    .then(() => process.exit(0))
+    .catch(err => {
+      console.error('Error seeding backloads:', err);
+      process.exit(1);
+    });
+}
+
+module.exports = { seedSampleBackloads };
