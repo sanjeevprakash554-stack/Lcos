@@ -4010,22 +4010,11 @@ const app = {
                     zoomControl: true,
                     minZoom: 6,
                     maxZoom: 18,
-                    scrollWheelZoom: false
+                    scrollWheelZoom: true,
+                    wheelDebounceTime: 40,
+                    wheelPxPerZoomLevel: 60
                 });
                 window.leafletMap = this.leafletMap;
-
-                // Re-enable mouse wheel zoom when user clicks to interact with the map,
-                // and restore smooth page/dashboard scrolling when mouse leaves map bounds
-                mapEl.addEventListener('click', () => {
-                    if (this.leafletMap && this.leafletMap.scrollWheelZoom) {
-                        this.leafletMap.scrollWheelZoom.enable();
-                    }
-                });
-                mapEl.addEventListener('mouseleave', () => {
-                    if (this.leafletMap && this.leafletMap.scrollWheelZoom) {
-                        this.leafletMap.scrollWheelZoom.disable();
-                    }
-                });
 
                 // 1. Detailed Tamil Nadu District & Highway Map View (OpenStreetMap - 100% Free)
                 const districtMapLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -4055,8 +4044,9 @@ const app = {
                 // Default view: Entire Tamil Nadu regional structure bounds
                 this.leafletMap.fitBounds([[8.05, 76.2], [13.55, 80.35]], { padding: [20, 20] });
             } else {
-                // When already created, default to full Tamil Nadu overview
-                this.leafletMap.fitBounds([[8.05, 76.2], [13.55, 80.35]], { padding: [20, 20] });
+                if (this.leafletMap && this.leafletMap.scrollWheelZoom && !this.leafletMap.scrollWheelZoom.enabled()) {
+                    this.leafletMap.scrollWheelZoom.enable();
+                }
             }
 
             // Invalidate size to ensure Leaflet recalculates full expanded container bounds
