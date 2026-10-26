@@ -121,10 +121,28 @@ async function runMigrations() {
       // Index might already exist
     }
 
-    // 9. Ensure default initial test trip TRIP-1001 is IN_TRANSIT for mobile tracking demo
+    // 9. Purge legacy dummy operational records (trips, alerts, call logs, gps tracking crumbs, dummy stock)
     try {
-      await db.query("UPDATE trips SET status = 'IN_TRANSIT' WHERE id = 'TRIP-1001' AND status = 'CREATED'");
-    } catch (_) {}
+      const dummyTrips = await db.query("SELECT COUNT(*) AS c FROM trips WHERE id LIKE 'TRIP-%'");
+      const tripCount = Number(dummyTrips.rows[0]?.c || 0);
+      if (tripCount > 0) {
+        console.log(`[Migration] Purging ${tripCount} dummy trips and related operational records...`);
+        await db.query("DELETE FROM call_logs WHERE trip_id LIKE 'TRIP-%'");
+        await db.query("DELETE FROM alerts WHERE trip_id LIKE 'TRIP-%' OR id LIKE 'ALT-%'");
+        await db.query("DELETE FROM gps_tracking_records WHERE trip_id LIKE 'TRIP-%'");
+        await db.query("DELETE FROM trips WHERE id LIKE 'TRIP-%'");
+        await db.query("DELETE FROM stock");
+        await db.query("DELETE FROM manager_requests");
+        await db.query("DELETE FROM invoices WHERE id = 'INV-1001'");
+        await db.query("DELETE FROM payments WHERE id = 'PAY-1001'");
+        await db.query("UPDATE vehicles SET status = 'Available', movement_status = 'STOPPED', speed_kmh = 0");
+        await db.query("UPDATE drivers SET status = 'Available'");
+        await db.query("UPDATE helpers SET status = 'Available'");
+        console.log('✅ [Migration] Dummy operational records successfully purged.');
+      }
+    } catch (purgeErr) {
+      console.warn('[Migration Purge Notice]:', purgeErr.message);
+    }
 
     // 10. Ensure multiple driver accounts exist for concurrent mobile tracking testing
     const extraDrivers = [
@@ -146,9 +164,7 @@ async function runMigrations() {
       } catch (_) {}
     }
 
-    try {
-      await db.query("UPDATE trips SET status = 'IN_TRANSIT' WHERE id IN ('TRIP-1001', 'TRIP-1002', 'TRIP-1005', 'TRIP-1006', 'TRIP-1012')");
-    } catch (_) {}
+    // Legacy test trip overrides removed
 
     // Ensure every single driver in drivers table has a linked user account for mobile login
     try {
