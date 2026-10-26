@@ -11,10 +11,92 @@ const app = {
     isSubscriptionActive: false,
     currentSubscription: null,
 
+    parseJwt(token) {
+        try {
+            const parts = String(token || '').split('.');
+            if (parts.length !== 3) return null;
+            const base64Url = parts[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            return JSON.parse(jsonPayload);
+        } catch (_) {
+            return null;
+        }
+    },
+
+    async restoreSession() {
+        const token = window.LCOS_API ? LCOS_API.getToken() : (localStorage.getItem('LCOS_JWT_TOKEN') || '');
+        if (!token) return false;
+
+        try {
+            const payload = this.parseJwt(token);
+            if (!payload) return false;
+
+            // Check if JWT has expired
+            if (payload.exp && payload.exp * 1000 <= Date.now()) {
+                console.warn('[Session] Stored JWT expired, clearing...');
+                if (window.LCOS_API) LCOS_API.setToken('');
+                try {
+                    localStorage.removeItem('LCOS_JWT_TOKEN');
+                    localStorage.removeItem('LCOS_ACTIVE_ROLE');
+                    sessionStorage.removeItem('LCOS_ACTIVE_TAB');
+                } catch (_) {}
+                return false;
+            }
+
+            const loginPage = document.getElementById('login-page');
+            const appContainer = document.getElementById('app-container');
+
+            if (loginPage) {
+                loginPage.style.display = 'none';
+                loginPage.style.opacity = '0';
+            }
+            if (appContainer) {
+                appContainer.style.display = 'flex';
+                appContainer.style.opacity = '1';
+            }
+            document.body.classList.add('dashboard-active');
+
+            const role = (payload.role ? payload.role.toLowerCase() : (localStorage.getItem('LCOS_ACTIVE_ROLE') || 'tracking_team')).replace(/[\s_-]+/g, '_');
+            if (window.LCOS_State) {
+                LCOS_State.setCurrentRole(role);
+                await LCOS_State.loadFromBackend();
+            }
+
+            this.initSocketTelemetryListener();
+
+            // Set role subtitle in sidebar
+            const subTitle = document.getElementById('sidebar-role-subtitle');
+            if (subTitle) {
+                const normRole = (payload.role || '').toUpperCase();
+                subTitle.textContent = normRole === 'OWNER' ? 'Executive Owner' : normRole === 'BRANCH_MANAGER' ? 'Branch Manager' : 'Tracking Team';
+            }
+
+            // Restore active tab (default to dashboard)
+            const savedTab = sessionStorage.getItem('LCOS_ACTIVE_TAB') || 'dashboard';
+            this.switchTab(savedTab);
+            this.renderMap();
+            this.renderAll();
+
+            // Recalculate Leaflet size so map is immediately sharp
+            [50, 150, 300, 600, 1000].forEach(delay => {
+                setTimeout(() => {
+                    if (this.leafletMap) this.leafletMap.invalidateSize();
+                }, delay);
+            });
+
+            console.log(`✅ [Session] Restored active session for ${payload.username || 'user'} (${role})`);
+            return true;
+        } catch (err) {
+            console.warn('[Session Restore Notice]:', err.message);
+            return false;
+        }
+    },
     async init() {
         // Ensure desktop & mobile scrolling is fully unlocked on boot
         try {
-            document.body.classList.remove('dashboard-active');
             document.documentElement.style.overflowY = 'auto';
             document.documentElement.style.height = 'auto';
             document.body.style.overflowY = 'auto';
@@ -25,7 +107,6 @@ const app = {
         // 1. Immediately bind all UI click events synchronously
         this.bindEvents();
         this.setupSimulation();
-        this.initSocketTelemetryListener();
         this.startStalenessWatcher();
 
         // 2. Initialize landing subscription status
@@ -35,13 +116,29 @@ const app = {
             console.warn('Subscription init warning:', err);
         }
 
-        // 3. Load backend state in background
-        try {
-            if (window.LCOS_State) {
-                await LCOS_State.init();
+        // 3. Attempt to restore existing logged-in session (keeps user logged in on page refresh)
+        const sessionRestored = await this.restoreSession();
+
+        if (!sessionRestored) {
+            // User is not logged in: ensure login-page is visible and app-container hidden
+            document.body.classList.remove('dashboard-active');
+            const loginPage = document.getElementById('login-page');
+            const appContainer = document.getElementById('app-container');
+            if (loginPage) {
+                loginPage.style.display = 'block';
+                loginPage.style.opacity = '1';
+                loginPage.style.transform = 'scale(1)';
             }
-        } catch (e) {
-            console.warn('Init auth fallback:', e.message);
+            if (appContainer) appContainer.style.display = 'none';
+
+            // Load baseline state
+            try {
+                if (window.LCOS_State) {
+                    await LCOS_State.init();
+                }
+            } catch (e) {
+                console.warn('Init auth fallback:', e.message);
+            }
         }
         this.showToast('LCOS Central Operations Portal Initialized.', 'info');
     },
@@ -757,6 +854,7 @@ const app = {
 
         document.getElementById(`tab-${tabId}`).classList.add('active');
         this.activeTab = tabId;
+        try { sessionStorage.setItem('LCOS_ACTIVE_TAB', tabId); } catch (_) {}
 
         // Reset scroll position to top of main workspace on tab change
         const mainEl = document.querySelector('main.main-content');
@@ -1111,6 +1209,13 @@ const app = {
             try { this.socket.disconnect(); } catch (e) {}
             this.socket = null;
         }
+        if (window.LCOS_API) LCOS_API.setToken('');
+        try {
+            localStorage.removeItem('LCOS_JWT_TOKEN');
+            localStorage.removeItem('LCOS_ACTIVE_ROLE');
+            sessionStorage.removeItem('LCOS_ACTIVE_TAB');
+        } catch (_) {}
+
         const loginPage = document.getElementById('login-page');
         const appContainer = document.getElementById('app-container');
         
@@ -4993,24 +5098,19 @@ const app = {
                     }
                 }
 
-                // 3. Pan or fly to vehicle so live telemetry is immediately in view
-                if (this.leafletMap) {
-                    if (this.activeSelectedVehicleId === data.vehicleId) {
-                        this.leafletMap.panTo([data.lat, data.lng]);
-                    } else if (!this._lastAutoFocusedVeh || this._lastAutoFocusedVeh === data.vehicleId) {
-                        this._lastAutoFocusedVeh = data.vehicleId;
-                        this.leafletMap.flyTo([data.lat, data.lng], 14, { duration: 1.2 });
-                        const entry = this.vehicleMarkerRegistry.get(data.vehicleId);
-                        if (entry && entry.marker) {
-                            setTimeout(() => entry.marker.openPopup(), 600);
-                        }
-                    }
+                // 3. Smooth camera tracking ONLY if this vehicle is explicitly selected in the dropdown
+                const selectedVehTripId = document.getElementById('map-filter-vehicle')?.value;
+                if (this.leafletMap && (this.activeSelectedVehicleId === data.vehicleId || (selectedVehTripId && selectedVehTripId === data.tripId))) {
+                    this.leafletMap.panTo([data.lat, data.lng], { animate: false });
                 }
 
-                // 4. Update Running Trucks filter count if newly active
+                // 4. Update filter dropdown option WITHOUT clearing map layers or resetting map bounds
                 const vehSelect = document.getElementById('map-filter-vehicle');
                 if (vehSelect && data.tripId && !Array.from(vehSelect.options).some(opt => opt.value === data.tripId)) {
-                    this.updateMapReport();
+                    const opt = document.createElement('option');
+                    opt.value = data.tripId;
+                    opt.textContent = `${data.vehicleId} (In Transit 🟢 Live)`;
+                    vehSelect.appendChild(opt);
                 }
             });
 
