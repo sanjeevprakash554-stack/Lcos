@@ -487,16 +487,25 @@
       'use strict';
 
       // ==========================================
+      
+      function calculateBearing(lat1, lon1, lat2, lon2) {
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const y = Math.sin(dLon) * Math.cos(lat2 * Math.PI / 180);
+        const x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
+                  Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos(dLon);
+        return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+      }
+
       // STATE & CONFIGURATION
       // ==========================================
       const CONFIG = {
         STORAGE_KEY: 'LCOS_JWT_TOKEN',
         TRACKING_KEY: 'LCOS_DRIVER_TRACKING_ACTIVE',
-        MIN_SEND_INTERVAL_MS: 3000,   // Strict server rate limit (3s)
-        MOVING_INTERVAL_MS: 3000,     // 5 seconds when moving
+        MIN_SEND_INTERVAL_MS: 1500,   // High-cadence 1.5s live rate
+        MOVING_INTERVAL_MS: 2000,     // 2s responsive cadence when moving
         STOPPED_INTERVAL_MS: 5000,   // 30 seconds when stopped
         SPEED_THRESHOLD_KMH: 3,       // >= 3 km/h counts as moving
-        DISTANCE_THRESHOLD_M: 15,     // >= 15m delta counts as moving
+        DISTANCE_THRESHOLD_M: 5,      // >= 5m delta counts as moving
         MAX_QUEUE_CAP: 5000,          // Cap offline queue at 5000
         BATCH_CHUNK_SIZE: 500,        // Max points per batch flush
       };
@@ -1179,7 +1188,12 @@
           }
         }
 
-        const heading = coords.heading !== null && coords.heading !== undefined && !isNaN(coords.heading) ? coords.heading : 0;
+        let heading = coords.heading !== null && coords.heading !== undefined && !isNaN(coords.heading) && coords.heading > 0
+          ? coords.heading
+          : 0;
+        if ((!heading || heading === 0) && state.lastFix) {
+          heading = Math.round(calculateBearing(state.lastFix.lat, state.lastFix.lng, lat, lng));
+        }
         const isMoving = speedKmh >= CONFIG.SPEED_THRESHOLD_KMH || distanceMeters >= CONFIG.DISTANCE_THRESHOLD_M;
         state.movementStatus = isMoving ? 'MOVING' : 'STOPPED';
 
@@ -1419,7 +1433,7 @@
               { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
             );
           }
-        }, 5000);
+        }, 2500);
       }
 
       function stopTracking() {

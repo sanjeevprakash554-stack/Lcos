@@ -9,7 +9,7 @@ const { broadcastGpsUpdate, broadcastAlert, broadcastTripArriving, broadcastAler
 
 // Configuration
 const GPS_MIN_ACCURACY_M = parseFloat(process.env.GPS_MIN_ACCURACY_M || '100');
-const GPS_RATE_LIMIT_MS = parseInt(process.env.GPS_RATE_LIMIT_MS || '3000', 10);
+const GPS_RATE_LIMIT_MS = parseInt(process.env.GPS_RATE_LIMIT_MS || '1500', 10);
 const GPS_BATCH_LIMIT_MS = 10000;
 const GPS_RETENTION_DAYS = parseInt(process.env.GPS_RETENTION_DAYS || '90', 10);
 

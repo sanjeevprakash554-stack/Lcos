@@ -2726,30 +2726,84 @@ const app = {
             const empId = trip ? (trip.created_by_emp_id || trip.driverId || 'EMP-101') : 'EMP-DRV-101';
             const titleText = trip ? `🚚 Live Running Truck Tracking` : `🚀 Simulated Express Dispatch`;
 
-            const truckMarker = L.marker([midLat, midLng], { icon: simTruckIcon }).addTo(simGroup);
-            truckMarker.bindPopup(`
-                <div style="font-size:0.82rem; font-family:var(--font-body); color:#0f172a; padding:0.35rem; min-width:235px;">
-                    <div style="font-weight:700; color:#0284c7; font-size:0.92rem; margin-bottom:0.25rem;">${titleText}</div>
-                    <div><strong>Tracking / Trip ID:</strong> <span style="color:#0284c7; font-weight:700;">${tripId}</span></div>
-                    <div><strong>Log / Dispatch ID:</strong> <span style="color:#475569;">${dispatchId}</span></div>
-                    <div><strong>Vehicle Reg:</strong> <strong style="color:#0369a1;">${vehId}</strong></div>
-                    <div><strong>Assigned Driver:</strong> ${driverName}</div>
-                    <div><strong>Driver / Emp ID:</strong> <span style="color:#b45309; font-weight:700; font-family:monospace;">${empId}</span></div>
-                    <div><strong>Corridor:</strong> ${originName} → ${destName}</div>
-                    <div><strong>Telemetry:</strong> 58 km/h • GPS 4G-LTE Synced</div>
-                    <div style="color:#10b981; font-weight:700; margin-top:0.35rem;">● Live Active Transit Telemetry</div>
-                </div>
-            `).openPopup();
+            // Generate curved road waypoints from origin to destination for lively realistic transit
+            const waypoints = [];
+            const numPoints = 25;
+            for (let i = 0; i <= numPoints; i++) {
+                const fraction = i / numPoints;
+                // Quadratic bezier curve with realistic highway arc
+                const curveArc = Math.sin(fraction * Math.PI) * 0.08;
+                const pLat = (1 - fraction) * originGPS.lat + fraction * destGPS.lat + curveArc;
+                const pLng = (1 - fraction) * originGPS.lng + fraction * destGPS.lng - curveArc * 0.7;
+                waypoints.push({ lat: pLat, lng: pLng });
+            }
 
             simGroup.addTo(map);
             this.simRouteLayer = simGroup;
-
             map.fitBounds(polyline.getBounds(), { padding: [40, 40], maxZoom: 12 });
 
-            setTimeout(() => {
-                map.invalidateSize();
-                truckMarker.openPopup();
-            }, 300);
+            // Initialize moving vehicle on map
+            this.updateSingleVehicleMarker({
+                vehicleId: vehId,
+                tripId: tripId,
+                driverName: driverName,
+                cargoDesc: 'Priority Commercial Freight',
+                originName: originName,
+                destName: destName,
+                lat: originGPS.lat,
+                lng: originGPS.lng,
+                speedKmh: 54,
+                heading: Math.round(this.calculateBearing(originGPS.lat, originGPS.lng, waypoints[1].lat, waypoints[1].lng)),
+                movementStatus: 'MOVING',
+                recordedAt: new Date().toISOString()
+            });
+
+            // Animate moving step-by-step along corridor in real-time
+            if (this._simDispatchTimer) clearInterval(this._simDispatchTimer);
+            let stepIndex = 0;
+            const dispatchBtn = document.getElementById('btn-sim-dispatch');
+            if (dispatchBtn) dispatchBtn.innerHTML = '⏹ Stop Live Dispatch Simulation';
+
+            this._simDispatchTimer = setInterval(() => {
+                stepIndex++;
+                if (stepIndex >= waypoints.length) {
+                    clearInterval(this._simDispatchTimer);
+                    this._simDispatchTimer = null;
+                    if (dispatchBtn) dispatchBtn.innerHTML = '🚀 Simulate Live Dispatch on Map';
+                    this.updateSingleVehicleMarker({
+                        vehicleId: vehId,
+                        tripId: tripId,
+                        driverName: driverName,
+                        lat: destGPS.lat,
+                        lng: destGPS.lng,
+                        speedKmh: 0,
+                        movementStatus: 'STOPPED',
+                        recordedAt: new Date().toISOString()
+                    });
+                    this.showToast(`🏁 Vehicle ${vehId} arrived at ${destName}!`, 'success');
+                    return;
+                }
+
+                const currentPt = waypoints[stepIndex];
+                const nextPt = waypoints[Math.min(waypoints.length - 1, stepIndex + 1)];
+                const stepHeading = Math.round(this.calculateBearing(currentPt.lat, currentPt.lng, nextPt.lat, nextPt.lng));
+                const currentSpeed = 50 + Math.round(Math.sin(stepIndex) * 8);
+
+                this.updateSingleVehicleMarker({
+                    vehicleId: vehId,
+                    tripId: tripId,
+                    driverName: driverName,
+                    cargoDesc: 'Priority Commercial Freight',
+                    originName: originName,
+                    destName: destName,
+                    lat: currentPt.lat,
+                    lng: currentPt.lng,
+                    speedKmh: currentSpeed,
+                    heading: stepHeading,
+                    movementStatus: 'MOVING',
+                    recordedAt: new Date().toISOString()
+                });
+            }, 1200);
         } else {
             console.warn('Leaflet map instance was not ready when simulating dispatch.');
         }
@@ -4291,19 +4345,63 @@ const app = {
         `;
     },
 
+    shortestAngleDiff(fromDeg, toDeg) {
+        let diff = (toDeg - fromDeg) % 360;
+        if (diff < -180) diff += 360;
+        if (diff > 180) diff -= 360;
+        return diff;
+    },
+
+    calculateBearing(lat1, lon1, lat2, lon2) {
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const y = Math.sin(dLon) * Math.cos(lat2 * Math.PI / 180);
+        const x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
+                  Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos(dLon);
+        return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    },
+
     updateMarkerVisual(entry) {
         if (!entry || !entry.marker) return;
         const visual = this.getMarkerVisualState(entry.lastRecordedAt, entry.movementStatus, entry.speedKmh);
         const iconEl = entry.marker.getElement();
         if (iconEl) {
-            const inner = iconEl.querySelector('.truck-marker-inner');
-            if (inner) {
-                inner.style.transform = `rotate(${entry.heading || 0}deg)`;
-                const dot = inner.querySelector('div');
-                if (dot) {
-                    dot.style.backgroundColor = visual.color;
-                    dot.style.boxShadow = `0 0 8px ${visual.color}`;
+            const container = iconEl.querySelector('.lcos-live-vehicle-marker');
+            const isMoving = entry.movementStatus === 'MOVING' || (entry.speedKmh && entry.speedKmh >= 2.5);
+            if (container) {
+                if (isMoving) {
+                    container.classList.add('is-moving');
+                    container.classList.remove('is-stopped');
+                } else {
+                    container.classList.remove('is-moving');
+                    container.classList.add('is-stopped');
                 }
+            }
+
+            const rotator = iconEl.querySelector('.vehicle-rotator');
+            if (rotator) {
+                rotator.style.transform = `rotate(${Math.round(entry.heading || 0)}deg)`;
+            }
+
+            const body = iconEl.querySelector('.vehicle-body');
+            if (body) {
+                body.style.backgroundColor = visual.color;
+                body.style.boxShadow = isMoving ? `0 0 16px ${visual.color}` : `0 0 8px ${visual.color}`;
+            }
+
+            const pulseRing = iconEl.querySelector('.vehicle-pulse-ring');
+            if (pulseRing) {
+                pulseRing.style.backgroundColor = visual.color;
+            }
+
+            const pulseRingOuter = iconEl.querySelector('.vehicle-pulse-ring-outer');
+            if (pulseRingOuter) {
+                pulseRingOuter.style.borderColor = visual.color;
+            }
+
+            const hudPill = iconEl.querySelector('.vehicle-hud-pill');
+            if (hudPill) {
+                const speedText = entry.speedKmh > 0 ? `<span class="hud-speed">${Math.round(entry.speedKmh)} km/h</span>` : '';
+                hudPill.innerHTML = `<span class="hud-plate">${this.escapeHtml(entry.vehicleId)}</span> ${speedText}`;
             }
         }
     },
@@ -4341,16 +4439,27 @@ const app = {
 
         if (!entry) {
             const visual = this.getMarkerVisualState(recordedAt, movementStatus, speedKmh);
+            const isMovingInit = movementStatus === 'MOVING' || speedKmh >= 2.5;
             const icon = L.divIcon({
                 className: 'lcos-truck-marker',
-                html: `<div class="truck-marker-inner" style="width:28px; height:28px; display:flex; align-items:center; justify-content:center; transform:rotate(${heading}deg); transition:transform 0.4s ease;">
-                    <div style="background-color:${visual.color}; width:20px; height:20px; border-radius:50%; border:2px solid #ffffff; box-shadow:0 0 8px ${visual.color}; display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px;">
-                        ▲
+                html: `<div class="lcos-live-vehicle-marker ${isMovingInit ? 'is-moving' : 'is-stopped'}" data-vehicle-id="${this.escapeHtml(vehicleId)}">
+                    <div class="vehicle-pulse-ring" style="background:${visual.color};"></div>
+                    <div class="vehicle-pulse-ring-outer" style="border-color:${visual.color};"></div>
+                    <div class="vehicle-rotator" style="transform:rotate(${heading}deg);">
+                        <div class="vehicle-body" style="background-color:${visual.color}; box-shadow:0 0 14px ${visual.color};">
+                            <svg viewBox="0 0 24 24" class="vehicle-svg" width="14" height="14" fill="#ffffff">
+                                <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="vehicle-hud-pill">
+                        <span class="hud-plate">${this.escapeHtml(vehicleId)}</span>
+                        ${speedKmh > 0 ? `<span class="hud-speed">${Math.round(speedKmh)} km/h</span>` : ''}
                     </div>
                 </div>`,
-                iconSize: [28, 28],
-                iconAnchor: [14, 14],
-                popupAnchor: [0, -14],
+                iconSize: [44, 44],
+                iconAnchor: [22, 22],
+                popupAnchor: [0, -22],
             });
 
             const marker = L.marker([lat, lng], { icon });
@@ -4378,6 +4487,7 @@ const app = {
                 originName: oName,
                 destName: dstName,
                 animFrame: null,
+                liveTrail: null,
             };
 
             marker.bindPopup(this.getTruckPopupHtml(entry));
@@ -4436,35 +4546,80 @@ const app = {
         const distKm = this.haversineDistanceKm(entry.currentLat, entry.currentLng, lat, lng);
         const isHidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
 
-        if (distKm > 5 || isHidden) {
+        // Ensure live road trail polyline exists
+        if (!entry.liveTrail && this.routeLayerGroup) {
+            entry.liveTrail = L.polyline([[entry.currentLat, entry.currentLng], [lat, lng]], {
+                color: '#10b981',
+                weight: 4,
+                opacity: 0.85,
+                lineCap: 'round',
+                lineJoin: 'round'
+            }).addTo(this.routeLayerGroup);
+        }
+
+        // Automatic bearing calculation if heading is 0 or uncalibrated
+        let targetHeading = heading;
+        if ((!targetHeading || targetHeading === 0) && entry.currentLat && entry.currentLng) {
+            const dLat = lat - entry.currentLat;
+            const dLng = lng - entry.currentLng;
+            if (Math.abs(dLat) > 0.00005 || Math.abs(dLng) > 0.00005) {
+                targetHeading = Math.round(this.calculateBearing(entry.currentLat, entry.currentLng, lat, lng));
+            }
+        }
+        if (targetHeading !== undefined) entry.heading = targetHeading;
+
+        if (distKm > 6 || isHidden) {
             if (entry.animFrame) cancelAnimationFrame(entry.animFrame);
             entry.animFrame = null;
             entry.currentLat = lat;
             entry.currentLng = lng;
             entry.marker.setLatLng([lat, lng]);
+            if (entry.liveTrail) entry.liveTrail.addLatLng([lat, lng]);
             this.updateMarkerVisual(entry);
         } else {
-            // Smoothly interpolate over 1.5 seconds using requestAnimationFrame
+            // Silky smooth continuous interpolation with frame-by-frame position tracking
             if (entry.animFrame) cancelAnimationFrame(entry.animFrame);
             const startLat = entry.currentLat;
             const startLng = entry.currentLng;
+            const startHeading = entry.heading || targetHeading || 0;
+            const angleDiff = this.shortestAngleDiff(startHeading, targetHeading);
             const startTime = performance.now();
-            const duration = 1500;
+            const duration = 1400; // 1.4s glide matches 1.5s live cadence perfectly
 
             const step = (now) => {
                 const elapsed = now - startTime;
                 const progress = Math.min(1, elapsed / duration);
-                const t = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+                // Cubic ease-out for ultra-natural vehicle glide
+                const t = 1 - Math.pow(1 - progress, 3);
 
                 const curLat = startLat + (lat - startLat) * t;
                 const curLng = startLng + (lng - startLng) * t;
+                const curHeading = (startHeading + angleDiff * t + 360) % 360;
+
+                entry.currentLat = curLat;
+                entry.currentLng = curLng;
+                entry.heading = curHeading;
                 entry.marker.setLatLng([curLat, curLng]);
+
+                if (entry.liveTrail) {
+                    entry.liveTrail.addLatLng([curLat, curLng]);
+                    const trailPts = entry.liveTrail.getLatLngs();
+                    if (trailPts.length > 250) trailPts.shift();
+                }
+
+                this.updateMarkerVisual(entry);
+
+                // Auto-center camera smoothly if selected
+                if (this.activeSelectedVehicleId === vehicleId && this.leafletMap) {
+                    this.leafletMap.panTo([curLat, curLng], { animate: false });
+                }
 
                 if (progress < 1) {
                     entry.animFrame = requestAnimationFrame(step);
                 } else {
                     entry.currentLat = lat;
                     entry.currentLng = lng;
+                    entry.heading = targetHeading;
                     entry.animFrame = null;
                     this.updateMarkerVisual(entry);
                 }
@@ -4533,6 +4688,9 @@ const app = {
             if (entry.animFrame) cancelAnimationFrame(entry.animFrame);
             if (entry.marker && this.routeLayerGroup) {
                 this.routeLayerGroup.removeLayer(entry.marker);
+            }
+            if (entry.liveTrail && this.routeLayerGroup) {
+                this.routeLayerGroup.removeLayer(entry.liveTrail);
             }
             this.vehicleMarkerRegistry.delete(vehicleId);
         }
