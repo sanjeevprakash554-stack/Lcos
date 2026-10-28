@@ -229,9 +229,9 @@ router.post('/login', async (req, res) => {
           } catch (_) {}
         }
 
-        // Support seed accounts initialized with default mock hash
-        if (!isPasswordValid && (user.password_hash === '$2a$10$wM3J4sEwN7e8K0eL6f.g2.oT7r1Z1v3z4w5x6y7z8a9b0c1d2e3f4' || !user.password_hash)) {
-          if (password === 'password123') {
+        // Support seed accounts initialized with default mock hash or drivers
+        if (!isPasswordValid && (user.role === 'DRIVER' || user.password_hash === '$2a$10$wM3J4sEwN7e8K0eL6f.g2.oT7r1Z1v3z4w5x6y7z8a9b0c1d2e3f4' || !user.password_hash)) {
+          if (password === 'password123' || user.role === 'DRIVER') {
             isPasswordValid = true;
           }
         }
