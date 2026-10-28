@@ -100,14 +100,17 @@ async function checkVehicleStoppages() {
         console.log(`[StoppageDetector] Created Alert ${alertId} for Vehicle ${row.vehicle_id}`);
         broadcastAlert(newAlert.rows[0]);
 
-        // 1. Send automated WhatsApp stoppage alert to Driver
-        if (row.driver_phone) {
+        const higherOfficialPhone = process.env.HIGHER_OFFICIAL_PHONE || row.manager_phone || '916382897998';
+        const cleanDriverPhone = (row.driver_phone || '').replace(/[^0-9]/g, '');
+        const cleanOfficialPhone = (higherOfficialPhone || '').replace(/[^0-9]/g, '');
+
+        // 1. Send automated WhatsApp stoppage alert to Driver ONLY (3 interactive buttons)
+        if (row.driver_phone && cleanDriverPhone !== cleanOfficialPhone) {
           whatsappService.sendStoppageAlertNotification(row, { stoppage_duration_minutes: durationMins }, row.driver_phone)
             .catch(err => console.warn('⚠️ Stoppage WhatsApp alert error (Driver):', err.message));
         }
 
-        // 2. Send automated WhatsApp stoppage alert to Higher Official / Operations Manager
-        const higherOfficialPhone = process.env.HIGHER_OFFICIAL_PHONE || row.manager_phone || '916382897998';
+        // 2. Send automated WhatsApp stoppage alert to Higher Official ONLY (text alert without interactive buttons)
         if (higherOfficialPhone) {
           whatsappService.sendHigherOfficialStoppageAlert(row, { stoppage_duration_minutes: durationMins }, higherOfficialPhone)
             .catch(err => console.warn('⚠️ Stoppage WhatsApp alert error (Higher Official):', err.message));

@@ -68,16 +68,19 @@ router.post('/', authenticateToken, async (req, res) => {
           }
         }
 
-        // 1. Notify Driver
-        if (driverPhone) {
+        const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
+        const cleanOfficialPhone = (higherOfficial || '').replace(/[^0-9]/g, '');
+        const cleanDriverPhone = (driverPhone || '').replace(/[^0-9]/g, '');
+
+        // 1. Notify Driver ONLY if driver has separate phone
+        if (driverPhone && cleanDriverPhone !== cleanOfficialPhone) {
           await whatsappService.sendTextMessage(
             driverPhone,
             `⚠️ *OPERATIONS ALERT: ${type || 'Incident'}*\n------------------------\n${message}\nTrip ID: ${tripId || 'N/A'} | Vehicle: ${vehicleId || 'Assigned'}\n------------------------\nPlease check in with Operations Control immediately.`
-          );
+          ).catch(e => console.warn('Driver alert error:', e.message));
         }
 
         // 2. Notify Higher Official
-        const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
         if (higherOfficial) {
           const isStoppage = (type && type.toLowerCase().includes('stoppage')) || (message && message.toLowerCase().includes('halted'));
           if (isStoppage) {

@@ -1253,39 +1253,46 @@ router.post('/test-stoppage-alert', async (req, res) => {
     const destName = alertData.dest_name || 'Salem';
     const tripIdText = alertData.trip_id || 'TRIP-1002';
 
-    // 1. Dispatch stoppage notification to Driver
-    if (cleanRecipientPhone) {
-      whatsappService.sendStoppageAlertNotification(
-        {
-          id: targetVehicle,
-          vehicle_id: targetVehicle,
-          current_lat: '11.6455',
-          current_lng: '78.1576'
-        },
-        { stoppage_duration_minutes: stoppageMins },
-        cleanRecipientPhone
-      ).catch(err => {
-        console.warn('⚠️ [WhatsApp] Driver stoppage notification error:', err.message);
-      });
-    }
-
-    // 2. ALWAYS dispatch official stoppage alert to Higher Official (exact photo format)
     const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
-    if (higherOfficial) {
-      whatsappService.sendHigherOfficialStoppageAlert(
-        {
-          vehicle_id: targetVehicle,
-          driver_name: driverName,
-          driver_phone: cleanRecipientPhone,
-          trip_id: tripIdText,
-          source_name: sourceName,
-          dest_name: destName,
-          current_lat: '11.6455',
-          current_lng: '78.1576'
-        },
-        { stoppage_duration_minutes: stoppageMins },
-        higherOfficial
-      ).catch(e => console.warn('Higher official stoppage alert error:', e.message));
+    const cleanOfficialPhone = (higherOfficial || '').replace(/[^0-9]/g, '');
+    const cleanDriverPhone = (cleanRecipientPhone || '').replace(/[^0-9]/g, '');
+
+    // ONLY dispatch fallback if checkVehicleStoppages() did not already dispatch!
+    // Prevents duplicate double messages.
+    if (!alreadyDispatched) {
+      // 1. Dispatch stoppage notification to Driver ONLY if driver has separate phone
+      if (cleanRecipientPhone && cleanDriverPhone !== cleanOfficialPhone) {
+        whatsappService.sendStoppageAlertNotification(
+          {
+            id: targetVehicle,
+            vehicle_id: targetVehicle,
+            current_lat: '11.6455',
+            current_lng: '78.1576'
+          },
+          { stoppage_duration_minutes: stoppageMins },
+          cleanRecipientPhone
+        ).catch(err => {
+          console.warn('⚠️ [WhatsApp] Driver stoppage notification error:', err.message);
+        });
+      }
+
+      // 2. Dispatch official stoppage alert to Higher Official (exact photo format, no buttons)
+      if (higherOfficial) {
+        whatsappService.sendHigherOfficialStoppageAlert(
+          {
+            vehicle_id: targetVehicle,
+            driver_name: driverName,
+            driver_phone: cleanRecipientPhone,
+            trip_id: tripIdText,
+            source_name: sourceName,
+            dest_name: destName,
+            current_lat: '11.6455',
+            current_lng: '78.1576'
+          },
+          { stoppage_duration_minutes: stoppageMins },
+          higherOfficial
+        ).catch(e => console.warn('Higher official stoppage alert error:', e.message));
+      }
     }
 
     const waMeUrl = `https://wa.me/${cleanRecipientPhone}?text=${encodeURIComponent(alertMessage)}`;
