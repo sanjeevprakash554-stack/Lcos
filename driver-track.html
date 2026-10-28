@@ -347,6 +347,15 @@
 
   <!-- SCREEN 2: ACTIVE TRIP & TRACKING CONTROLS -->
   <section id="sectionDashboard" class="banner-hidden">
+    <!-- Screen Awake Notice -->
+    <div class="banner banner-info" style="margin-bottom:12px; font-size:0.84rem; line-height:1.45; border-left:4px solid #3b82f6;">
+      <span style="font-size:1.2rem; margin-top:1px;">📱</span>
+      <div>
+        <strong style="color:#93c5fd;">Keep Screen On While Driving:</strong><br/>
+        Screen Wake Lock is active so your screen will <strong>stay awake</strong> without timing out. Keep your phone mounted on your vehicle dashboard with this screen open. <em>Do not turn off your screen</em> with the power button, because mobile operating systems (Android & iOS) pause browser GPS tracking when locked.
+      </div>
+    </div>
+
     <!-- Active Trip Card -->
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
@@ -684,12 +693,41 @@
       }
 
       // ==========================================
-      // BACKGROUND AUDIO KEEP-ALIVE (Mobile OS Media Process Loop)
+      // BACKGROUND AUDIO KEEP-ALIVE (Mobile OS Media Process Loop & MediaSession)
       // ==========================================
+      function setupMediaSession(audio) {
+        if ('mediaSession' in navigator) {
+          try {
+            navigator.mediaSession.metadata = new MediaMetadata({
+              title: 'LCOS Fleet GPS Tracker',
+              artist: 'Central Operations Dispatch',
+              album: 'Live Real-time Vehicle Telemetry',
+              artwork: [
+                { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+                { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' }
+              ]
+            });
+            navigator.mediaSession.playbackState = 'playing';
+
+            navigator.mediaSession.setActionHandler('play', () => {
+              if (audio) audio.play();
+              navigator.mediaSession.playbackState = 'playing';
+            });
+            navigator.mediaSession.setActionHandler('pause', () => {
+              if (audio) audio.play();
+              navigator.mediaSession.playbackState = 'playing';
+            });
+          } catch (e) {
+            console.warn('[MediaSession] Setup failed:', e.message);
+          }
+        }
+      }
+
       function initSilentAudio() {
         if (state.bgAudio) return state.bgAudio;
         try {
-          // Generate a 1-second 8000Hz mono 8-bit PCM silent WAV Blob
+          // Generate a 1-second 8000Hz mono 8-bit PCM audio loop with dynamic micro-variations
+          // so mobile OS audio codecs treat it as an active media broadcast
           const sampleRate = 8000;
           const numSamples = sampleRate * 1;
           const buffer = new ArrayBuffer(44 + numSamples);
@@ -702,30 +740,33 @@
           view.setUint32(4, 36 + numSamples, true);
           writeStr(8, 'WAVE');
           writeStr(12, 'fmt ');
-          view.setUint32(16, 16, true); // Subchunk1Size
-          view.setUint16(20, 1, true);  // PCM format
-          view.setUint16(22, 1, true);  // Mono
+          view.setUint32(16, 16, true);
+          view.setUint16(20, 1, true);
+          view.setUint16(22, 1, true);
           view.setUint32(24, sampleRate, true);
-          view.setUint32(28, sampleRate, true); // ByteRate
-          view.setUint16(32, 1, true);  // BlockAlign
-          view.setUint16(34, 8, true);  // 8-bit
+          view.setUint32(28, sampleRate, true);
+          view.setUint16(32, 1, true);
+          view.setUint16(34, 8, true);
           writeStr(36, 'data');
           view.setUint32(40, numSamples, true);
 
           const pcm = new Uint8Array(buffer, 44);
-          pcm.fill(128); // 8-bit PCM silence
+          for (let i = 0; i < numSamples; i++) {
+            pcm[i] = 128 + Math.round(Math.sin(i * 0.05)); // Subtle 40Hz micro-oscillation
+          }
 
           const blob = new Blob([buffer], { type: 'audio/wav' });
           const audio = new Audio();
           audio.src = URL.createObjectURL(blob);
           audio.loop = true;
-          audio.volume = 0.01;
+          audio.volume = 0.001; // Inaudible
           audio.setAttribute('playsinline', '');
           audio.setAttribute('webkit-playsinline', '');
           state.bgAudio = audio;
+          setupMediaSession(audio);
           return audio;
         } catch (err) {
-          console.warn('[KeepAlive Audio] Error creating silent audio:', err);
+          console.warn('[KeepAlive Audio] Error creating audio:', err);
           return null;
         }
       }
@@ -734,6 +775,7 @@
         try {
           const audio = initSilentAudio();
           if (audio) {
+            setupMediaSession(audio);
             const p = audio.play();
             if (p && typeof p.catch === 'function') {
               p.catch((e) => console.warn('[KeepAlive Audio] Play promise ignored:', e.message));
@@ -749,6 +791,9 @@
           try {
             state.bgAudio.pause();
             state.bgAudio.currentTime = 0;
+            if ('mediaSession' in navigator) {
+              navigator.mediaSession.playbackState = 'paused';
+            }
           } catch (_) {}
         }
       }
@@ -810,7 +855,7 @@
         if ('wakeLock' in navigator) {
           try {
             state.wakeLock = await navigator.wakeLock.request('screen');
-            safeSetText(el.textWakeLockStatus, 'Active');
+            safeSetText(el.textWakeLockStatus, 'Active (Screen Kept On)');
             state.wakeLock.addEventListener('release', () => {
               safeSetText(el.textWakeLockStatus, 'Released');
               if (state.isTracking && document.visibilityState === 'visible') {
@@ -838,6 +883,9 @@
         if (document.visibilityState === 'hidden') {
           if (state.isTracking && el.bannerBackgroundWarning) {
             el.bannerBackgroundWarning.classList.remove('banner-hidden');
+          }
+          if (state.isTracking && state.bgAudio && state.bgAudio.paused) {
+            try { state.bgAudio.play(); } catch (_) {}
           }
         } else {
           if (el.bannerBackgroundWarning) {
@@ -968,6 +1016,7 @@
       // Login form submission
       el.formLogin.addEventListener('submit', async (e) => {
         e.preventDefault();
+        playBackgroundAudio();
         const phone = (el.inputPhone ? el.inputPhone.value.trim() : '');
         const username = (el.inputUsername ? el.inputUsername.value.trim() : '');
         const password = (el.inputPassword ? el.inputPassword.value.trim() : '');
@@ -1436,6 +1485,7 @@
         if (state.isTracking) {
           stopTracking();
         } else {
+          playBackgroundAudio();
           startTracking();
         }
       });
