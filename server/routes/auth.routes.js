@@ -280,31 +280,6 @@ router.post('/login', async (req, res) => {
         }
       }
 
-      // Ensure active shipment in transit exists for driver so tracking can start immediately
-      if (driverId) {
-        try {
-          const tripCheck = await db.query(
-            `SELECT id FROM trips WHERE driver_id = $1 AND status IN ('IN_TRANSIT', 'DELAYED', 'CREATED', 'DISPATCH_APPROVED') LIMIT 1`,
-            [driverId]
-          );
-          if (tripCheck.rows.length === 0) {
-            const vehRes = await db.query(
-              `SELECT id FROM vehicles WHERE status != 'Maintenance' ORDER BY id ASC LIMIT 1`
-            );
-            const vehId = vehRes.rows[0]?.id || 'TN-01-AB-1234';
-            const autoTripId = 'TRIP-' + Math.floor(1000 + Math.random() * 9000);
-            await db.query(
-              `INSERT INTO trips (id, company_id, dispatch_id, commodity_id, quantity, source_branch_id, destination_branch_id, vehicle_id, driver_id, status, checklists, transit_updates, created_at, updated_at)
-               VALUES ($1, 'COMP-001', 'DISP-AUTO', 'COM-RIC', 200, 'BR-CHE', 'BR-MDU', $2, $3, 'IN_TRANSIT', '{}', '[]', NOW(), NOW())`,
-              [autoTripId, vehId, driverId]
-            );
-            await db.query(`UPDATE vehicles SET status = 'In Transit', movement_status = 'MOVING' WHERE id = $1`, [vehId]);
-            console.log(`[Auto-Trip] Auto-assigned trip ${autoTripId} (vehicle: ${vehId}) to driver ${driverId}`);
-          }
-        } catch (tErr) {
-          console.warn('[Auto-Trip Check Warning]:', tErr.message);
-        }
-      }
     }
 
     const payload = {

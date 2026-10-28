@@ -1917,7 +1917,7 @@ const app = {
             const activeTrip = trips.find(t => t.vehicleId === vehicleId && t.status !== 'CLOSED' && t.status !== 'COMPLETED_RETURN') 
                             || trips.find(t => t.vehicleId === vehicleId) 
                             || trips[0];
-            const resolvedTripId = activeTrip ? activeTrip.id : 'TRIP-1002';
+            const resolvedTripId = activeTrip ? activeTrip.id : '';
 
             // 3. Open call dialog with driver's details prefilled
             this.openModal('modal-log-call');
@@ -2823,12 +2823,12 @@ const app = {
             });
 
             const trip = this.selectedLiveSimTrip;
-            const tripId = trip ? trip.id : 'TRIP-1002';
-            const vehId = trip ? trip.vehicleId : 'TN-30-SIM-99';
-            const dispatchId = trip ? (trip.dispatchId || trip.dispatch_id || `LOG-${trip.id}`) : 'DISP-2002';
+            const tripId = trip ? trip.id : '--';
+            const vehId = trip ? trip.vehicleId : '--';
+            const dispatchId = trip ? (trip.dispatchId || trip.dispatch_id || `LOG-${trip.id}`) : '--';
             const driver = trip ? ((LCOS_State.getDrivers() || []).find(d => d.id === trip.driverId)) : null;
-            const driverName = trip ? (trip.driver_name || (driver ? driver.name : 'Assigned Driver')) : 'Selvam R.';
-            const empId = trip ? (trip.created_by_emp_id || trip.driverId || 'EMP-101') : '--';
+            const driverName = trip ? (trip.driver_name || (driver ? driver.name : 'Assigned Driver')) : '--';
+            const empId = trip ? (trip.created_by_emp_id || trip.driverId || '--') : '--';
             const titleText = trip ? `🚚 Live Running Truck Tracking` : `🚀 Simulated Express Dispatch`;
 
             // Generate curved road waypoints from origin to destination for lively realistic transit
@@ -2929,11 +2929,15 @@ const app = {
         }
 
         const trip = this.selectedLiveSimTrip;
-        const tripId = trip ? trip.id : 'TRIP-1003';
-        const vehId = trip ? trip.vehicleId : 'TN-37-CD-5678';
-        const driver = trip ? ((LCOS_State.getDrivers() || []).find(d => d.id === trip.driverId)) : null;
-        const driverName = trip ? (trip.driver_name || (driver ? driver.name : 'Rajesh Nair')) : 'Rajesh Nair';
-        const empId = trip ? (trip.created_by_emp_id || trip.driverId || 'EMP-101') : '--';
+        if (!trip) {
+            this.showToast('No active running trip selected for stoppage simulation.', 'warning');
+            return;
+        }
+        const tripId = trip.id;
+        const vehId = trip.vehicleId || '--';
+        const driver = (LCOS_State.getDrivers() || []).find(d => d.id === trip.driverId);
+        const driverName = trip.driver_name || (driver ? driver.name : 'Assigned Driver');
+        const empId = trip.created_by_emp_id || trip.driverId || '--';
 
         const alertItem = {
             id: `ALT-SIM-${Date.now()}`,
@@ -2955,11 +2959,15 @@ const app = {
 
     simulateDriverTelemetryPing() {
         const trip = this.selectedLiveSimTrip;
-        const tripId = trip ? trip.id : 'TRIP-1002';
-        const vehId = trip ? trip.vehicleId : 'TN-59-EF-9012';
-        const driver = trip ? ((LCOS_State.getDrivers() || []).find(d => d.id === trip.driverId)) : null;
-        const driverName = trip ? (trip.driver_name || (driver ? driver.name : 'Assigned Driver')) : 'Saravanan K.';
-        const empId = trip ? (trip.created_by_emp_id || trip.driverId || 'EMP-101') : '--';
+        if (!trip) {
+            this.showToast('No active running truck selected to ping. Dispatch a trip first.', 'warning');
+            return;
+        }
+        const tripId = trip.id;
+        const vehId = trip.vehicleId || '--';
+        const driver = (LCOS_State.getDrivers() || []).find(d => d.id === trip.driverId);
+        const driverName = trip.driver_name || (driver ? driver.name : 'Assigned Driver');
+        const empId = trip.created_by_emp_id || trip.driverId || '--';
 
         this.showToast(`📡 Pinging vehicle ${vehId} [Trip: ${tripId}, Emp ID: ${empId}]... 4G-LTE Lock OK (Latency: 34ms)`, 'info');
         setTimeout(() => {
@@ -5351,7 +5359,7 @@ const app = {
             trip = allTrips[0];
         }
 
-        const finalTripId = trip ? trip.id : (tripId || (tripRef ? tripRef.replace(/^TRIP\s*[\/\-]\s*/i, '') : 'TRIP-1002'));
+        const finalTripId = trip ? trip.id : (tripId || (tripRef ? tripRef.replace(/^TRIP\s*[\/\-]\s*/i, '') : ''));
 
         try {
             const drv = trip ? LCOS_State.getDrivers().find(d => d.id === trip.driverId) : null;

@@ -407,7 +407,7 @@ async function sendTripStatusReply(toNumber, tripId, driver = null) {
   if (!trip) {
     return whatsappService.sendTextMessage(
       toNumber,
-      `⚠️ No active trip was found matching your query. Please reply with *TRACK <TripID>*, e.g., *TRACK TRIP-1002*.`
+      `⚠️ No active trip was found matching your query. Please reply with *TRACK <TripID>*, e.g., *TRACK TRIP-101*.`
     );
   }
 
@@ -582,9 +582,9 @@ async function handleTransitResumed(toNumber, driver, trip, explicitVehId = null
  * Helper: Records Transit Delay reported by driver
  */
 async function recordTransitDelay(toNumber, driver, trip, reason, explicitVehId = null) {
-  const vehicleId = explicitVehId || trip?.vehicle_id || 'TN-59-EF-9012';
+  const vehicleId = explicitVehId || trip?.vehicle_id || '--';
   const tripId = trip?.id || 'Active Shipment';
-  const driverName = driver?.name || 'Saravanan K.';
+  const driverName = driver?.name || 'Driver';
 
   if (trip) {
     // Append transit update
@@ -674,9 +674,9 @@ async function recordTransitDelay(toNumber, driver, trip, reason, explicitVehId 
  * Helper: Triggers Emergency SOS Alert
  */
 async function triggerEmergencyAlert(toNumber, driver, trip, messageText, explicitVehId = null) {
-  const vehicleId = explicitVehId || trip?.vehicle_id || 'TN-59-EF-9012';
+  const vehicleId = explicitVehId || trip?.vehicle_id || '--';
   const tripId = trip?.id || 'UNASSIGNED';
-  const driverName = driver?.name || 'Saravanan K.';
+  const driverName = driver?.name || 'Driver';
 
   const alertMsg = `🚨 Driver ${driverName} reported breakdown for ${vehicleId}: "${messageText}"`;
 

@@ -330,7 +330,7 @@
       </div>
       <div class="form-group">
         <label class="form-label" for="inputUsername">🆔 Driver ID or Username</label>
-        <input type="text" id="inputUsername" class="form-input" placeholder="e.g. DRV-101, DRV-112, driver1, driver5" autocomplete="username">
+        <input type="text" id="inputUsername" class="form-input" placeholder="Enter Driver ID or Username" autocomplete="username">
       </div>
       <div class="form-group">
         <label class="form-label" for="inputPassword" style="display:flex; justify-content:space-between;">
@@ -343,27 +343,6 @@
         <span>📡</span>
         <span>Start Live GPS Tracking</span>
       </button>
-
-      <!-- Quick Demo Login Presets -->
-      <div style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--card-border);">
-        <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:8px; font-weight:600; text-align:center;">
-          ⚡ Quick 1-Tap Driver Presets
-        </div>
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px;">
-          <button type="button" class="btn btn-secondary" onclick="fillDriverAndLogin('916382897998', 'DRV-101')" style="min-height:36px; font-size:0.78rem; padding:4px 6px;">
-            🚚 Selvam (DRV-101 / 916382897998)
-          </button>
-          <button type="button" class="btn btn-secondary" onclick="fillDriverAndLogin('7904743468', 'DRV-112')" style="min-height:36px; font-size:0.78rem; padding:4px 6px;">
-            🚚 Sanjeev (DRV-112 / 7904743468)
-          </button>
-          <button type="button" class="btn btn-secondary" onclick="fillDriverAndLogin('919884023456', 'DRV-102')" style="min-height:36px; font-size:0.78rem; padding:4px 6px;">
-            🚚 Kumaravel (DRV-102 / 9884023456)
-          </button>
-          <button type="button" class="btn btn-secondary" onclick="fillDriverAndLogin('916382897998', 'DRV-105')" style="min-height:36px; font-size:0.78rem; padding:4px 6px;">
-            🚚 Saravanan (DRV-105 / 916382897998)
-          </button>
-        </div>
-      </div>
     </form>
   </section>
 
@@ -378,9 +357,9 @@
 
       <div id="viewHasTrip">
         <div class="trip-route">
-          <span id="textSource">Branch A</span>
+          <span id="textSource">Origin</span>
           <span style="color:var(--text-muted);">➔</span>
-          <span id="textDestination">Branch B</span>
+          <span id="textDestination">Destination</span>
         </div>
         <div class="trip-meta">
           <div>Trip ID: <strong id="textTripId" style="color:#fff;">-</strong></div>
