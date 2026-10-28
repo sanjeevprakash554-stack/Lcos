@@ -1045,12 +1045,38 @@ router.post('/test-stoppage-alert', async (req, res) => {
     const stoppageMins = parseInt(minutes, 10) || 25;
     const phoneToUse = testPhone || process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
 
+    // 0. Ensure fundamental parent records exist to guarantee FOREIGN KEY integrity
+    try {
+      await db.query(`
+        INSERT INTO companies (id, name, email)
+        VALUES ('COMP-001', 'LCOS Central Logistics', 'admin@lcos.internal')
+        ON CONFLICT (id) DO NOTHING
+      `);
+      await db.query(`
+        INSERT INTO branches (id, company_id, name, code, district, city, lat, lng)
+        VALUES ('BR-CBE', 'COMP-001', 'Coimbatore Branch', 'CBE', 'Coimbatore', 'Coimbatore', 11.0168, 76.9558)
+        ON CONFLICT (id) DO NOTHING
+      `);
+      await db.query(`
+        INSERT INTO branches (id, company_id, name, code, district, city, lat, lng)
+        VALUES ('BR-CHE', 'COMP-001', 'Chennai Central', 'CHE', 'Chennai', 'Chennai', 13.0827, 80.2707)
+        ON CONFLICT (id) DO NOTHING
+      `);
+      await db.query(`
+        INSERT INTO commodities (id, company_id, name, category, unit)
+        VALUES ('COM-RIC', 'COMP-001', 'Rice', 'Grain', 'Tons')
+        ON CONFLICT (id) DO NOTHING
+      `);
+    } catch (parentErr) {
+      console.warn('Notice ensuring parent lookup records:', parentErr.message);
+    }
+
     let targetVehicle = vehicleId;
 
     // 1. If tripId was passed, find its vehicle
     if (!targetVehicle && tripId) {
       const tripRes = await db.query(`SELECT vehicle_id FROM trips WHERE id = $1`, [tripId]);
-      if (tripRes.rows.length > 0) {
+      if (tripRes.rows.length > 0 && tripRes.rows[0].vehicle_id) {
         targetVehicle = tripRes.rows[0].vehicle_id;
       }
     }
@@ -1072,7 +1098,7 @@ router.post('/test-stoppage-alert', async (req, res) => {
       }
     }
 
-    // 3. Fallback: pick any active vehicle
+    // 3. Fallback: pick any active vehicle or default to 'TN-59-EF-9012'
     if (!targetVehicle) {
       const activeVehRes = await db.query(
         `SELECT v.id FROM vehicles v 
@@ -1082,7 +1108,63 @@ router.post('/test-stoppage-alert', async (req, res) => {
       targetVehicle = activeVehRes.rows[0]?.id || 'TN-59-EF-9012';
     }
 
-    // 4. Set vehicle stopped in the past (> 20 mins ago) & refresh last_ping_at to NOW so GPS watchdog does not skip it
+    // 4. Ensure Driver, Vehicle, and Active Trip exist in DB to prevent FOREIGN KEY constraint errors
+    let driverId = 'DRV-101';
+    let driverName = 'Saravanan K.';
+    const cleanPh = String(phoneToUse).replace(/[^0-9]/g, '');
+    const last10Ph = cleanPh.slice(-10);
+    const dCheck = await db.query(
+      `SELECT id, name FROM drivers WHERE REPLACE(REPLACE(REPLACE(phone, ' ', ''), '+', ''), '-', '') LIKE '%' || $1 LIMIT 1`,
+      [last10Ph]
+    );
+    if (dCheck.rows.length > 0) {
+      driverId = dCheck.rows[0].id;
+      driverName = dCheck.rows[0].name || driverName;
+    } else {
+      const d101 = await db.query(`SELECT id FROM drivers WHERE id = 'DRV-101'`);
+      if (d101.rows.length === 0) {
+        await db.query(`
+          INSERT INTO drivers (id, company_id, name, phone, license_number, status, current_lat, current_lng, created_at)
+          VALUES ('DRV-101', 'COMP-001', 'Saravanan K.', $1, 'TN-59-2021-00982', 'AVAILABLE', 11.6455, 78.1576, NOW())
+        `, [phoneToUse]);
+      } else {
+        await db.query(`UPDATE drivers SET phone = $1 WHERE id = 'DRV-101'`, [phoneToUse]);
+      }
+    }
+
+    const vCheck = await db.query(`SELECT id FROM vehicles WHERE id = $1`, [targetVehicle]);
+    if (vCheck.rows.length === 0) {
+      await db.query(`
+        INSERT INTO vehicles (id, company_id, type, capacity_tons, ownership, status, movement_status, speed_kmh, current_lat, current_lng, created_at)
+        VALUES ($1, 'COMP-001', 'Heavy Truck (10-Wheeler)', 16, 'OWNED', 'ACTIVE', 'STOPPED', 0, 11.6455, 78.1576, NOW())
+      `, [targetVehicle]);
+    }
+
+    let verifiedTripId = null;
+    const tCheck = await db.query(
+      `SELECT id FROM trips WHERE vehicle_id = $1 AND status IN ('IN_TRANSIT', 'DELAYED', 'CREATED') LIMIT 1`,
+      [targetVehicle]
+    );
+    if (tCheck.rows.length > 0) {
+      verifiedTripId = tCheck.rows[0].id;
+    } else {
+      const trip1002 = await db.query(`SELECT id FROM trips WHERE id = 'TRIP-1002'`);
+      if (trip1002.rows.length === 0) {
+        await db.query(`
+          INSERT INTO trips (id, company_id, vehicle_id, driver_id, status, source_branch_id, destination_branch_id, commodity_id, quantity, expected_delivery_date, created_at)
+          VALUES ('TRIP-1002', 'COMP-001', $1, $2, 'IN_TRANSIT', 'BR-CBE', 'BR-CHE', 'COM-RIC', 25, NOW(), NOW())
+        `, [targetVehicle, driverId]);
+      } else {
+        await db.query(`
+          UPDATE trips 
+          SET vehicle_id = $1, driver_id = $2, status = 'IN_TRANSIT', source_branch_id = 'BR-CBE', destination_branch_id = 'BR-CHE'
+          WHERE id = 'TRIP-1002'
+        `, [targetVehicle, driverId]);
+      }
+      verifiedTripId = 'TRIP-1002';
+    }
+
+    // 5. Set vehicle stopped in the past (> 20 mins ago) & refresh last_ping_at to NOW so GPS watchdog does not skip it
     const isEmbedded = db.isUsingEmbedded && db.isUsingEmbedded();
     if (isEmbedded) {
       await db.query(
@@ -1106,16 +1188,16 @@ router.post('/test-stoppage-alert', async (req, res) => {
       );
     }
 
-    // 5. Clear ALL previous stoppage/delay/outage alerts for this vehicle to allow fresh trigger
+    // 6. Clear ALL previous stoppage/delay/outage alerts for this vehicle to allow fresh trigger
     await db.query(
       `DELETE FROM alerts WHERE vehicle_id = $1 AND type IN ('Stoppage Detected', 'Driver Delay Report', 'Emergency Breakdown', 'No Update')`,
       [targetVehicle]
     );
 
-    // 6. Run automated stoppage detector
+    // 7. Run automated stoppage detector
     await stoppageDetector.checkVehicleStoppages();
 
-    // 7. Fetch generated alert
+    // 8. Fetch generated alert
     let alertRes = await db.query(
       `SELECT a.*, d.name AS driver_name, d.phone AS driver_phone,
               sb.name AS source_name, dest_b.name AS dest_name
@@ -1131,26 +1213,14 @@ router.post('/test-stoppage-alert', async (req, res) => {
 
     // Guarantee alert creation if detector skipped for any reason
     if (alertRes.rows.length === 0) {
-      const activeTripRes = await db.query(
-        `SELECT t.id, t.company_id, t.driver_id, d.name AS driver_name, d.phone AS driver_phone,
-                sb.name AS source_name, dest_b.name AS dest_name
-         FROM trips t
-         LEFT JOIN drivers d ON d.id = t.driver_id
-         LEFT JOIN branches sb ON sb.id = t.source_branch_id
-         LEFT JOIN branches dest_b ON dest_b.id = t.destination_branch_id
-         WHERE t.vehicle_id = $1 AND t.status IN ('IN_TRANSIT', 'DELAYED', 'CREATED')
-         LIMIT 1`,
-        [targetVehicle]
-      );
-      const row = activeTripRes.rows[0] || {};
       const fallbackAlertId = 'ALT-STP-' + Math.floor(1000 + Math.random() * 9000);
-      const fallbackMsg = `AUTOMATIC DETECTED: Vehicle ${targetVehicle} (${row.driver_name || 'Saravanan K.'}) stopped at location (11.6455, 78.1576) for over ${stoppageMins} minutes! (Threshold: 20 mins)`;
+      const fallbackMsg = `AUTOMATIC DETECTED: Vehicle ${targetVehicle} (${driverName}) stopped at location (11.6455, 78.1576) for over ${stoppageMins} minutes! (Threshold: 20 mins)`;
       
       const newCreatedAlert = await db.query(
         `INSERT INTO alerts (id, company_id, trip_id, vehicle_id, driver_id, type, message, severity, status, stoppage_duration_minutes, created_at)
-         VALUES ($1, $2, $3, $4, $5, 'Stoppage Detected', $6, 'warning', 'Active', $7, NOW())
+         VALUES ($1, 'COMP-001', $2, $3, $4, 'Stoppage Detected', $5, 'warning', 'Active', $6, NOW())
          RETURNING *`,
-        [fallbackAlertId, row.company_id || 'COMP-001', row.id || 'TRIP-1002', targetVehicle, row.driver_id || 'DRV-101', fallbackMsg, stoppageMins]
+        [fallbackAlertId, verifiedTripId, targetVehicle, driverId, fallbackMsg, stoppageMins]
       );
       if (newCreatedAlert.rows && newCreatedAlert.rows[0]) {
         broadcastAlert(newCreatedAlert.rows[0]);
@@ -1171,7 +1241,7 @@ router.post('/test-stoppage-alert', async (req, res) => {
     const alertData = alertRes.rows[0] || {};
     const recipientPhoneRaw = alertData.driver_phone || phoneToUse || process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
     const cleanRecipientPhone = whatsappService.formatPhoneNumber(recipientPhoneRaw);
-    const driverName = alertData.driver_name || 'Saravanan K.';
+    driverName = alertData.driver_name || driverName || 'Saravanan K.';
     const sourceName = alertData.source_name || 'Coimbatore';
     const destName = alertData.dest_name || 'Salem';
     const tripIdText = alertData.trip_id || 'TRIP-1002';
