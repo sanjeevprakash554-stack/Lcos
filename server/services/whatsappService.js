@@ -314,34 +314,66 @@ class WhatsAppService {
   }
 
   /**
-   * Automated Trigger: Send Trip Dispatch Notification to Driver
+   * Automated Trigger: Send Trip Dispatch Notification to Driver & Higher Officials
+   * Sends clean message-only updates directly without interactive button options.
    */
-  async sendTripDispatchNotification(trip, driverPhone) {
-    if (!driverPhone) return null;
+  async sendTripDispatchNotification(trip, recipientPhone) {
+    if (!recipientPhone) return null;
 
-    const bodyText = 
-`🚛 *NEW TRIP ASSIGNED - LCOS LOGISTICS*
+    const formattedRecipient = this.formatPhoneNumber(recipientPhone);
+    const officialPhone = this.formatPhoneNumber(process.env.HIGHER_OFFICIAL_PHONE || '916382897998');
+    const isHigherOfficial = formattedRecipient === officialPhone;
+
+    const expectedTimeStr = trip.expected_delivery_date
+      ? new Date(trip.expected_delivery_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })
+      : 'As Scheduled';
+
+    const cargoText = `${trip.commodity_name || trip.commodity_id || 'Commodity'} (${trip.quantity} Bags/Tons)`;
+    const originText = trip.source_branch_name || trip.source_branch_id || 'Origin Depot';
+    const destText = trip.destination_branch_name || trip.destination_branch_id || 'Destination Depot';
+
+    let bodyText;
+    if (isHigherOfficial) {
+      bodyText = 
+`🚚 *TRIP DISPATCHED - LCOS LOGISTICS*
 ────────────────────────────
 📋 *Trip ID:* ${trip.id}
-📦 *Cargo:* ${trip.commodity_name || trip.commodity_id || 'Commodity'} (${trip.quantity} Bags/Tons)
+📦 *Cargo:* ${cargoText}
 🚚 *Vehicle:* ${trip.vehicle_id}
-📍 *Origin:* ${trip.source_branch_name || trip.source_branch_id}
-🏁 *Destination:* ${trip.destination_branch_name || trip.destination_branch_id}
-⏱️ *Expected Delivery:* ${trip.expected_delivery_date ? new Date(trip.expected_delivery_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }) : 'As Scheduled'}
+${trip.driver_name ? `👤 *Driver:* ${trip.driver_name}${trip.driver_phone ? ` (📞 ${trip.driver_phone})` : ''}\n` : ''}📍 *Origin:* ${originText}
+🏁 *Destination:* ${destText}
+⏱️ *Expected Delivery:* ${expectedTimeStr}
+────────────────────────────
+💡 *Quick Actions:*
+Reply *TRACK ${trip.id}* to view live progress.
+Reply *DELAY <reason>* to record transit delay.
+Reply *SOS* for emergency assistance.
+Send a 📍 Location pin anytime to sync vehicle GPS.
+
+_Logistics Operations Control_`;
+    } else {
+      bodyText = 
+`🚚 *Trip Dispatched*
+🚛 *NEW TRIP ASSIGNED - LCOS LOGISTICS*
+────────────────────────────
+📋 *Trip ID:* ${trip.id}
+📦 *Cargo:* ${cargoText}
+🚚 *Vehicle:* ${trip.vehicle_id}
+📍 *Origin:* ${originText}
+🏁 *Destination:* ${destText}
+⏱️ *Expected Delivery:* ${expectedTimeStr}
 ────────────────────────────
 💡 *Quick Actions:*
 Reply *TRACK ${trip.id}* to view progress.
 Reply *DELAY <reason>* if delayed.
 Reply *SOS* for emergency assistance.
-Send a 📍 Location pin anytime to sync your vehicle GPS.`;
+Send a 📍 Location pin anytime to sync your vehicle GPS.
 
-    const buttons = [
-      { id: `trk_${trip.id}`, title: 'Track Trip Status' },
-      { id: `loc_${trip.id}`, title: 'Share Location Pin' },
-      { id: `sos_${trip.id}`, title: 'Emergency SOS' },
-    ];
+_Logistics Operations Control_`;
+    }
 
-    return this.sendInteractiveButtons(driverPhone, '🚚 Trip Dispatched', bodyText, buttons, 'Logistics Operations Control');
+    // Message only — interactive buttons removed as required
+    return this.sendTextMessage(recipientPhone, bodyText);
   }
 
   /**

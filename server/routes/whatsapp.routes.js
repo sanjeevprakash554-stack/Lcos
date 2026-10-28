@@ -968,6 +968,12 @@ router.post('/notify-trip', async (req, res) => {
     }
 
     const result = await whatsappService.sendTripDispatchNotification(trip, trip.driver_phone);
+    const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
+    const cleanDriverPhone = (trip.driver_phone || '').replace(/[^0-9]/g, '');
+    const cleanOfficialPhone = (higherOfficial || '').replace(/[^0-9]/g, '');
+    if (higherOfficial && cleanDriverPhone !== cleanOfficialPhone) {
+      await whatsappService.sendTripDispatchNotification(trip, higherOfficial).catch(e => console.warn('Higher official dispatch notice error:', e.message));
+    }
     const cleanPhone = whatsappService.formatPhoneNumber(trip.driver_phone);
     const dispatchText = 
 `🚛 *NEW TRIP ASSIGNED - LCOS LOGISTICS*

@@ -129,23 +129,36 @@ router.post('/', authenticateToken, authorizeRoles('SUPER_ADMIN', 'OWNER', 'TRAC
 
     broadcastTripUpdate(newTrip.rows[0]);
 
-    // Asynchronously dispatch WhatsApp trip assignment alert to driver
+    // Asynchronously dispatch WhatsApp trip assignment alert to driver and higher officials
     (async () => {
       try {
         const driverInfo = await db.query(`SELECT name, phone FROM drivers WHERE id = $1`, [driverId]);
         const commInfo = await db.query(`SELECT name FROM commodities WHERE id = $1`, [commodityId]);
         const srcInfo = await db.query(`SELECT name FROM branches WHERE id = $1`, [sourceBranchId]);
         const dstInfo = await db.query(`SELECT name FROM branches WHERE id = $1`, [destinationBranchId]);
+        const dispatchTripData = {
+          id: tripId,
+          commodity_name: commInfo.rows[0]?.name || commodityId,
+          quantity,
+          vehicle_id: vehicleId,
+          driver_name: driverInfo.rows[0]?.name,
+          driver_phone: driverInfo.rows[0]?.phone,
+          source_branch_name: srcInfo.rows[0]?.name || sourceBranchId,
+          destination_branch_name: dstInfo.rows[0]?.name || destinationBranchId,
+          expected_delivery_date: expectedDelivery,
+        };
+
+        // 1. Send text message directly to Driver (message only, no interactive buttons)
         if (driverInfo.rows[0]?.phone) {
-          await whatsappService.sendTripDispatchNotification({
-            id: tripId,
-            commodity_name: commInfo.rows[0]?.name || commodityId,
-            quantity,
-            vehicle_id: vehicleId,
-            source_branch_name: srcInfo.rows[0]?.name || sourceBranchId,
-            destination_branch_name: dstInfo.rows[0]?.name || destinationBranchId,
-            expected_delivery_date: expectedDelivery,
-          }, driverInfo.rows[0].phone);
+          await whatsappService.sendTripDispatchNotification(dispatchTripData, driverInfo.rows[0].phone);
+        }
+
+        // 2. Send text message directly to Higher Official (message only, no interactive buttons)
+        const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
+        const cleanDriverPhone = (driverInfo.rows[0]?.phone || '').replace(/[^0-9]/g, '');
+        const cleanOfficialPhone = (higherOfficial || '').replace(/[^0-9]/g, '');
+        if (higherOfficial && cleanDriverPhone !== cleanOfficialPhone) {
+          await whatsappService.sendTripDispatchNotification(dispatchTripData, higherOfficial);
         }
       } catch (waErr) {
         console.warn('⚠️ [WhatsApp Auto-Dispatch Alert Error]:', waErr.message);
@@ -626,11 +639,18 @@ router.post('/assign-backload', authenticateToken, authorizeRoles('SUPER_ADMIN',
         );
         const row = enrichedTripRes.rows[0];
         if (row) {
-          // 1. Send Dispatch details & interactive buttons to driver
+          // 1. Send Dispatch details directly to driver (message only, no interactive buttons)
           if (row.driver_phone) {
             await whatsappService.sendTripDispatchNotification(row, row.driver_phone);
           }
-          // 2. Send Pairing confirmation to source branch manager
+          // 2. Send Dispatch alert directly to Higher Official (message only, no interactive buttons)
+          const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
+          const cleanDriverPhone = (row.driver_phone || '').replace(/[^0-9]/g, '');
+          const cleanOfficialPhone = (higherOfficial || '').replace(/[^0-9]/g, '');
+          if (higherOfficial && cleanDriverPhone !== cleanOfficialPhone) {
+            await whatsappService.sendTripDispatchNotification(row, higherOfficial);
+          }
+          // 3. Send Pairing confirmation to source branch manager
           if (row.source_branch_phone) {
             await whatsappService.sendReturnLoadConfirmedNotification({
               managerPhone: row.source_branch_phone,
