@@ -5184,6 +5184,25 @@ const app = {
             });
 
             console.log('[LCOS Telemetry] Auto-Sync WebSocket listener initialized.');
+
+            // Auto-poll alerts every 4 seconds as an ultra-resilient fallback to WebSockets
+            if (!this._alertsPollTimer) {
+                this._alertsPollTimer = setInterval(async () => {
+                    try {
+                        if (!document.hidden && (this.currentTab === 'dashboard' || this.currentTab === 'alerts' || !this.currentTab)) {
+                            await LCOS_State.loadFromBackend();
+                            const allAlerts = LCOS_State.getAlerts() || [];
+                            this.renderAlertBanner(allAlerts);
+                            if (this.currentTab === 'alerts' && typeof this.renderAlerts === 'function') {
+                                this.renderAlerts();
+                            }
+                            const activeAlerts = allAlerts.filter(a => (a.status === 'Active' || a.status === 'Escalated') && a.type !== 'Incoming Call');
+                            const alertStat = document.getElementById('stat-alerts');
+                            if (alertStat) alertStat.textContent = activeAlerts.length;
+                        }
+                    } catch (e) {}
+                }, 4000);
+            }
         } catch (e) {
             console.warn('[LCOS Telemetry] WebSocket listener setup note:', e);
         }

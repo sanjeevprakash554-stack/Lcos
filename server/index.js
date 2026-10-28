@@ -130,6 +130,14 @@ app.use('/api/whatsapp', whatsappRoutes);
 // Fallback webhook aliases (in case dashboard was configured without /api prefix)
 app.use('/whatsapp', whatsappRoutes);
 app.use('/payments', paymentRoutes);
+app.use('/webhook', (req, res, next) => {
+  req.url = '/webhook';
+  whatsappRoutes(req, res, next);
+});
+app.use('/api/webhook', (req, res, next) => {
+  req.url = '/webhook';
+  whatsappRoutes(req, res, next);
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {

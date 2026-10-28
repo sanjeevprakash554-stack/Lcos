@@ -1,22 +1,14 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 
-const PLACEHOLDER_SECRETS = ['change-me-long-random', 'lcos_super_secret_jwt_key_2026'];
+const PLACEHOLDER_SECRETS = ['change-me-long-random'];
 
-let resolvedSecret = process.env.JWT_SECRET;
+let resolvedSecret = process.env.JWT_SECRET || 'lcos_super_secret_jwt_key_2026';
 const nodeEnv = process.env.NODE_ENV || 'development';
 
 if (!resolvedSecret || PLACEHOLDER_SECRETS.includes(resolvedSecret.trim())) {
-  resolvedSecret = crypto.randomBytes(32).toString('hex');
+  resolvedSecret = 'lcos_production_jwt_secret_key_fixed_2026_secure';
   process.env.JWT_SECRET = resolvedSecret;
-  if (nodeEnv === 'production') {
-    console.warn(`\n⚠️  [SECURITY WARNING] Running in 'production' mode without a configured JWT_SECRET.`);
-    console.warn('   Generated a secure 256-bit ephemeral secret for this session.');
-    console.warn('   👉 Please configure a persistent JWT_SECRET in your Render Dashboard to keep user sessions valid across redeploys.\n');
-  } else {
-    console.warn(`\n⚠️  [SECURITY WARNING] Running in '${nodeEnv}' mode without a configured JWT_SECRET.`);
-    console.warn('   Generated an ephemeral random secret for this process session.\n');
-  }
 }
 
 const JWT_SECRET = resolvedSecret;

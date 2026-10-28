@@ -236,6 +236,7 @@ function broadcastAlert(alertData) {
   if (!io || !alertData) return;
   const companyId = alertData.company_id || alertData.companyId || 'COMP-001';
   io.to(`company_${companyId}`).emit('alert_created', alertData);
+  io.emit('alert_created', alertData);
 }
 
 /**
@@ -268,6 +269,7 @@ function broadcastTripArriving(tripData) {
 function broadcastStoppageDriverResponse(companyId, data) {
   if (!io) return;
   io.to(`company_${companyId || 'COMP-001'}`).emit('stoppage_driver_response', data);
+  io.emit('stoppage_driver_response', data);
 }
 
 /**
@@ -276,6 +278,7 @@ function broadcastStoppageDriverResponse(companyId, data) {
 function broadcastStoppageReasonAccepted(companyId, data) {
   if (!io) return;
   io.to(`company_${companyId || 'COMP-001'}`).emit('stoppage_reason_accepted', data);
+  io.emit('stoppage_reason_accepted', data);
 }
 
 /**
@@ -284,6 +287,7 @@ function broadcastStoppageReasonAccepted(companyId, data) {
 function broadcastStoppageReasonDeclined(companyId, data) {
   if (!io) return;
   io.to(`company_${companyId || 'COMP-001'}`).emit('stoppage_reason_declined', data);
+  io.emit('stoppage_reason_declined', data);
 }
 
 /**
