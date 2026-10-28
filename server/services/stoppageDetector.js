@@ -62,10 +62,12 @@ async function checkVehicleStoppages() {
         }
       }
 
-      // Check if an active stoppage alert already exists for this trip/vehicle
+      // Check if an active stoppage alert or driver delay response already exists for this vehicle
       const alertCheck = await db.query(
         `SELECT id FROM alerts 
-         WHERE vehicle_id = $1 AND type = 'Stoppage Detected' AND status = 'Active'`,
+         WHERE vehicle_id = $1 
+           AND type IN ('Stoppage Detected', 'Driver Delay Report', 'Emergency Breakdown') 
+           AND status IN ('Active', 'Escalated', 'Pending_Approval')`,
         [row.vehicle_id]
       );
 

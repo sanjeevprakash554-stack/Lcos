@@ -712,32 +712,12 @@ async function recordTransitDelay(toNumber, driver, trip, reason, explicitVehId 
     timestamp: new Date().toISOString()
   });
 
-  // Notify Higher Official of the delay report immediately in all cases
-  const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE;
-  if (higherOfficial) {
-    whatsappService.sendTextMessage(
-      higherOfficial,
-      `🚨 *DRIVER REPORTED TRANSIT DELAY*\n────────────────────────────\n📋 *Trip ID:* ${tripId}\n🚛 *Vehicle:* ${vehicleId}\n👤 *Driver:* ${driverName} (📞 ${toNumber})\n⚠️ *Delay Reason:* "${reason}"\n🕒 *Reported At:* ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}\n────────────────────────────\nOperations Control has registered this delay report.`
-    ).catch(e => console.warn('Higher official delay alert error:', e.message));
-  }
+  // Clear vehicle stoppage timer so background detector does not re-alert while under review
+  await db.query(`UPDATE vehicles SET stoppage_start_time = NULL WHERE id = $1`, [vehicleId]);
 
-  if (reason.toLowerCase().includes('lunch') || reason.toLowerCase().includes('food') || reason.toLowerCase().includes('break') || reason.toLowerCase().includes('rest')) {
-    const buttons = [
-      { id: `stp_moving_${vehicleId}`, title: 'Resuming Movement' }
-    ];
-    return whatsappService.sendInteractiveButtons(
-      toNumber,
-      '🍲 Lunch Break Registered',
-      `Central Operations registered your meal break for Vehicle *${vehicleId}*. Alerts are paused for 45 minutes.\n\nWhenever you finish and start your engine, tap below to resume live tracking:`,
-      buttons,
-      'LCOS Central Operations'
-    );
-  }
-
-  return whatsappService.sendTextMessage(
-    toNumber,
-    `⚠️ *Delay Acknowledged:*\nVehicle: ${vehicleId}\nReason: "${reason}"\n\nCentral Operations Control has been notified. Please drive safely and keep us updated.`
-  );
+  // Clean workflow: The driver's selected reason is posted directly to Web Notifications for manager action.
+  // When manager accepts or declines in the web UI, the driver receives the final status notification.
+  return { success: true };
 }
 
 /**
@@ -1212,13 +1192,17 @@ router.post('/test-stoppage-alert', async (req, res) => {
        LEFT JOIN trips t ON t.id = a.trip_id
        LEFT JOIN branches sb ON sb.id = t.source_branch_id
        LEFT JOIN branches dest_b ON dest_b.id = t.destination_branch_id
-       WHERE a.vehicle_id = $1 AND a.type = 'Stoppage Detected' 
+       WHERE a.vehicle_id = $1 AND a.type = 'Stoppage Detected' AND a.status = 'Active'
        ORDER BY a.created_at DESC LIMIT 1`,
       [targetVehicle]
     );
 
-    // Guarantee alert creation if detector skipped for any reason
-    if (alertRes.rows.length === 0) {
+    let alreadyDispatched = false;
+    if (alertRes.rows.length > 0) {
+      // checkVehicleStoppages() already dispatched exactly 1 alert to Driver and 1 to Higher Official
+      alreadyDispatched = true;
+    } else {
+      // Guarantee alert creation if detector skipped for any reason
       const fallbackAlertId = 'ALT-STP-' + Math.floor(1000 + Math.random() * 9000);
       const fallbackMsg = `AUTOMATIC DETECTED: Vehicle ${targetVehicle} (${driverName}) stopped at location (11.6455, 78.1576) for over ${stoppageMins} minutes! (Threshold: 20 mins)`;
       
@@ -1252,57 +1236,38 @@ router.post('/test-stoppage-alert', async (req, res) => {
     const destName = alertData.dest_name || 'Salem';
     const tripIdText = alertData.trip_id || 'TRIP-1002';
 
-    const alertMessage = 
-`🚨 *URGENT STOPPAGE ALERT (>20 MINS) - LCOS CENTRAL OPERATIONS*
-────────────────────────────
-🚛 *Vehicle:* ${targetVehicle}
-👤 *Driver:* ${driverName} (📞 +${cleanRecipientPhone})
-📋 *Trip ID:* ${tripIdText}
-📍 *Route:* ${sourceName} ➔ ${destName}
-⏱️ *Stationary Time:* ${stoppageMins}+ minutes
-────────────────────────────
-⚠️ Central Operations detected an unscheduled halt exceeding 20 minutes.
-Please report your halt reason immediately:
-1️⃣ Traffic / Toll Delay
-2️⃣ Puncture / Breakdown
-3️⃣ Resuming Movement`;
-
-    // 8. Dispatch the officially approved Meta template (_unscheduled_halt_warning_v1)
-    whatsappService.sendTemplate(
-      cleanRecipientPhone,
-      '_unscheduled_halt_warning_v1',
-      'en',
-      [
+    // If detector did NOT already dispatch (e.g. fallback creation), dispatch exactly once to each party
+    if (!alreadyDispatched) {
+      whatsappService.sendStoppageAlertNotification(
         {
-          type: 'body',
-          parameters: [
-            { type: 'text', text: targetVehicle },
-            { type: 'text', text: `${stoppageMins}+ minutes` },
-            { type: 'text', text: '11.6455, 78.1576' }
-          ]
-        }
-      ]
-    ).catch(err => {
-      console.warn('⚠️ [WhatsApp] Meta template delivery notice:', err.message);
-    });
-
-    // 8b. Also send instant alert to Higher Official / Operations Manager
-    const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
-    if (higherOfficial) {
-      whatsappService.sendHigherOfficialStoppageAlert(
-        {
+          id: targetVehicle,
           vehicle_id: targetVehicle,
-          driver_name: driverName,
-          driver_phone: cleanRecipientPhone,
-          trip_id: tripIdText,
-          source_name: sourceName,
-          dest_name: destName,
           current_lat: '11.6455',
           current_lng: '78.1576'
         },
         { stoppage_duration_minutes: stoppageMins },
-        higherOfficial
-      ).catch(e => console.warn('Higher official stoppage alert error:', e.message));
+        cleanRecipientPhone
+      ).catch(err => {
+        console.warn('⚠️ [WhatsApp] Driver stoppage notification error:', err.message);
+      });
+
+      const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
+      if (higherOfficial) {
+        whatsappService.sendHigherOfficialStoppageAlert(
+          {
+            vehicle_id: targetVehicle,
+            driver_name: driverName,
+            driver_phone: cleanRecipientPhone,
+            trip_id: tripIdText,
+            source_name: sourceName,
+            dest_name: destName,
+            current_lat: '11.6455',
+            current_lng: '78.1576'
+          },
+          { stoppage_duration_minutes: stoppageMins },
+          higherOfficial
+        ).catch(e => console.warn('Higher official stoppage alert error:', e.message));
+      }
     }
 
     const waMeUrl = `https://wa.me/${cleanRecipientPhone}?text=${encodeURIComponent(alertMessage)}`;
