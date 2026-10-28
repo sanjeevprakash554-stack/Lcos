@@ -24,3 +24,5 @@ services:
         value: lcos_meta_verify_token_2026
       - key: WHATSAPP_ENABLED
         value: "true"
+      - key: HIGHER_OFFICIAL_PHONE
+        value: "916382897998"

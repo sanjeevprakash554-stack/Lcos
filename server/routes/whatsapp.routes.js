@@ -715,6 +715,23 @@ async function recordTransitDelay(toNumber, driver, trip, reason, explicitVehId 
   // Clear vehicle stoppage timer so background detector does not re-alert while under review
   await db.query(`UPDATE vehicles SET stoppage_start_time = NULL WHERE id = $1`, [vehicleId]);
 
+  // Notify Higher Official of the reported delay reason immediately
+  const officialForDelay = process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
+  if (officialForDelay) {
+    const delayMsg =
+`🟡 *DRIVER DELAY REPORT SUBMITTED*
+────────────────────────────
+🚛 *Vehicle:* ${vehicleId}
+👤 *Driver:* ${driverName} (📞 ${toNumber})
+📋 *Trip ID:* ${trip?.id || 'Active Trip'}
+⏱️ *Reason:* "${reason}"
+🕒 *Time:* ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}
+────────────────────────────
+ℹ️ *Status:* Driver submitted delay reason on WhatsApp. Immediate review available on LCOS Dashboard.`;
+
+    whatsappService.sendTextMessage(officialForDelay, delayMsg).catch(e => console.warn('Higher official delay alert error:', e.message));
+  }
+
   // Clean workflow: The driver's selected reason is posted directly to Web Notifications for manager action.
   // When manager accepts or declines in the web UI, the driver receives the final status notification.
   return { success: true };
@@ -1236,8 +1253,8 @@ router.post('/test-stoppage-alert', async (req, res) => {
     const destName = alertData.dest_name || 'Salem';
     const tripIdText = alertData.trip_id || 'TRIP-1002';
 
-    // If detector did NOT already dispatch (e.g. fallback creation), dispatch exactly once to each party
-    if (!alreadyDispatched) {
+    // 1. Dispatch stoppage notification to Driver
+    if (cleanRecipientPhone) {
       whatsappService.sendStoppageAlertNotification(
         {
           id: targetVehicle,
@@ -1250,24 +1267,25 @@ router.post('/test-stoppage-alert', async (req, res) => {
       ).catch(err => {
         console.warn('⚠️ [WhatsApp] Driver stoppage notification error:', err.message);
       });
+    }
 
-      const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
-      if (higherOfficial) {
-        whatsappService.sendHigherOfficialStoppageAlert(
-          {
-            vehicle_id: targetVehicle,
-            driver_name: driverName,
-            driver_phone: cleanRecipientPhone,
-            trip_id: tripIdText,
-            source_name: sourceName,
-            dest_name: destName,
-            current_lat: '11.6455',
-            current_lng: '78.1576'
-          },
-          { stoppage_duration_minutes: stoppageMins },
-          higherOfficial
-        ).catch(e => console.warn('Higher official stoppage alert error:', e.message));
-      }
+    // 2. ALWAYS dispatch official stoppage alert to Higher Official (exact photo format)
+    const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
+    if (higherOfficial) {
+      whatsappService.sendHigherOfficialStoppageAlert(
+        {
+          vehicle_id: targetVehicle,
+          driver_name: driverName,
+          driver_phone: cleanRecipientPhone,
+          trip_id: tripIdText,
+          source_name: sourceName,
+          dest_name: destName,
+          current_lat: '11.6455',
+          current_lng: '78.1576'
+        },
+        { stoppage_duration_minutes: stoppageMins },
+        higherOfficial
+      ).catch(e => console.warn('Higher official stoppage alert error:', e.message));
     }
 
     const waMeUrl = `https://wa.me/${cleanRecipientPhone}?text=${encodeURIComponent(alertMessage)}`;
@@ -1302,19 +1320,25 @@ router.post('/accept-reason', async (req, res) => {
     const vehId = vehicleId || 'TN-59-EF-9012';
 
     // 1. Resolve alert (by alertId, vehicle_id, or trip_id)
-    if (alertId) {
+    if (alertId && alertId !== 'undefined' && alertId !== 'null') {
       await db.query(`UPDATE alerts SET status = 'Resolved', resolved_at = NOW() WHERE id = $1`, [alertId]);
     }
+    const cleanVeh = (vehId || '').replace(/[^A-Za-z0-9]/g, '');
     await db.query(
       `UPDATE alerts SET status = 'Resolved', resolved_at = NOW() 
-       WHERE (vehicle_id = $1 OR ($2 <> '' AND trip_id = $2)) AND (type = 'Stoppage Detected' OR type = 'Driver Delay Report' OR type = 'Emergency Breakdown') AND (status = 'Active' OR status = 'Escalated')`,
-      [vehId, tripId || '']
+       WHERE (
+         vehicle_id = $1 
+         OR REPLACE(REPLACE(vehicle_id, '-', ''), ' ', '') = $2
+         OR ($3 <> '' AND trip_id = $3)
+       ) AND (status = 'Active' OR status = 'Escalated')`,
+      [vehId, cleanVeh, tripId || '']
     );
 
-    // 2. Clear vehicle stoppage timer
+    // 2. Clear vehicle stoppage timer and resume moving status
     await db.query(
-      `UPDATE vehicles SET stoppage_start_time = NULL, movement_status = 'MOVING', speed_kmh = 45, updated_at = NOW() WHERE id = $1`,
-      [vehId]
+      `UPDATE vehicles SET stoppage_start_time = NULL, movement_status = 'MOVING', speed_kmh = 45, updated_at = NOW() 
+       WHERE id = $1 OR REPLACE(REPLACE(id, '-', ''), ' ', '') = $2`,
+      [vehId, cleanVeh]
     );
 
     // 2b. Revert Trip status from DELAYED to IN_TRANSIT

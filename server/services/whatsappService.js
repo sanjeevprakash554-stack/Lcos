@@ -441,7 +441,8 @@ Central Operations flagged an unscheduled halt (>20 minutes without movement).
    * Automated Trigger: Send Stoppage Alert to Higher Official / Operations Manager
    */
   async sendHigherOfficialStoppageAlert(vehicle, alertData, officialPhone) {
-    if (!officialPhone) return null;
+    const targetPhone = officialPhone || process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
+    if (!targetPhone) return null;
 
     const bodyText =
 `🚨 *CRITICAL OPERATIONS ALERT - VEHICLE STOPPAGE > 20 MINS*
@@ -463,7 +464,8 @@ Automated inquiry sent to driver. Immediate review or driver follow-up required.
    * Automated Trigger: Send Transit Resumed Notification to Higher Official / Tracking Team
    */
   async sendHigherOfficialTransitResumed(details, officialPhone) {
-    if (!officialPhone) return null;
+    const targetPhone = officialPhone || process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
+    if (!targetPhone) return null;
 
     const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' });
     const bodyText =

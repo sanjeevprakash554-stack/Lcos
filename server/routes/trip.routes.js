@@ -445,6 +445,18 @@ router.post('/:id/close-delivery', authenticateToken, async (req, res) => {
       [JSON.stringify(deliveryInfo), req.params.id]
     );
 
+    // Auto-resolve any stoppage, delay or outage alerts for this completed trip & vehicle
+    await db.query(
+      `UPDATE alerts SET status = 'Resolved', resolved_at = NOW() 
+       WHERE (trip_id = $1 OR vehicle_id = $2 OR REPLACE(REPLACE(vehicle_id, '-', ''), ' ', '') = REPLACE(REPLACE($2, '-', ''), ' ', '')) 
+         AND (status = 'Active' OR status = 'Escalated')`,
+      [req.params.id, trip.vehicle_id]
+    );
+    await db.query(
+      `UPDATE vehicles SET stoppage_start_time = NULL, movement_status = 'COMPLETED', updated_at = NOW() WHERE id = $1`,
+      [trip.vehicle_id]
+    );
+
     broadcastTripUpdate(updatedTrip.rows[0]);
 
     // Send WhatsApp delivery notification asynchronously

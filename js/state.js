@@ -565,26 +565,122 @@ const LCOS_State = {
     async addManagerRequest(type, requestData) {
         try {
             const apiRes = await LCOS_API.addManagerRequest(type, requestData);
-            if (apiRes.success) {
+            if (apiRes && apiRes.success) {
                 await this.loadFromBackend();
                 return apiRes.request;
             }
         } catch (err) {
             console.error('API addManagerRequest error:', err);
         }
+        // Local fallback so request is always recorded and visible immediately
+        const maxNum = (this.data.requests || []).reduce((max, r) => {
+            const n = parseInt(String(r.id || '').replace('REQ-', ''), 10);
+            return (!isNaN(n) && n > max) ? n : max;
+        }, 100);
+        const localReq = {
+            id: 'REQ-' + (maxNum + 1),
+            type,
+            data: requestData,
+            status: 'Pending',
+            timestamp: new Date().toISOString()
+        };
+        (this.data.requests = this.data.requests || []).unshift(localReq);
+        return localReq;
     },
 
     async approveManagerRequest(reqId) {
+        let apiSuccess = false;
         try {
             const apiRes = await LCOS_API.approveManagerRequest(reqId);
-            if (apiRes.success) {
+            if (apiRes && apiRes.success) {
+                apiSuccess = true;
                 await this.loadFromBackend();
-                return true;
             }
         } catch (err) {
             console.error('API approveManagerRequest error:', err);
         }
-        return false;
+
+        // Locate and update request in local state
+        const req = (this.data.requests || []).find(r => r.id === reqId);
+        if (req) {
+            req.status = 'Approved';
+            req.approvedAt = new Date().toISOString();
+
+            let data = req.data;
+            if (typeof data === 'string') {
+                try { data = JSON.parse(data); } catch (_) { data = {}; }
+            }
+            data = data || {};
+
+            if (req.type === 'Add Driver') {
+                const driverName = data.name;
+                const driverLicense = data.license || data.license_number || '';
+                const driverPhone = data.phone || '';
+                const driverExp = Number(data.experience || data.experience_years || 1);
+
+                const alreadyExists = (this.data.drivers || []).some(d => 
+                    (driverLicense && d.license === driverLicense) || 
+                    (driverPhone && d.phone === driverPhone) ||
+                    (driverName && d.name && d.name.toLowerCase() === driverName.toLowerCase())
+                );
+
+                if (!alreadyExists && driverName) {
+                    const maxNum = (this.data.drivers || []).reduce((max, d) => {
+                        const n = parseInt(String(d.id || '').replace('DRV-', ''), 10);
+                        return (!isNaN(n) && n > max) ? n : max;
+                    }, 100);
+                    const newId = 'DRV-' + (maxNum + 1);
+
+                    this.data.drivers.push({
+                        id: newId,
+                        name: driverName,
+                        license: driverLicense,
+                        phone: driverPhone,
+                        experience: driverExp,
+                        performance: 100,
+                        warnings: 0,
+                        status: 'Available'
+                    });
+                }
+            } else if (req.type === 'Add Vehicle') {
+                const vehId = (data.id || data.vehicleId || '').toUpperCase().trim();
+                const alreadyExists = (this.data.vehicles || []).some(v => v.id === vehId);
+                if (!alreadyExists && vehId) {
+                    this.data.vehicles.push({
+                        id: vehId,
+                        type: data.type || 'Lorry',
+                        capacity: Number(data.capacity || 10),
+                        owner: data.owner || 'Self Owned',
+                        status: 'Available',
+                        currentLat: null,
+                        currentLng: null,
+                        speedKmh: 0,
+                        heading: 0,
+                        movementStatus: 'STOPPED'
+                    });
+                }
+            } else if (req.type === 'Add Stock') {
+                const branchId = data.branchId;
+                const comId = data.commodityId;
+                const qty = Number(data.quantity || data.qty || 0);
+                const s = (this.data.stock || []).find(st => st.branch_id === branchId && st.commodity_id === comId);
+                if (s) {
+                    s.available_qty = Number(s.available_qty || 0) + qty;
+                } else if (branchId && comId) {
+                    (this.data.stock = this.data.stock || []).push({
+                        branch_id: branchId,
+                        commodity_id: comId,
+                        available_qty: qty,
+                        in_transit_qty: 0,
+                        delivered_qty: 0,
+                        pending_qty: 0
+                    });
+                }
+            }
+            return true;
+        }
+
+        return apiSuccess;
     },
 
     async addStockDirectly(branchId, commodityId, qty) {

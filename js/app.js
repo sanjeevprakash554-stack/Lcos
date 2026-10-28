@@ -537,34 +537,34 @@ const app = {
         });
 
         // Submit request form submit
-        document.getElementById('form-submit-request').addEventListener('submit', (e) => {
+        document.getElementById('form-submit-request').addEventListener('submit', async (e) => {
             e.preventDefault();
             const type = document.getElementById('req-resource-type').value;
             let requestData = {};
 
             if (type === 'Add Driver') {
                 requestData = {
-                    name: document.getElementById('req-drv-name').value,
-                    license: document.getElementById('req-drv-license').value,
-                    phone: document.getElementById('req-drv-phone').value,
-                    experience: Number(document.getElementById('req-drv-exp').value)
+                    name: document.getElementById('req-drv-name').value.trim(),
+                    license: document.getElementById('req-drv-license').value.trim(),
+                    phone: document.getElementById('req-drv-phone').value.trim(),
+                    experience: Number(document.getElementById('req-drv-exp').value) || 1
                 };
             } else if (type === 'Add Vehicle') {
                 requestData = {
-                    id: document.getElementById('req-veh-id').value.toUpperCase(),
+                    id: document.getElementById('req-veh-id').value.toUpperCase().trim(),
                     type: document.getElementById('req-veh-type').value,
-                    capacity: Number(document.getElementById('req-veh-capacity').value),
+                    capacity: Number(document.getElementById('req-veh-capacity').value) || 10,
                     owner: document.getElementById('req-veh-owner').value
                 };
             } else if (type === 'Add Stock') {
                 requestData = {
                     branchId: document.getElementById('req-stock-branch').value,
                     commodityId: document.getElementById('req-stock-commodity').value,
-                    quantity: Number(document.getElementById('req-stock-qty').value)
+                    quantity: Number(document.getElementById('req-stock-qty').value) || 0
                 };
             }
 
-            LCOS_State.addManagerRequest(type, requestData);
+            await LCOS_State.addManagerRequest(type, requestData);
             this.showToast('Request submitted to Supervisor for approval.', 'success');
             document.getElementById('form-submit-request').reset();
             this.closeModal('modal-request-resource');
@@ -1497,18 +1497,19 @@ const app = {
             let badgeClass = isApp ? 'badge-request-approved' : 'badge-request-pending';
             let actionBtn = '';
             
-            if (!isApp && role === 'branch_manager') {
+            if (!isApp && (role === 'branch_manager' || role === 'owner' || role === 'super_admin')) {
                 actionBtn = `<button class="btn btn-success" style="padding:0.35rem 0.75rem; font-size:0.8rem;" onclick="app.approveRequest('${r.id}')">Approve Request</button>`;
-            } else if (!isApp && role === 'owner') {
+            } else if (!isApp) {
                 actionBtn = `<span class="badge badge-request-pending" style="font-size:0.75rem; padding:0.25rem 0.5rem;">Pending Approval</span>`;
             } else if (isApp) {
                 actionBtn = `<span class="badge badge-request-approved" style="font-size:0.75rem; padding:0.25rem 0.5rem;">✓ Approved</span>`;
             }
 
+            const rData = (typeof r.data === 'string' ? JSON.parse(r.data) : r.data) || {};
             let desc = '';
-            if (r.type === 'Add Driver') desc = `Driver Registration: ${r.data.name} (License: ${r.data.license}, Phone: ${r.data.phone})`;
-            else if (r.type === 'Add Vehicle') desc = `Vehicle Registration: ${r.data.id} (${r.data.type}, Capacity: ${r.data.capacity} MT)`;
-            else if (r.type === 'Add Stock') desc = `Stock Replenishment: +${r.data.quantity} units of ${r.data.commodityId} at ${r.data.branchId}`;
+            if (r.type === 'Add Driver') desc = `Driver Registration: ${rData.name || 'New Driver'} (License: ${rData.license || rData.license_number || '--'}, Phone: ${rData.phone || '--'})`;
+            else if (r.type === 'Add Vehicle') desc = `Vehicle Registration: ${rData.id || '--'} (${rData.type || 'Lorry'}, Capacity: ${rData.capacity || 0} MT)`;
+            else if (r.type === 'Add Stock') desc = `Stock Replenishment: +${rData.quantity || rData.qty || 0} units of ${rData.commodityId || '--'} at ${rData.branchId || '--'}`;
 
             return `
                 <div class="request-item-card ${isApp ? 'approved' : ''}" style="padding:0.95rem 1.1rem; border-radius:10px; display:flex; justify-content:space-between; align-items:center; gap:1rem;">
@@ -1905,16 +1906,20 @@ const app = {
 
     async acceptCurrentStoppageReason(vehicleId = 'TN-59-EF-9012', alertId = null) {
         try {
+            const cleanTargetVeh = (vehicleId || '').replace(/[^A-Za-z0-9]/g, '');
+            const safeAlertId = (alertId && alertId !== 'undefined' && alertId !== 'null') ? alertId : null;
+
             // Optimistically mark alert as resolved in local state immediately so banner hides without delay
             const allAlerts = LCOS_State.getAlerts() || [];
             allAlerts.forEach(a => {
-                if (a.id === alertId || (vehicleId && (a.vehicleId === vehicleId || a.vehicle_id === vehicleId))) {
+                const aVeh = (a.vehicleId || a.vehicle_id || '').replace(/[^A-Za-z0-9]/g, '');
+                if ((safeAlertId && a.id === safeAlertId) || (cleanTargetVeh && aVeh === cleanTargetVeh)) {
                     a.status = 'Resolved';
                 }
             });
             this.renderAlertBanner(allAlerts);
 
-            const res = await window.LCOS_API.acceptStoppageReason({ vehicleId, alertId });
+            const res = await window.LCOS_API.acceptStoppageReason({ vehicleId, alertId: safeAlertId });
             if (res.success) {
                 this.showToast('✅ Delay reason ACCEPTED! Lorry approved to proceed & confirmation sent to driver WhatsApp.', 'success');
                 await this.refreshAlertsAndDashboard();
@@ -1983,16 +1988,17 @@ const app = {
 
     async dismissAlert(alertId) {
         try {
+            const safeAlertId = (alertId && alertId !== 'undefined' && alertId !== 'null') ? alertId : null;
             // Optimistically mark alert as resolved in local state
             const allAlerts = LCOS_State.getAlerts() || [];
-            if (alertId) {
-                const found = allAlerts.find(a => a.id === alertId);
+            if (safeAlertId) {
+                const found = allAlerts.find(a => a.id === safeAlertId);
                 if (found) found.status = 'Resolved';
             }
             this.renderAlertBanner(allAlerts);
 
-            if (alertId) {
-                await LCOS_State.resolveAlert(alertId);
+            if (safeAlertId) {
+                await LCOS_State.resolveAlert(safeAlertId);
                 this.showToast('Alert resolved and dismissed.', 'success');
             }
             await LCOS_State.loadFromBackend();
@@ -2095,16 +2101,17 @@ const app = {
                     let badgeClass = isApp ? 'badge-request-approved' : 'badge-request-pending';
                     let actionBtn = '';
                     
-                    if (!isApp && role === 'branch_manager') {
+                    if (!isApp && (role === 'branch_manager' || role === 'owner' || role === 'super_admin')) {
                         actionBtn = `<button class="btn btn-success" style="padding:0.2rem 0.4rem; font-size:0.7rem;" onclick="app.approveRequest('${r.id}')">Approve</button>`;
-                    } else if (!isApp && role === 'owner') {
+                    } else if (!isApp) {
                         actionBtn = `<span class="badge badge-request-pending" style="font-size:0.65rem; padding:0.15rem 0.3rem;">Pending</span>`;
                     }
 
+                    const rData = (typeof r.data === 'string' ? JSON.parse(r.data) : r.data) || {};
                     let desc = '';
-                    if (r.type === 'Add Driver') desc = `Driver: ${r.data.name} (License: ${r.data.license})`;
-                    else if (r.type === 'Add Vehicle') desc = `Vehicle: ${r.data.id} (${r.data.type})`;
-                    else if (r.type === 'Add Stock') desc = `Stock: +${r.data.quantity} units of ${r.data.commodityId} at ${r.data.branchId}`;
+                    if (r.type === 'Add Driver') desc = `Driver: ${rData.name || 'New Driver'} (License: ${rData.license || rData.license_number || '--'})`;
+                    else if (r.type === 'Add Vehicle') desc = `Vehicle: ${rData.id || '--'} (${rData.type || 'Lorry'})`;
+                    else if (r.type === 'Add Stock') desc = `Stock: +${rData.quantity || rData.qty || 0} units of ${rData.commodityId || '--'} at ${rData.branchId || '--'}`;
 
                     return `
                         <div class="request-item-card ${isApp ? 'approved' : ''}">
@@ -2145,15 +2152,18 @@ const app = {
         // Suppress alerts if the associated trip or task has completed
         const alerts = (rawAlerts || []).filter(a => {
             if (!a) return false;
-            if (a.status !== 'Active' && a.status !== 'Escalated') return false;
+            const status = String(a.status || '').toLowerCase();
+            if (status !== 'active' && status !== 'escalated') return false;
             if (a.type === 'Incoming Call') return false;
             
             // If the alert is linked to a completed or closed trip, hide it
-            if (a.tripId && completedTripIds.has(a.tripId)) return false;
+            const alertTripId = a.tripId || a.trip_id;
+            if (alertTripId && completedTripIds.has(alertTripId)) return false;
 
             // If the vehicle has trips recorded and none of them are active, hide it
-            if (a.vehicleId) {
-                const vehicleTrips = trips.filter(t => t.vehicleId === a.vehicleId);
+            const aVeh = (a.vehicleId || a.vehicle_id || '').replace(/[^A-Za-z0-9]/g, '');
+            if (aVeh) {
+                const vehicleTrips = trips.filter(t => (t.vehicleId || t.vehicle_id || '').replace(/[^A-Za-z0-9]/g, '') === aVeh);
                 const hasActive = vehicleTrips.some(t => ['IN_TRANSIT', 'DELAYED', 'CREATED', 'DISPATCH_APPROVED'].includes(t.status));
                 if (vehicleTrips.length > 0 && !hasActive) return false;
             }
@@ -5704,13 +5714,15 @@ const app = {
         this.renderAll();
     },
 
-    approveRequest(reqId) {
-        const success = LCOS_State.approveManagerRequest(reqId);
+    async approveRequest(reqId) {
+        this.showToast(`Processing approval for request ${reqId}...`, 'info');
+        const success = await LCOS_State.approveManagerRequest(reqId);
         if (success) {
-            this.showToast(`Request ${reqId} approved and resource registered.`, 'success');
+            this.showToast(`Request ${reqId} approved and resource registered successfully.`, 'success');
             this.renderAll();
         } else {
             this.showToast('Failed to approve request.', 'danger');
+            this.renderAll();
         }
     },
 

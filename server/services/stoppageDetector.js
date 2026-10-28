@@ -107,7 +107,7 @@ async function checkVehicleStoppages() {
         }
 
         // 2. Send automated WhatsApp stoppage alert to Higher Official / Operations Manager
-        const higherOfficialPhone = process.env.HIGHER_OFFICIAL_PHONE || row.manager_phone;
+        const higherOfficialPhone = process.env.HIGHER_OFFICIAL_PHONE || row.manager_phone || '916382897998';
         if (higherOfficialPhone) {
           whatsappService.sendHigherOfficialStoppageAlert(row, { stoppage_duration_minutes: durationMins }, higherOfficialPhone)
             .catch(err => console.warn('⚠️ Stoppage WhatsApp alert error (Higher Official):', err.message));
@@ -200,7 +200,7 @@ async function checkNoGpsSignalOutages() {
               `⚠️ *GPS Signal Outage Warning*\nVehicle *${row.vehicle_id}* has stopped transmitting GPS data for ${elapsedMins} minutes.\nPlease ensure your mobile tracker is online and GPS is enabled.`
             ).catch(err => console.warn('⚠️ No Update WhatsApp alert error (Driver):', err.message));
           }
-          const higherOfficialPhone = process.env.HIGHER_OFFICIAL_PHONE || row.manager_phone;
+          const higherOfficialPhone = process.env.HIGHER_OFFICIAL_PHONE || row.manager_phone || '916382897998';
           if (higherOfficialPhone) {
             whatsappService.sendTextMessage(
               higherOfficialPhone,

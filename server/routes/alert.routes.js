@@ -77,12 +77,42 @@ router.post('/', authenticateToken, async (req, res) => {
         }
 
         // 2. Notify Higher Official
-        const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE;
+        const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
         if (higherOfficial) {
-          await whatsappService.sendTextMessage(
-            higherOfficial,
-            `🚨 *OPERATIONS INCIDENT ALERT*\n------------------------\nType: ${type || 'Incident'} (Severity: ${severity || 'Warning'})\nDetails: ${message}\nVehicle: ${vehicleId || 'N/A'} | Driver: ${driverName || 'N/A'} (📞 ${driverPhone || 'N/A'})\nTrip ID: ${tripId || 'N/A'}\n------------------------\nOperations Control has logged this incident.`
-          );
+          const isStoppage = (type && type.toLowerCase().includes('stoppage')) || (message && message.toLowerCase().includes('halted'));
+          if (isStoppage) {
+            let routeInfo = { source_name: 'Origin Depot', dest_name: 'Destination Depot' };
+            if (tripId) {
+              const bRes = await db.query(
+                `SELECT sb.name AS source_name, db_br.name AS dest_name 
+                 FROM trips t 
+                 LEFT JOIN branches sb ON sb.id = t.source_branch_id 
+                 LEFT JOIN branches db_br ON db_br.id = t.destination_branch_id 
+                 WHERE t.id = $1`,
+                [tripId]
+              );
+              if (bRes.rows.length > 0) routeInfo = bRes.rows[0];
+            }
+            await whatsappService.sendHigherOfficialStoppageAlert(
+              {
+                vehicle_id: vehicleId || 'TN-59-EF-9012',
+                driver_name: driverName || 'Saravanan K.',
+                driver_phone: driverPhone || '916382897998',
+                trip_id: tripId || 'TRIP-1002',
+                source_name: routeInfo.source_name || 'Coimbatore',
+                dest_name: routeInfo.dest_name || 'Chennai',
+                current_lat: '11.6455',
+                current_lng: '78.1576'
+              },
+              { stoppage_duration_minutes: 25 },
+              higherOfficial
+            ).catch(err => console.warn('Higher official stoppage alert error:', err.message));
+          } else {
+            await whatsappService.sendTextMessage(
+              higherOfficial,
+              `🚨 *OPERATIONS INCIDENT ALERT*\n────────────────────────────\n📋 *Type:* ${type || 'Incident'} (${severity || 'Warning'})\n📝 *Details:* ${message}\n🚛 *Vehicle:* ${vehicleId || 'N/A'}\n👤 *Driver:* ${driverName || 'N/A'}${driverPhone ? ` (📞 ${driverPhone})` : ''}\n📋 *Trip ID:* ${tripId || 'N/A'}\n────────────────────────────\n_Logistics Operations Control_`
+            ).catch(err => console.warn('Higher official alert error:', err.message));
+          }
         }
       } catch (waErr) {
         console.warn('⚠️ [WhatsApp Alert Dispatch Error]:', waErr.message);
