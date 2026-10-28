@@ -19,11 +19,11 @@ class WhatsAppService {
   }
 
   getConfig() {
-    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
-    const accessToken = process.env.WHATSAPP_ACCESS_TOKEN || '';
-    const businessAccountId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '';
+    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || '1246879781843655';
+    const accessToken = process.env.WHATSAPP_ACCESS_TOKEN || 'EAAQeAI63VoYBSw60w5C4LZBBg4AXIipaVBK8MZA8c9uFZBoPqXf426GgnMwbp9JcvXQaCBFvmhItuWcO2NFAJ7azzZAIe9jzrNXHXhuA2UNPZCoxykaSjruteZCxYyLvkZCiwnAgAwxuMWLF5u9xEAulduVqTMfQOL857HnURSJgYXI9KiDuun0y7vKhkgjGqFbWwZDZD';
+    const businessAccountId = process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '2546380309167877';
     const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN || 'lcos_meta_verify_token_2026';
-    const higherOfficialPhone = process.env.HIGHER_OFFICIAL_PHONE || '';
+    const higherOfficialPhone = process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
 
     return {
       apiVersion: process.env.WHATSAPP_API_VERSION || 'v21.0',
@@ -349,13 +349,41 @@ Send a 📍 Location pin anytime to sync your vehicle GPS.`;
    */
   async sendStoppageAlertNotification(vehicle, alertData, recipientPhone) {
     if (!recipientPhone) return null;
+    const vehId = vehicle.vehicle_id || vehicle.id || 'TN-59-EF-9012';
+    const duration = `${alertData.stoppage_duration_minutes || 20}+ minutes`;
+    const coords = `${vehicle.current_lat || '11.6455'}, ${vehicle.current_lng || '78.1576'}`;
 
+    // 1. Primary: Send the officially approved Meta template (_unscheduled_halt_warning_v1)
+    try {
+      const templateRes = await this.sendTemplate(
+        recipientPhone,
+        '_unscheduled_halt_warning_v1',
+        'en',
+        [
+          {
+            type: 'body',
+            parameters: [
+              { type: 'text', text: vehId },
+              { type: 'text', text: duration },
+              { type: 'text', text: coords }
+            ]
+          }
+        ]
+      );
+      if (templateRes && templateRes.success) {
+        return templateRes;
+      }
+    } catch (err) {
+      console.warn('⚠️ [WhatsApp] Meta template delivery notice:', err.message);
+    }
+
+    // 2. Secondary fallback: Interactive buttons within active 24h window
     const bodyText =
 `🚨🔊 *URGENT STOPPAGE ALERT (>20 MINS)*
 ────────────────────────────
-🚛 *Vehicle:* ${vehicle.vehicle_id || vehicle.id}
-⏱️ *Stationary Time:* ${alertData.stoppage_duration_minutes || 20}+ minutes
-📍 *Current Coordinates:* ${vehicle.current_lat || 'Unknown'}, ${vehicle.current_lng || 'Unknown'}
+🚛 *Vehicle:* ${vehId}
+⏱️ *Stationary Time:* ${duration}
+📍 *Current Coordinates:* ${coords}
 ────────────────────────────
 Central Operations flagged an unscheduled halt (>20 minutes without movement).
 ⚠️ *Tap your current reason below to update Central Operations immediately:*`;
@@ -363,13 +391,12 @@ Central Operations flagged an unscheduled halt (>20 minutes without movement).
     const buttons = [
       { id: `stp_traffic_${vehicle.id || vehicle.vehicle_id}`, title: 'Traffic / Toll Delay' },
       { id: `stp_breakdown_${vehicle.id || vehicle.vehicle_id}`, title: 'Puncture / Breakdown' },
-      { id: `stp_moving_${vehicle.id || vehicle.vehicle_id}`, title: 'Resuming Movement' },
+      { id: `stp_lunch_${vehicle.id || vehicle.vehicle_id}`, title: 'Lunch / Food Break' },
     ];
 
     try {
       const btnRes = await this.sendInteractiveButtons(recipientPhone, '🚨 Unscheduled Halt Warning', bodyText, buttons, 'LCOS Monitoring Unit');
       if (!btnRes.success) {
-        // Fallback to text message if interactive is rejected
         return await this.sendTextMessage(recipientPhone, bodyText);
       }
       return btnRes;
@@ -438,6 +465,78 @@ Automated inquiry sent to driver. Immediate review or driver follow-up required.
 All goods verified and stock received at destination warehouse. Thank you for your partnership!`;
 
     return this.sendTextMessage(recipientPhone, bodyText);
+  }
+
+  /**
+   * Automated Trigger: Send Return Load Opportunity Notification to Driver & Branch Manager
+   */
+  async sendReturnLoadOpportunityNotification({ driverPhone, managerPhone, returnTrip, vehicle, driver, sourceBranch, destBranch }) {
+    const results = { driver: null, manager: null };
+
+    const cargoDesc = `${returnTrip.commodity_name || 'Commodity'} (${returnTrip.quantity} ${returnTrip.commodity_unit || 'Units'})`;
+    const sourceName = sourceBranch?.name || returnTrip.source_branch_id || 'Current Branch';
+    const sourceManager = sourceBranch?.manager_name || 'Branch In-charge';
+    const sourcePhone = sourceBranch?.phone || 'Office Line';
+    const destName = destBranch?.name || returnTrip.destination_branch_id || 'Home Base';
+    const vehicleId = vehicle?.id || vehicle?.vehicle_id || 'Lorry';
+    const driverName = driver?.name || 'Assigned Driver';
+    const driverPhoneNum = driver?.phone || 'Driver Line';
+
+    // 1. Message to Driver
+    if (driverPhone) {
+      const driverBody =
+`🔔 *RETURN LOAD OPPORTUNITY DETECTED - LCOS*
+────────────────────────────
+📦 *Cargo:* ${cargoDesc}
+📍 *Pickup Location:* ${sourceName}
+🏢 *Branch Manager:* ${sourceManager} (📞 ${sourcePhone})
+🏁 *Destination:* ${destName} (Home Depot)
+🚛 *Your Lorry:* ${vehicleId}
+────────────────────────────
+📞 *Action Required:* Call Branch Manager ${sourceManager} (${sourcePhone}) to verify gate number and loading readiness.
+💻 Once verified, the manager will click *"Pair Backload"* on LCOS to approve your return journey!`;
+
+      results.driver = await this.sendTextMessage(driverPhone, driverBody);
+    }
+
+    // 2. Message to Branch Manager
+    if (managerPhone) {
+      const managerBody =
+`🔔 *NEW RETURN LOAD OPPORTUNITY (CALL & VERIFY)*
+────────────────────────────
+📦 *Pending Cargo:* ${cargoDesc}
+📍 *Pickup Branch:* ${sourceName}
+🏁 *Destination:* ${destName}
+🚛 *Available Lorry:* ${vehicleId}
+👤 *Driver:* ${driverName} (📞 ${driverPhoneNum})
+────────────────────────────
+📞 *Action Required:* Call Driver ${driverName} (${driverPhoneNum}) to verify truck availability & gate arrival.
+💻 *Next Step:* Once confirmed, open LCOS Return Hub and click *"Pair Backload"* to dispatch!`;
+
+      results.manager = await this.sendTextMessage(managerPhone, managerBody);
+    }
+
+    return results;
+  }
+
+  /**
+   * Automated Trigger: Send Return Load Confirmed & Dispatched Notification to Branch Manager
+   */
+  async sendReturnLoadConfirmedNotification({ managerPhone, tripId, vehicleId, driverName, driverPhone, sourceName, destName, cargoDesc }) {
+    if (!managerPhone) return null;
+
+    const bodyText =
+`✅ *RETURN LOAD CONFIRMED & PAIRED*
+────────────────────────────
+📋 *Trip ID:* ${tripId}
+🚛 *Vehicle:* ${vehicleId}
+👤 *Driver:* ${driverName} (📞 ${driverPhone})
+📦 *Cargo:* ${cargoDesc}
+📍 *Route:* ${sourceName} ➔ ${destName}
+────────────────────────────
+🚀 Lorry has been officially paired and approved for return transit. Tracking is now active on LCOS!`;
+
+    return this.sendTextMessage(managerPhone, bodyText);
   }
 }
 

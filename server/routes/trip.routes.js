@@ -321,12 +321,23 @@ router.post('/:id/close-delivery', authenticateToken, async (req, res) => {
       );
     }
 
+    // Always mark the arriving vehicle and driver as Available (stationed at the destination branch)
+    await db.query(`UPDATE vehicles SET status = 'Available', updated_at = NOW() WHERE id = $1`, [trip.vehicle_id]);
+    await db.query(`UPDATE drivers SET status = 'Available', updated_at = NOW() WHERE id = $1`, [trip.driver_id]);
+    if (trip.helper_id) {
+      await db.query(`UPDATE helpers SET status = 'Available', updated_at = NOW() WHERE id = $1`, [trip.helper_id]);
+    }
+
     // Automated Return Load Matching Engine
     // Check if there is an available pending load at the current destination heading back or to a suitable return destination
     const returnLoadRes = await db.query(
-      `SELECT t.*, c.name AS commodity_name 
+      `SELECT t.*, c.name AS commodity_name, c.unit AS commodity_unit,
+              sb.name AS source_branch_name, sb.manager_name AS source_manager_name, sb.phone AS source_manager_phone,
+              db_br.name AS destination_branch_name, db_br.manager_name AS destination_manager_name, db_br.phone AS destination_manager_phone
        FROM trips t
        LEFT JOIN commodities c ON c.id = t.commodity_id
+       LEFT JOIN branches sb ON sb.id = t.source_branch_id
+       LEFT JOIN branches db_br ON db_br.id = t.destination_branch_id
        WHERE t.source_branch_id = $1 
          AND t.status IN ('CREATED', 'PLANNED') 
          AND (t.company_id = $2 OR t.company_id = 'COMP-001' OR t.company_id IS NULL)
@@ -338,35 +349,51 @@ router.post('/:id/close-delivery', authenticateToken, async (req, res) => {
     let returnMatchingInfo = {};
     if (returnLoadRes.rows.length > 0) {
       const returnTrip = returnLoadRes.rows[0];
-      // Assign return payload to the same lorry, driver, and helper
-      await db.query(
-        `UPDATE trips 
-         SET vehicle_id = $1, driver_id = $2, helper_id = $3, status = 'DISPATCH_APPROVED', updated_at = NOW()
-         WHERE id = $4`,
-        [trip.vehicle_id, trip.driver_id, trip.helper_id, returnTrip.id]
-      );
-
-      await db.query(`UPDATE vehicles SET status = 'In Transit', updated_at = NOW() WHERE id = $1`, [trip.vehicle_id]);
-      await db.query(`UPDATE drivers SET status = 'On Trip', updated_at = NOW() WHERE id = $1`, [trip.driver_id]);
 
       returnMatchingInfo = {
         hasReturnLoad: true,
-        returnTripId: returnTrip.id,
+        potentialReturnTripId: returnTrip.id,
         returnCommodity: returnTrip.commodity_name || 'Return Cargo',
         returnQuantity: returnTrip.quantity,
         returnSource: trip.destination_branch_id,
         returnDestination: returnTrip.destination_branch_id,
-        statusText: 'Return Load Assigned',
-        message: `Return cargo matched! Trip ${returnTrip.id} (${returnTrip.commodity_name}) assigned to lorry ${trip.vehicle_id}.`
+        statusText: 'Opportunity Detected - Call & Verify',
+        message: `Return cargo found (${returnTrip.commodity_name}) at ${returnTrip.source_branch_name || trip.destination_branch_id}. WhatsApp sent to Driver & Branch Manager. Call & verify before clicking "Pair Backload".`
       };
+
+      // Asynchronously trigger automated WhatsApp to both Driver and Destination Branch Manager
+      (async () => {
+        try {
+          const driverRes = await db.query(`SELECT name, phone FROM drivers WHERE id = $1`, [trip.driver_id]);
+          const vehicleRes = await db.query(`SELECT id, type FROM vehicles WHERE id = $1`, [trip.vehicle_id]);
+          const driverInfo = driverRes.rows[0] || {};
+          const vehicleInfo = vehicleRes.rows[0] || {};
+
+          await whatsappService.sendReturnLoadOpportunityNotification({
+            driverPhone: driverInfo.phone,
+            managerPhone: returnTrip.source_manager_phone,
+            returnTrip,
+            vehicle: vehicleInfo,
+            driver: driverInfo,
+            sourceBranch: {
+              id: trip.destination_branch_id,
+              name: returnTrip.source_branch_name,
+              manager_name: returnTrip.source_manager_name,
+              phone: returnTrip.source_manager_phone,
+            },
+            destBranch: {
+              id: returnTrip.destination_branch_id,
+              name: returnTrip.destination_branch_name,
+              manager_name: returnTrip.destination_manager_name,
+              phone: returnTrip.destination_manager_phone,
+            },
+          });
+        } catch (waErr) {
+          console.warn('⚠️ [WhatsApp Return Opportunity Alert Error]:', waErr.message);
+        }
+      })();
     } else {
       // No return load available -> Flag as Empty Return
-      await db.query(`UPDATE vehicles SET status = 'Available', updated_at = NOW() WHERE id = $1`, [trip.vehicle_id]);
-      await db.query(`UPDATE drivers SET status = 'Available', updated_at = NOW() WHERE id = $1`, [trip.driver_id]);
-      if (trip.helper_id) {
-        await db.query(`UPDATE helpers SET status = 'Available', updated_at = NOW() WHERE id = $1`, [trip.helper_id]);
-      }
-
       returnMatchingInfo = {
         hasReturnLoad: false,
         returnType: 'Empty Return',
@@ -580,6 +607,47 @@ router.post('/assign-backload', authenticateToken, authorizeRoles('SUPER_ADMIN',
     }
 
     broadcastTripUpdate(updatedTrip.rows[0]);
+
+    // Send automated WhatsApp dispatch alerts asynchronously
+    (async () => {
+      try {
+        const enrichedTripRes = await db.query(
+          `SELECT t.*, c.name AS commodity_name, c.unit AS commodity_unit,
+                  sb.name AS source_branch_name, sb.phone AS source_branch_phone, sb.manager_name AS source_manager_name,
+                  db_br.name AS destination_branch_name, db_br.phone AS destination_branch_phone,
+                  d.name AS driver_name, d.phone AS driver_phone
+           FROM trips t
+           LEFT JOIN commodities c ON c.id = t.commodity_id
+           LEFT JOIN branches sb ON sb.id = t.source_branch_id
+           LEFT JOIN branches db_br ON db_br.id = t.destination_branch_id
+           LEFT JOIN drivers d ON d.id = t.driver_id
+           WHERE t.id = $1`,
+          [tripId]
+        );
+        const row = enrichedTripRes.rows[0];
+        if (row) {
+          // 1. Send Dispatch details & interactive buttons to driver
+          if (row.driver_phone) {
+            await whatsappService.sendTripDispatchNotification(row, row.driver_phone);
+          }
+          // 2. Send Pairing confirmation to source branch manager
+          if (row.source_branch_phone) {
+            await whatsappService.sendReturnLoadConfirmedNotification({
+              managerPhone: row.source_branch_phone,
+              tripId: row.id,
+              vehicleId: row.vehicle_id,
+              driverName: row.driver_name,
+              driverPhone: row.driver_phone,
+              sourceName: row.source_branch_name,
+              destName: row.destination_branch_name,
+              cargoDesc: `${row.commodity_name || 'Goods'} (${row.quantity} ${row.commodity_unit || 'Units'})`
+            });
+          }
+        }
+      } catch (waErr) {
+        console.warn('⚠️ [WhatsApp Backload Paired Alert Error]:', waErr.message);
+      }
+    })();
 
     res.json({
       success: true,

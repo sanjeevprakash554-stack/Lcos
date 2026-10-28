@@ -1410,12 +1410,27 @@ const app = {
             let actionBtn = '';
             const role = LCOS_State.getCurrentRole();
 
-            if (a.type === 'Driver Delay Report' || a.type === 'Stoppage Detected' || a.type === 'Emergency Breakdown' || (a.message && a.message.toLowerCase().includes('stoppage'))) {
+            const hasDriverReason = a.type === 'Driver Delay Report' || 
+                a.type === 'Emergency Breakdown' ||
+                (a.message && (
+                    a.message.toLowerCase().includes('reported delay') || 
+                    a.message.toLowerCase().includes('reported reason') ||
+                    a.message.toLowerCase().includes('reported breakdown')
+                ));
+
+            if (hasDriverReason) {
                 const phone = a.driverPhone || a.driver_phone || '916382897998';
                 const vehId = a.vehicleId || a.vehicle_id || 'TN-59-EF-9012';
                 actionBtn = `
-                    <button class="btn btn-success" style="padding:0.35rem 0.75rem; font-size:0.8rem; background:#10b981; border-color:#059669; font-weight:700; color:#fff;" onclick="app.acceptCurrentStoppageReason('${vehId}', '${a.id}')">✅ Accept</button>
+                    <button class="btn btn-success" style="padding:0.35rem 0.75rem; font-size:0.8rem; background:#10b981; border-color:#059669; font-weight:700; color:#fff;" onclick="app.acceptCurrentStoppageReason('${vehId}', '${a.id}')">✅ Accept Reason</button>
                     <button class="btn btn-danger" style="padding:0.35rem 0.75rem; font-size:0.8rem; background:#ef4444; border-color:#dc2626; font-weight:700; color:#fff;" onclick="app.declineAndCallDriver('${vehId}', '${phone}', '${a.id}')">📞 Decline & Call</button>
+                `;
+            } else if (a.type === 'Stoppage Detected' || (a.message && a.message.toLowerCase().includes('stoppage'))) {
+                const phone = a.driverPhone || a.driver_phone || '916382897998';
+                const vehId = a.vehicleId || a.vehicle_id || 'TN-59-EF-9012';
+                actionBtn = `
+                    <span class="badge" style="font-size:0.75rem; padding:0.25rem 0.5rem; background:rgba(245, 158, 11, 0.15); color:#d97706; border:1px solid #f59e0b; margin-right:0.35rem;">⏳ Awaiting WhatsApp Reply</span>
+                    <button class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.75rem; font-weight:600;" onclick="app.declineAndCallDriver('${vehId}', '${phone}', '${a.id}')">📞 Call Driver</button>
                 `;
             } else if (role === 'owner') {
                 actionBtn = `<span class="badge badge-draft" style="font-size:0.75rem; padding:0.25rem 0.5rem;">OWNER MONITORING</span>`;
@@ -1814,11 +1829,13 @@ const app = {
         const buttonIds = {
             traffic: `stp_traffic_${vehicleId}`,
             breakdown: `stp_breakdown_${vehicleId}`,
+            lunch: `stp_lunch_${vehicleId}`,
             resuming: `stp_moving_${vehicleId}`
         };
         const titles = {
             traffic: 'Traffic / Toll Delay',
             breakdown: 'Puncture / Breakdown',
+            lunch: 'Lunch / Food Break',
             resuming: 'Resuming Movement'
         };
 
@@ -2143,10 +2160,24 @@ const app = {
                     alert.message.toLowerCase().includes('transit delay')
                 ));
 
+            const hasDriverReason = alert.type === 'Driver Delay Report' || 
+                alert.type === 'Emergency Breakdown' ||
+                (alert.message && (
+                    alert.message.toLowerCase().includes('reported delay') || 
+                    alert.message.toLowerCase().includes('reported reason') ||
+                    alert.message.toLowerCase().includes('reported breakdown') ||
+                    alert.message.toLowerCase().includes('lunch') ||
+                    alert.message.toLowerCase().includes('rest break') ||
+                    alert.message.toLowerCase().includes('traffic')
+                ));
+
             if (bannerBadge) {
-                if (isStoppage) {
-                    bannerBadge.textContent = '🚨 STOPPAGE';
-                    bannerBadge.style.background = '#e11d48';
+                if (isStoppage && hasDriverReason) {
+                    bannerBadge.textContent = alert.type === 'Emergency Breakdown' ? '🚨 BREAKDOWN' : '🟡 REASON SUBMITTED';
+                    bannerBadge.style.background = alert.type === 'Emergency Breakdown' ? '#dc2626' : '#d97706';
+                } else if (isStoppage) {
+                    bannerBadge.textContent = '⏳ AWAITING DRIVER REPLY';
+                    bannerBadge.style.background = '#f59e0b';
                 } else if (alert.severity === 'critical' || alert.severity === 'danger') {
                     bannerBadge.textContent = 'CRITICAL';
                     bannerBadge.style.background = '#e11d48';
@@ -2177,10 +2208,19 @@ const app = {
                 const phone = alert.driverPhone || alert.driver_phone || '916382897998';
                 const vehId = alert.vehicleId || alert.vehicle_id || 'TN-59-EF-9012';
 
-                if (isStoppage) {
+                if (isStoppage && hasDriverReason) {
+                    // Stage 2: Driver has submitted a reason via WhatsApp -> Ops can Accept or Decline
                     bannerActions.innerHTML = `
-                        <button class="btn btn-success" style="padding:0.25rem 0.65rem; font-size:0.75rem; background:#10b981; border:1px solid #059669; font-weight:700; color:#fff; border-radius:6px; cursor:pointer;" onclick="app.acceptCurrentStoppageReason('${vehId}', '${alert.id}')">✅ Accept</button>
+                        <button class="btn btn-success" style="padding:0.25rem 0.65rem; font-size:0.75rem; background:#10b981; border:1px solid #059669; font-weight:700; color:#fff; border-radius:6px; cursor:pointer;" onclick="app.acceptCurrentStoppageReason('${vehId}', '${alert.id}')">✅ Accept Reason</button>
                         <button class="btn btn-danger" style="padding:0.25rem 0.65rem; font-size:0.75rem; background:#ef4444; border:1px solid #dc2626; font-weight:700; color:#fff; border-radius:6px; cursor:pointer;" onclick="app.declineAndCallDriver('${vehId}', '${phone}', '${alert.id}')">📞 Decline & Call</button>
+                        <button class="btn btn-secondary" style="background:#ffffff; border:1px solid #fca5a5; color:#9f1239; font-weight:700; padding:0.25rem 0.6rem; font-size:0.75rem; border-radius:6px; cursor:pointer;" onclick="app.dismissAlert('${alert.id}')">✓ Dismiss</button>
+                        <button class="btn btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="app.showDashboardAlerts()">View All (${this._currentAlertsList.length})</button>
+                    `;
+                } else if (isStoppage) {
+                    // Stage 1: Vehicle stationary > 20 mins, WhatsApp alert dispatched, awaiting driver response
+                    bannerActions.innerHTML = `
+                        <span class="badge" style="background:rgba(245, 158, 11, 0.15); color:#d97706; border:1px solid #f59e0b; padding:0.25rem 0.6rem; font-size:0.75rem; font-weight:700; border-radius:6px; display:inline-flex; align-items:center; gap:0.25rem;">⏳ Awaiting Driver Reason</span>
+                        <button class="btn btn-secondary" style="background:#ffffff; border:1px solid #d1d5db; color:#374151; font-weight:700; padding:0.25rem 0.6rem; font-size:0.75rem; border-radius:6px; cursor:pointer;" onclick="app.declineAndCallDriver('${vehId}', '${phone}', '${alert.id}')">📞 Call Driver</button>
                         <button class="btn btn-secondary" style="background:#ffffff; border:1px solid #fca5a5; color:#9f1239; font-weight:700; padding:0.25rem 0.6rem; font-size:0.75rem; border-radius:6px; cursor:pointer;" onclick="app.dismissAlert('${alert.id}')">✓ Dismiss</button>
                         <button class="btn btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="app.showDashboardAlerts()">View All (${this._currentAlertsList.length})</button>
                     `;
