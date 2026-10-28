@@ -121,27 +121,32 @@ async function runMigrations() {
       // Index might already exist
     }
 
-    // 9. Full Production Purge of all dummy data (trips, alerts, call logs, gps crumbs, dummy stock, fake fleets, fake drivers)
+    // 9. Ensure active operational truck & verified WhatsApp driver exist
     try {
-      console.log('[Migration] Running complete dummy data purge on database...');
-      await db.query("DELETE FROM call_logs");
-      await db.query("DELETE FROM alerts");
-      await db.query("DELETE FROM gps_tracking_records");
-      await db.query("DELETE FROM trips");
-      await db.query("DELETE FROM stock");
-      await db.query("DELETE FROM manager_requests");
-      await db.query("DELETE FROM invoices");
-      await db.query("DELETE FROM payments");
-      await db.query("DELETE FROM whatsapp_logs");
-      await db.query("DELETE FROM helpers");
-      await db.query("DELETE FROM drivers");
-      await db.query("DELETE FROM vehicles");
-      await db.query("DELETE FROM users WHERE role = 'DRIVER' OR username LIKE 'driver%' OR username LIKE 'drv%'");
-      await db.query("UPDATE branches SET manager_name = NULL, phone = NULL");
-      await db.query("UPDATE companies SET name = 'LCOS Central Logistics', email = 'admin@lcos.internal', phone = NULL, address = NULL WHERE id = 'COMP-001'");
-      console.log('✅ [Migration] All dummy operational data, fleets, and drivers purged cleanly.');
-    } catch (purgeErr) {
-      console.warn('[Migration Purge Notice]:', purgeErr.message);
+      const vCheck = await db.query("SELECT id FROM vehicles WHERE id = 'TN-59-EF-9012'");
+      if (vCheck.rows.length === 0) {
+        await db.query(`
+          INSERT INTO vehicles (id, company_id, type, capacity_tons, ownership, status, movement_status, speed_kmh, current_lat, current_lng, created_at)
+          VALUES ('TN-59-EF-9012', 'COMP-001', 'Heavy Truck (10-Wheeler)', 16, 'OWNED', 'ACTIVE', 'STOPPED', 0, 11.6455, 78.1576, NOW())
+        `);
+      }
+      const dCheck = await db.query("SELECT id FROM drivers WHERE phone LIKE '%6382897998%'");
+      if (dCheck.rows.length === 0) {
+        await db.query(`
+          INSERT INTO drivers (id, company_id, name, phone, license_number, status, current_lat, current_lng, created_at)
+          VALUES ('DRV-101', 'COMP-001', 'Saravanan K.', '916382897998', 'TN-59-2021-00982', 'AVAILABLE', 11.6455, 78.1576, NOW())
+        `);
+      }
+      const tCheck = await db.query("SELECT id FROM trips WHERE id = 'TRIP-1002'");
+      if (tCheck.rows.length === 0) {
+        await db.query(`
+          INSERT INTO trips (id, company_id, vehicle_id, driver_id, status, source_branch_id, destination_branch_id, commodity_id, quantity, expected_delivery_date, created_at)
+          VALUES ('TRIP-1002', 'COMP-001', 'TN-59-EF-9012', 'DRV-101', 'IN_TRANSIT', 'BR-CBE', 'BR-CHE', 'COM-RIC', 25, NOW(), NOW())
+        `);
+      }
+      console.log('✅ [Migration] Verified WhatsApp driver (Saravanan K.) & vehicle (TN-59-EF-9012) ready.');
+    } catch (seedErr) {
+      console.warn('[Migration Seeding Notice]:', seedErr.message);
     }
 
     // 6. Backfill branch coordinates

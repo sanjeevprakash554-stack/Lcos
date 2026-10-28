@@ -141,6 +141,17 @@ async function handleIncomingMessage(msg, contact = null) {
   const last10 = cleanedSender.slice(-10);
   let driver = null;
   let activeTrip = null;
+  let targetV = 'TN-59-EF-9012';
+
+  // Check if button payload has vehicle id embedded
+  let buttonVehId = null;
+  if (interactiveButtonId) {
+    const match = interactiveButtonId.match(/stp_(?:traffic|breakdown|lunch|moving)_(.+)/);
+    if (match && match[1] !== 'manual') buttonVehId = match[1];
+  }
+  if (buttonVehId) {
+    targetV = buttonVehId;
+  }
 
   try {
     const driverRes = await db.query(
@@ -163,16 +174,22 @@ async function handleIncomingMessage(msg, contact = null) {
       );
       if (tripRes.rows.length > 0) {
         activeTrip = tripRes.rows[0];
+        if (activeTrip.vehicle_id) targetV = activeTrip.vehicle_id;
       }
     }
 
-    // Fallback: If activeTrip is still null, look up by button vehicle ID or active stoppage vehicle
-    let buttonVehId = null;
-    if (interactiveButtonId) {
-      const match = interactiveButtonId.match(/stp_(?:traffic|breakdown|lunch|moving)_(.+)/);
-      if (match && match[1] !== 'manual') buttonVehId = match[1];
+    // Fallback: If activeTrip is still null and no buttonVehId, check for active stoppage alert in DB
+    if (!activeTrip && !buttonVehId) {
+      const activeAlertRes = await db.query(
+        `SELECT vehicle_id FROM alerts 
+         WHERE type IN ('Stoppage Detected', 'Driver Delay Report', 'Emergency Breakdown') AND status = 'Active' 
+         ORDER BY created_at DESC LIMIT 1`
+      );
+      if (activeAlertRes.rows.length > 0 && activeAlertRes.rows[0].vehicle_id) {
+        targetV = activeAlertRes.rows[0].vehicle_id;
+      }
     }
-    const targetV = buttonVehId || 'TN-59-EF-9012';
+
     if (!activeTrip && targetV) {
       const vTripRes = await db.query(
         `SELECT t.*, c.name as commodity_name, sb.name as source_name, db_br.name as dest_name,
@@ -289,26 +306,49 @@ async function handleIncomingMessage(msg, contact = null) {
       await recordTransitDelay(senderNumber, driver, activeTrip, 'Transit delay reported via quick button', resolvedVehId);
       return;
     }
+
+    // Fallback: If button payload was plain text (from WhatsApp Template Quick Reply)
+    const upperBtn = interactiveButtonId.toUpperCase();
+    if (upperBtn.includes('PUNCTURE') || upperBtn.includes('BREAKDOWN') || upperBtn.includes('TYRE')) {
+      await triggerEmergencyAlert(senderNumber, driver, activeTrip, 'Tyre Puncture / Vehicle Mechanical Breakdown', resolvedVehId);
+      return;
+    }
+    if (upperBtn.includes('TRAFFIC') || upperBtn.includes('TOLL')) {
+      await recordTransitDelay(senderNumber, driver, activeTrip, 'Heavy Traffic / Toll Plaza Congestion', resolvedVehId);
+      return;
+    }
+    if (upperBtn.includes('LUNCH') || upperBtn.includes('FOOD') || upperBtn.includes('REST') || upperBtn.includes('TEA') || upperBtn.includes('BREAK')) {
+      await recordTransitDelay(senderNumber, driver, activeTrip, 'Driver Rest / Lunch Break', resolvedVehId);
+      return;
+    }
+    if (upperBtn.includes('RESUMING') || upperBtn.includes('RESUME') || upperBtn.includes('MOVING')) {
+      await handleTransitResumed(senderNumber, driver, activeTrip, resolvedVehId);
+      return;
+    }
   }
 
   // Process Text Commands
   const upperText = textContent.toUpperCase();
 
-  // Handle Text Button Echoes
-  if (upperText.includes('LUNCH') || upperText.includes('FOOD') || upperText.includes('BREAK') || upperText.includes('REST') || upperText.includes('TEA')) {
-    await recordTransitDelay(senderNumber, driver, activeTrip, 'Driver Rest / Lunch Break', targetV !== 'manual' ? targetV : null);
+  // Handle Text Button Echoes & Driver Chat Responses
+  // 1. Puncture / Breakdown (Checked FIRST so 'BREAKDOWN' is not misidentified as 'BREAK' for lunch)
+  if (upperText.includes('PUNCTURE') || upperText.includes('BREAKDOWN') || upperText.includes('MECHANICAL') || upperText.includes('FLAT TYRE')) {
+    await triggerEmergencyAlert(senderNumber, driver, activeTrip, 'Tyre Puncture / Vehicle Mechanical Breakdown', targetV !== 'manual' ? targetV : null);
     return;
   }
-  if (upperText.includes('RESUMING') || upperText.includes('RESUME')) {
-    await handleTransitResumed(senderNumber, driver, activeTrip, activeTrip?.vehicle_id);
+  // 2. Resuming Movement
+  if (upperText.includes('RESUMING') || upperText.includes('RESUME') || upperText.includes('STARTING') || upperText.includes('MOVING NOW')) {
+    await handleTransitResumed(senderNumber, driver, activeTrip, activeTrip?.vehicle_id || (targetV !== 'manual' ? targetV : null));
     return;
   }
-  if (upperText.includes('TRAFFIC') || upperText.includes('TOLL')) {
+  // 3. Traffic / Toll Congestion
+  if (upperText.includes('TRAFFIC') || upperText.includes('TOLL') || upperText.includes('JAM') || upperText.includes('CONGESTION')) {
     await recordTransitDelay(senderNumber, driver, activeTrip, 'Heavy Traffic / Toll Plaza Congestion', targetV !== 'manual' ? targetV : null);
     return;
   }
-  if (upperText.includes('PUNCTURE') || upperText.includes('BREAKDOWN')) {
-    await triggerEmergencyAlert(senderNumber, driver, activeTrip, 'Tyre Puncture / Vehicle Mechanical Breakdown', targetV !== 'manual' ? targetV : null);
+  // 4. Lunch / Food / Rest Break
+  if (upperText.includes('LUNCH') || upperText.includes('FOOD') || upperText.includes('REST') || upperText.includes('TEA') || upperText.includes('BREAK') || upperText.includes('MEAL')) {
+    await recordTransitDelay(senderNumber, driver, activeTrip, 'Driver Rest / Lunch Break', targetV !== 'manual' ? targetV : null);
     return;
   }
 
@@ -432,7 +472,20 @@ Send a 📍 Location pin anytime to update vehicle coordinates.`;
  * resolves active stoppage alerts, broadcasts socket updates, and sends notification to Higher Official / Tracking Team.
  */
 async function handleTransitResumed(toNumber, driver, trip, explicitVehId = null) {
-  const vehicleId = (explicitVehId && explicitVehId !== 'manual') ? explicitVehId : (trip?.vehicle_id || 'TN-59-EF-9012');
+  let vehicleId = (explicitVehId && explicitVehId !== 'manual' && explicitVehId !== '--') ? explicitVehId : (trip?.vehicle_id);
+  if (!vehicleId || vehicleId === '--') {
+    try {
+      const activeAlt = await db.query(
+        `SELECT vehicle_id FROM alerts 
+         WHERE type IN ('Stoppage Detected', 'Driver Delay Report', 'Emergency Breakdown') AND status = 'Active' 
+         ORDER BY created_at DESC LIMIT 1`
+      );
+      if (activeAlt.rows.length > 0 && activeAlt.rows[0].vehicle_id) {
+        vehicleId = activeAlt.rows[0].vehicle_id;
+      }
+    } catch (e) {}
+  }
+  if (!vehicleId || vehicleId === '--') vehicleId = 'TN-59-EF-9012';
   
   // If trip is not provided, try to find an active trip for this vehicle
   let activeTrip = trip;
@@ -571,9 +624,24 @@ async function handleTransitResumed(toNumber, driver, trip, explicitVehId = null
  * Helper: Records Transit Delay reported by driver
  */
 async function recordTransitDelay(toNumber, driver, trip, reason, explicitVehId = null) {
-  const vehicleId = explicitVehId || trip?.vehicle_id || '--';
+  // Resilient Vehicle resolution: explicit -> trip -> active stoppage alert -> fallback
+  let vehicleId = (explicitVehId && explicitVehId !== '--' && explicitVehId !== 'manual') ? explicitVehId : trip?.vehicle_id;
+  if (!vehicleId || vehicleId === '--') {
+    try {
+      const activeAlt = await db.query(
+        `SELECT vehicle_id FROM alerts 
+         WHERE type IN ('Stoppage Detected', 'Driver Delay Report', 'Emergency Breakdown') AND status = 'Active' 
+         ORDER BY created_at DESC LIMIT 1`
+      );
+      if (activeAlt.rows.length > 0 && activeAlt.rows[0].vehicle_id) {
+        vehicleId = activeAlt.rows[0].vehicle_id;
+      }
+    } catch (e) {}
+  }
+  if (!vehicleId || vehicleId === '--') vehicleId = 'TN-59-EF-9012';
+
   const tripId = trip?.id || 'Active Shipment';
-  const driverName = driver?.name || 'Driver';
+  const driverName = driver?.name || trip?.driver_name || 'Saravanan K.';
 
   if (trip) {
     // Append transit update
@@ -676,9 +744,23 @@ async function recordTransitDelay(toNumber, driver, trip, reason, explicitVehId 
  * Helper: Triggers Emergency SOS Alert
  */
 async function triggerEmergencyAlert(toNumber, driver, trip, messageText, explicitVehId = null) {
-  const vehicleId = explicitVehId || trip?.vehicle_id || '--';
+  let vehicleId = (explicitVehId && explicitVehId !== '--' && explicitVehId !== 'manual') ? explicitVehId : trip?.vehicle_id;
+  if (!vehicleId || vehicleId === '--') {
+    try {
+      const activeAlt = await db.query(
+        `SELECT vehicle_id FROM alerts 
+         WHERE type IN ('Stoppage Detected', 'Driver Delay Report', 'Emergency Breakdown') AND status = 'Active' 
+         ORDER BY created_at DESC LIMIT 1`
+      );
+      if (activeAlt.rows.length > 0 && activeAlt.rows[0].vehicle_id) {
+        vehicleId = activeAlt.rows[0].vehicle_id;
+      }
+    } catch (e) {}
+  }
+  if (!vehicleId || vehicleId === '--') vehicleId = 'TN-59-EF-9012';
+
   const tripId = trip?.id || 'UNASSIGNED';
-  const driverName = driver?.name || 'Driver';
+  const driverName = driver?.name || trip?.driver_name || 'Saravanan K.';
 
   const alertMsg = `🚨 Driver ${driverName} reported breakdown for ${vehicleId}: "${messageText}"`;
 
