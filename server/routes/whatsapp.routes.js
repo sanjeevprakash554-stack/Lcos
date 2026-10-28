@@ -1301,14 +1301,14 @@ router.post('/accept-reason', async (req, res) => {
     const { vehicleId, alertId, tripId, reason } = req.body || {};
     const vehId = vehicleId || 'TN-59-EF-9012';
 
-    // 1. Resolve alert
+    // 1. Resolve alert (by alertId, vehicle_id, or trip_id)
     if (alertId) {
       await db.query(`UPDATE alerts SET status = 'Resolved', resolved_at = NOW() WHERE id = $1`, [alertId]);
     }
     await db.query(
       `UPDATE alerts SET status = 'Resolved', resolved_at = NOW() 
-       WHERE vehicle_id = $1 AND (type = 'Stoppage Detected' OR type = 'Driver Delay Report' OR type = 'Emergency Breakdown') AND (status = 'Active' OR status = 'Escalated')`,
-      [vehId]
+       WHERE (vehicle_id = $1 OR ($2 <> '' AND trip_id = $2)) AND (type = 'Stoppage Detected' OR type = 'Driver Delay Report' OR type = 'Emergency Breakdown') AND (status = 'Active' OR status = 'Escalated')`,
+      [vehId, tripId || '']
     );
 
     // 2. Clear vehicle stoppage timer

@@ -1905,17 +1905,19 @@ const app = {
 
     async acceptCurrentStoppageReason(vehicleId = 'TN-59-EF-9012', alertId = null) {
         try {
+            // Optimistically mark alert as resolved in local state immediately so banner hides without delay
+            const allAlerts = LCOS_State.getAlerts() || [];
+            allAlerts.forEach(a => {
+                if (a.id === alertId || (vehicleId && (a.vehicleId === vehicleId || a.vehicle_id === vehicleId))) {
+                    a.status = 'Resolved';
+                }
+            });
+            this.renderAlertBanner(allAlerts);
+
             const res = await window.LCOS_API.acceptStoppageReason({ vehicleId, alertId });
             if (res.success) {
                 this.showToast('✅ Delay reason ACCEPTED! Lorry approved to proceed & confirmation sent to driver WhatsApp.', 'success');
-                
                 await this.refreshAlertsAndDashboard();
-
-                const remaining = (LCOS_State.getAlerts() || []).filter(a => (a.status === 'Active' || a.status === 'Escalated') && a.type !== 'Incoming Call');
-                if (remaining.length === 0) {
-                    const alertsBanner = document.getElementById('alerts-banner');
-                    if (alertsBanner) alertsBanner.style.display = 'none';
-                }
             } else {
                 this.showToast('Error: ' + (res.message || 'Could not accept reason'), 'warning');
             }
@@ -1981,12 +1983,18 @@ const app = {
 
     async dismissAlert(alertId) {
         try {
+            // Optimistically mark alert as resolved in local state
+            const allAlerts = LCOS_State.getAlerts() || [];
+            if (alertId) {
+                const found = allAlerts.find(a => a.id === alertId);
+                if (found) found.status = 'Resolved';
+            }
+            this.renderAlertBanner(allAlerts);
+
             if (alertId) {
                 await LCOS_State.resolveAlert(alertId);
                 this.showToast('Alert resolved and dismissed.', 'success');
             }
-            const banner = document.getElementById('alerts-banner');
-            if (banner) banner.style.display = 'none';
             await LCOS_State.loadFromBackend();
             this.renderAll();
         } catch (err) {
@@ -2120,7 +2128,7 @@ const app = {
         this.updateMapReport();
     },
 
-    renderAlertBanner(alerts) {
+    renderAlertBanner(rawAlerts) {
         const alertsBanner = document.getElementById('alerts-banner');
         const ticker = document.getElementById('alerts-ticker-content');
         const bannerBadge = document.getElementById('alert-banner-badge');
@@ -2128,12 +2136,38 @@ const app = {
         
         if (!alertsBanner || !ticker) return;
 
+        // Fetch current trips to cross-verify if task/trip has been completed
+        const trips = LCOS_State.getTrips() || [];
+        const completedTripStatuses = ['CLOSED', 'COMPLETED', 'COMPLETED_RETURN', 'ARRIVED', 'DELIVERED'];
+        const completedTripIds = new Set(trips.filter(t => completedTripStatuses.includes(t.status)).map(t => t.id));
+
+        // Filter strictly for ACTIVE or ESCALATED alerts (NEVER show Resolved or Dismissed alerts)
+        // Suppress alerts if the associated trip or task has completed
+        const alerts = (rawAlerts || []).filter(a => {
+            if (!a) return false;
+            if (a.status !== 'Active' && a.status !== 'Escalated') return false;
+            if (a.type === 'Incoming Call') return false;
+            
+            // If the alert is linked to a completed or closed trip, hide it
+            if (a.tripId && completedTripIds.has(a.tripId)) return false;
+
+            // If the vehicle has trips recorded and none of them are active, hide it
+            if (a.vehicleId) {
+                const vehicleTrips = trips.filter(t => t.vehicleId === a.vehicleId);
+                const hasActive = vehicleTrips.some(t => ['IN_TRANSIT', 'DELAYED', 'CREATED', 'DISPATCH_APPROVED'].includes(t.status));
+                if (vehicleTrips.length > 0 && !hasActive) return false;
+            }
+
+            return true;
+        });
+
         if (!alerts || alerts.length === 0) {
             alertsBanner.style.display = 'none';
             if (this._alertBannerTimer) {
                 clearInterval(this._alertBannerTimer);
                 this._alertBannerTimer = null;
             }
+            this._currentAlertsList = [];
             return;
         }
 
@@ -5185,6 +5219,10 @@ const app = {
 
             console.log('[LCOS Telemetry] Auto-Sync WebSocket listener initialized.');
 
+            this.socket.on('alert_resolved', async () => {
+                await this.refreshAlertsAndDashboard();
+            });
+
             // Auto-poll alerts every 4 seconds as an ultra-resilient fallback to WebSockets
             if (!this._alertsPollTimer) {
                 this._alertsPollTimer = setInterval(async () => {
@@ -5192,13 +5230,13 @@ const app = {
                         if (!document.hidden && (this.currentTab === 'dashboard' || this.currentTab === 'alerts' || !this.currentTab)) {
                             await LCOS_State.loadFromBackend();
                             const allAlerts = LCOS_State.getAlerts() || [];
-                            this.renderAlertBanner(allAlerts);
-                            if (this.currentTab === 'alerts' && typeof this.renderAlerts === 'function') {
-                                this.renderAlerts();
-                            }
                             const activeAlerts = allAlerts.filter(a => (a.status === 'Active' || a.status === 'Escalated') && a.type !== 'Incoming Call');
+                            this.renderAlertBanner(activeAlerts);
+                            if (this.currentTab === 'alerts' && typeof this.renderAlertsView === 'function') {
+                                this.renderAlertsView();
+                            }
                             const alertStat = document.getElementById('stat-alerts');
-                            if (alertStat) alertStat.textContent = activeAlerts.length;
+                            if (alertStat) alertStat.textContent = this._currentAlertsList ? this._currentAlertsList.length : activeAlerts.length;
                         }
                     } catch (e) {}
                 }, 4000);

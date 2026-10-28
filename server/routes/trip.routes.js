@@ -209,6 +209,19 @@ router.put('/:id/status', authenticateToken, async (req, res) => {
       updatedTransitUpdates.push(transitUpdate);
     }
 
+    // Auto-resolve stoppage alerts if trip reaches destination or closes
+    if (['CLOSED', 'COMPLETED_RETURN', 'ARRIVED', 'DELIVERED'].includes(status)) {
+      await db.query(
+        `UPDATE alerts SET status = 'Resolved', resolved_at = NOW() 
+         WHERE (trip_id = $1 OR vehicle_id = $2) AND (status = 'Active' OR status = 'Escalated')`,
+        [req.params.id, trip.vehicle_id]
+      );
+      await db.query(
+        `UPDATE vehicles SET stoppage_start_time = NULL, updated_at = NOW() WHERE id = $1`,
+        [trip.vehicle_id]
+      );
+    }
+
     // Handle Stock Transitions
     if (status === 'IN_TRANSIT' && oldStatus !== 'IN_TRANSIT') {
       // Source available decreases
@@ -335,11 +348,18 @@ router.post('/:id/close-delivery', authenticateToken, async (req, res) => {
     }
 
     // Always mark the arriving vehicle and driver as Available (stationed at the destination branch)
-    await db.query(`UPDATE vehicles SET status = 'Available', updated_at = NOW() WHERE id = $1`, [trip.vehicle_id]);
+    await db.query(`UPDATE vehicles SET status = 'Available', stoppage_start_time = NULL, movement_status = 'AVAILABLE', speed_kmh = 0, updated_at = NOW() WHERE id = $1`, [trip.vehicle_id]);
     await db.query(`UPDATE drivers SET status = 'Available', updated_at = NOW() WHERE id = $1`, [trip.driver_id]);
     if (trip.helper_id) {
       await db.query(`UPDATE helpers SET status = 'Available', updated_at = NOW() WHERE id = $1`, [trip.helper_id]);
     }
+
+    // Automatically resolve all active stoppage / delay alerts for this completed trip & vehicle
+    await db.query(
+      `UPDATE alerts SET status = 'Resolved', resolved_at = NOW() 
+       WHERE (trip_id = $1 OR vehicle_id = $2) AND (status = 'Active' OR status = 'Escalated')`,
+      [trip.id, trip.vehicle_id]
+    );
 
     // Automated Return Load Matching Engine
     // Check if there is an available pending load at the current destination heading back or to a suitable return destination
@@ -460,9 +480,16 @@ router.post('/:id/return-arrival', authenticateToken, async (req, res) => {
     if (tripRes.rows.length === 0) return res.status(404).json({ success: false, message: 'Trip not found' });
     const trip = tripRes.rows[0];
 
-    // Release resources
-    await db.query(`UPDATE vehicles SET status = 'Available' WHERE id = $1`, [trip.vehicle_id]);
-    await db.query(`UPDATE drivers SET status = 'Available' WHERE id = $1`, [trip.driver_id]);
+    // Release resources and clear stoppage timer
+    await db.query(`UPDATE vehicles SET status = 'Available', stoppage_start_time = NULL, movement_status = 'AVAILABLE', speed_kmh = 0, updated_at = NOW() WHERE id = $1`, [trip.vehicle_id]);
+    await db.query(`UPDATE drivers SET status = 'Available', updated_at = NOW() WHERE id = $1`, [trip.driver_id]);
+
+    // Automatically resolve all active alerts for this completed return trip & vehicle
+    await db.query(
+      `UPDATE alerts SET status = 'Resolved', resolved_at = NOW() 
+       WHERE (trip_id = $1 OR vehicle_id = $2) AND (status = 'Active' OR status = 'Escalated')`,
+      [trip.id, trip.vehicle_id]
+    );
 
     const updated = await db.query(
       `UPDATE trips SET status = 'COMPLETED_RETURN', last_update_timestamp = NOW(), updated_at = NOW() WHERE id = $1 RETURNING *`,
