@@ -75,7 +75,13 @@ const LCOS_State = {
             { id: 'COM-WHE', name: 'Wheat', unit: 'Bags', weight: 50, value: 1800 },
             { id: 'COM-PUL', name: 'Pulses', unit: 'Bags', weight: 50, value: 3200 },
             { id: 'COM-CEM', name: 'Cement', unit: 'Bags', weight: 50, value: 450 },
-            { id: 'COM-STE', name: 'Steel', unit: 'Tons', weight: 1000, value: 65000 }
+            { id: 'COM-STE', name: 'Steel', unit: 'Tons', weight: 1000, value: 65000 },
+            { id: 'COM-OIL', name: 'Cooking Oil', unit: 'Tins', weight: 15, value: 2200 },
+            { id: 'COM-TEA', name: 'Nilgiri Tea', unit: 'Boxes', weight: 25, value: 4500 },
+            { id: 'COM-COT', name: 'Raw Cotton', unit: 'Bales', weight: 170, value: 12500 },
+            { id: 'COM-TEX', name: 'Textiles & Fabrics', unit: 'Rolls', weight: 40, value: 8500 },
+            { id: 'COM-FER', name: 'Fertilizers', unit: 'Bags', weight: 50, value: 1200 },
+            { id: 'COM-SPR', name: 'Auto Spare Parts', unit: 'Crates', weight: 100, value: 35000 }
         ],
         vehicles: [],
         drivers: [],
@@ -98,6 +104,33 @@ const LCOS_State = {
         const savedRole = localStorage.getItem('LCOS_ACTIVE_ROLE');
         if (savedRole) {
             this.data.systemSettings.currentRole = savedRole;
+        }
+
+        // Restore persisted state backup (requests, stock buffers, etc.)
+        try {
+            const backup = localStorage.getItem('LCOS_STATE_BACKUP');
+            if (backup) {
+                const parsed = JSON.parse(backup);
+                if (parsed.requests && Array.isArray(parsed.requests) && parsed.requests.length > 0) {
+                    this.data.requests = parsed.requests;
+                }
+                if (parsed.stock && typeof parsed.stock === 'object') {
+                    this.data.stock = { ...(parsed.stock || {}), ...(this.data.stock || {}) };
+                }
+            }
+        } catch (_) {}
+
+        // Initialize baseline stock for all default branches & commodities
+        if (!this.data.stock || typeof this.data.stock !== 'object' || Array.isArray(this.data.stock) || Object.keys(this.data.stock).length === 0) {
+            this.data.stock = this.data.stock || {};
+            for (const b of this.data.branches) {
+                if (!this.data.stock[b.id]) this.data.stock[b.id] = {};
+                for (const c of this.data.commodities) {
+                    if (!this.data.stock[b.id][c.id]) {
+                        this.data.stock[b.id][c.id] = { available: 1000, inTransit: 0, delivered: 0, pending: 0 };
+                    }
+                }
+            }
         }
         await this.loadFromBackend();
     },
@@ -128,15 +161,18 @@ const LCOS_State = {
                     'BR-CUD': { lat: 11.7480, lng: 79.7714 },
                     'BR-DHA': { lat: 12.1277, lng: 78.1579 },
                     'BR-DIN': { lat: 10.3673, lng: 77.9803 },
+                    'BR-DGL': { lat: 10.3673, lng: 77.9803 },
                     'BR-ERD': { lat: 11.3410, lng: 77.7172 },
                     'BR-KAL': { lat: 11.7384, lng: 78.9639 },
                     'BR-KAN': { lat: 12.8342, lng: 79.7036 },
+                    'BR-KNC': { lat: 12.8342, lng: 79.7036 },
                     'BR-KKI': { lat: 8.1833, lng: 77.4119 },
                     'BR-KAR': { lat: 10.9601, lng: 78.0766 },
                     'BR-KRI': { lat: 12.5266, lng: 78.2146 },
                     'BR-MDU': { lat: 9.9252, lng: 78.1198 },
                     'BR-MAY': { lat: 11.1018, lng: 79.6522 },
                     'BR-NAG': { lat: 10.7672, lng: 79.8449 },
+                    'BR-NGP': { lat: 10.7672, lng: 79.8449 },
                     'BR-NAM': { lat: 11.2189, lng: 78.1674 },
                     'BR-NIL': { lat: 11.4102, lng: 76.6950 },
                     'BR-PER': { lat: 11.2342, lng: 78.8820 },
@@ -145,11 +181,12 @@ const LCOS_State = {
                     'BR-RAN': { lat: 12.9296, lng: 79.3331 },
                     'BR-SAL': { lat: 11.6643, lng: 78.1460 },
                     'BR-SIV': { lat: 9.8433, lng: 78.4800 },
-                    'BR-TEN': { lat: 8.9597, lng: 77.3150 },
+                    'BR-TKS': { lat: 8.9597, lng: 77.3150 },
                     'BR-THA': { lat: 10.7870, lng: 79.1378 },
                     'BR-THE': { lat: 10.0104, lng: 77.4768 },
                     'BR-TUT': { lat: 8.7642, lng: 78.1348 },
                     'BR-TRY': { lat: 10.7905, lng: 78.7047 },
+                    'BR-TEN': { lat: 8.7139, lng: 77.7567 },
                     'BR-TNL': { lat: 8.7139, lng: 77.7567 },
                     'BR-TPR': { lat: 12.4950, lng: 78.5678 },
                     'BR-TUP': { lat: 11.1085, lng: 77.3411 },
@@ -160,19 +197,22 @@ const LCOS_State = {
                     'BR-VLP': { lat: 11.9401, lng: 79.4861 },
                     'BR-VIR': { lat: 9.5872, lng: 77.9514 }
                 };
-                this.data.branches = branchesRes.value.branches.map(b => {
+                const backendBranches = branchesRes.value.branches.map(b => {
                     const gps = districtGPS[b.id] || { lat: Number(b.lat || 11.1271), lng: Number(b.lng || 78.6569) };
                     return {
                         id: b.id,
                         name: b.name,
-                        manager: b.manager_name || b.manager,
-                        phone: b.phone,
+                        manager: b.manager_name || b.manager || 'Branch Manager',
+                        phone: b.phone || '+91 94412 00000',
                         lat: gps.lat,
                         lng: gps.lng,
                         x: b.x_coord || 50,
                         y: b.y_coord || 50
                     };
                 });
+                const existingIds = new Set(backendBranches.map(b => b.id));
+                const missingDefaults = (this.data.branches || []).filter(b => !existingIds.has(b.id));
+                this.data.branches = [...backendBranches, ...missingDefaults].sort((a, b) => a.name.localeCompare(b.name));
             }
 
             if (commoditiesRes.status === 'fulfilled' && commoditiesRes.value && commoditiesRes.value.commodities && commoditiesRes.value.commodities.length > 0) {
@@ -235,7 +275,16 @@ const LCOS_State = {
             }
 
             if (stockRes.status === 'fulfilled' && stockRes.value && stockRes.value.stock) {
-                this.data.stock = stockRes.value.stock;
+                const backendStock = stockRes.value.stock;
+                if (!this.data.stock || typeof this.data.stock !== 'object' || Array.isArray(this.data.stock)) {
+                    this.data.stock = {};
+                }
+                for (const bId of Object.keys(backendStock)) {
+                    if (!this.data.stock[bId]) this.data.stock[bId] = {};
+                    for (const cId of Object.keys(backendStock[bId])) {
+                        this.data.stock[bId][cId] = backendStock[bId][cId];
+                    }
+                }
             }
 
             if (alertsRes.status === 'fulfilled' && alertsRes.value && alertsRes.value.alerts) {
@@ -249,7 +298,11 @@ const LCOS_State = {
                     severity: a.severity,
                     status: a.status,
                     escalated: a.escalated,
-                    timestamp: a.created_at
+                    escalatedToRole: a.escalated_to_role,
+                    escalatedAt: a.escalated_at,
+                    stoppageDurationMinutes: a.stoppage_duration_minutes,
+                    timestamp: a.created_at,
+                    resolvedAt: a.resolved_at
                 }));
             }
 
@@ -266,14 +319,18 @@ const LCOS_State = {
                 }));
             }
 
-            if (requestsRes.status === 'fulfilled' && requestsRes.value && requestsRes.value.requests) {
-                this.data.requests = requestsRes.value.requests.map(r => ({
+            if (requestsRes.status === 'fulfilled' && requestsRes.value && Array.isArray(requestsRes.value.requests)) {
+                const backendReqs = requestsRes.value.requests.map(r => ({
                     id: r.id,
                     type: r.type,
                     data: typeof r.request_data === 'string' ? JSON.parse(r.request_data) : r.request_data,
                     status: r.status,
                     timestamp: r.created_at
                 }));
+                // Merge backend requests with any existing local requests so offline/local items are preserved
+                const backendIds = new Set(backendReqs.map(r => String(r.id || '').toUpperCase()));
+                const localOnly = (this.data.requests || []).filter(r => !backendIds.has(String(r.id || '').toUpperCase()));
+                this.data.requests = [...backendReqs, ...localOnly];
             }
 
             console.log('[LCOS_State] PostgreSQL data loaded into state successfully.');
@@ -304,7 +361,12 @@ const LCOS_State = {
     getCallLogs() { return this.data.callLogs; },
     getAlerts() { return this.data.alerts; },
     getSystemSettings() { return this.data.systemSettings; },
-    getStock() { return this.data.stock; },
+    getStock() {
+        if (!this.data.stock || typeof this.data.stock !== 'object' || Array.isArray(this.data.stock)) {
+            this.data.stock = {};
+        }
+        return this.data.stock;
+    },
     getRequests() { return this.data.requests || []; },
 
     save() {
@@ -338,6 +400,22 @@ const LCOS_State = {
     },
 
     async addTrip(trip) {
+        // Optimistically deduct source branch available stock & update in-transit
+        if (trip.sourceBranchId && trip.commodityId && trip.quantity) {
+            if (this.data.stock?.[trip.sourceBranchId]?.[trip.commodityId]) {
+                const cur = Number(this.data.stock[trip.sourceBranchId][trip.commodityId].available || 0);
+                this.data.stock[trip.sourceBranchId][trip.commodityId].available = Math.max(0, cur - Number(trip.quantity));
+            }
+            if (trip.destinationBranchId) {
+                if (!this.data.stock[trip.destinationBranchId]) this.data.stock[trip.destinationBranchId] = {};
+                if (!this.data.stock[trip.destinationBranchId][trip.commodityId]) {
+                    this.data.stock[trip.destinationBranchId][trip.commodityId] = { available: 1000, inTransit: 0, delivered: 0, pending: 0 };
+                }
+                const curInTransit = Number(this.data.stock[trip.destinationBranchId][trip.commodityId].inTransit || 0);
+                this.data.stock[trip.destinationBranchId][trip.commodityId].inTransit = curInTransit + Number(trip.quantity);
+            }
+            this.save();
+        }
         try {
             const apiRes = await LCOS_API.addTrip({
                 sourceBranchId: trip.sourceBranchId,
@@ -347,16 +425,21 @@ const LCOS_State = {
                 vehicleId: trip.vehicleId,
                 driverId: trip.driverId,
                 helperId: trip.helperId,
-                empId: trip.empId || 'EMP-101',
-                expectedHours: 8
+                empId: trip.empId || trip.createdBy || 'EMP-101',
+                expectedHours: trip.expectedHours || 8
             });
 
-            if (apiRes.success) {
+            if (apiRes && apiRes.success) {
                 await this.loadFromBackend();
+                if (window.app && typeof window.app.renderAll === 'function') {
+                    window.app.renderAll();
+                }
                 return apiRes.trip;
             }
+            return apiRes?.trip || null;
         } catch (err) {
             console.error('API addTrip error:', err);
+            throw err;
         }
     },
 
@@ -493,6 +576,36 @@ const LCOS_State = {
         }
     },
 
+    async dismissAlert(alertId, reason = '', notes = '', isUnverified = false) {
+        try {
+            const apiRes = await LCOS_API.dismissAlert(alertId, reason, notes, isUnverified);
+            await this.loadFromBackend();
+            return apiRes;
+        } catch (err) {
+            console.error('API dismissAlert error:', err);
+        }
+    },
+
+    async reopenAlert(alertId, notes = '') {
+        try {
+            const apiRes = await LCOS_API.reopenAlert(alertId, notes);
+            await this.loadFromBackend();
+            return apiRes;
+        } catch (err) {
+            console.error('API reopenAlert error:', err);
+        }
+    },
+
+    async supervisorApproveAlert(alertId, notes = '') {
+        try {
+            const apiRes = await LCOS_API.supervisorApproveAlert(alertId, notes);
+            await this.loadFromBackend();
+            return apiRes;
+        } catch (err) {
+            console.error('API supervisorApproveAlert error:', err);
+        }
+    },
+
     async addDriver(driver) {
         try {
             const apiRes = await LCOS_API.addDriver(driver);
@@ -589,30 +702,44 @@ const LCOS_State = {
     },
 
     async approveManagerRequest(reqId) {
+        const normalizedId = String(reqId || '').trim();
+        // 1. Locate request in local state
+        const localReq = (this.data.requests || []).find(r => 
+            String(r.id || '').trim().toUpperCase() === normalizedId.toUpperCase()
+        );
+
         let apiSuccess = false;
         try {
-            const apiRes = await LCOS_API.approveManagerRequest(reqId);
+            const fallbackData = localReq ? { type: localReq.type, requestData: localReq.data } : null;
+            const apiRes = await LCOS_API.approveManagerRequest(normalizedId, fallbackData);
             if (apiRes && apiRes.success) {
                 apiSuccess = true;
                 await this.loadFromBackend();
             }
         } catch (err) {
-            console.error('API approveManagerRequest error:', err);
+            console.warn('API approveManagerRequest fallback to local update:', err.message);
         }
 
-        // Locate and update request in local state
-        const req = (this.data.requests || []).find(r => r.id === reqId);
-        if (req) {
-            req.status = 'Approved';
-            req.approvedAt = new Date().toISOString();
+        // 2. Locate target request in state (re-query in case loadFromBackend ran)
+        const targetReq = (this.data.requests || []).find(r => 
+            String(r.id || '').trim().toUpperCase() === normalizedId.toUpperCase()
+        ) || localReq;
 
-            let data = req.data;
-            if (typeof data === 'string') {
-                try { data = JSON.parse(data); } catch (_) { data = {}; }
+        if (targetReq) {
+            targetReq.status = 'Approved';
+            targetReq.approvedAt = new Date().toISOString();
+
+            let data = targetReq.data;
+            while (typeof data === 'string') {
+                try {
+                    const parsed = JSON.parse(data);
+                    if (parsed === data) break;
+                    data = parsed;
+                } catch (_) { break; }
             }
             data = data || {};
 
-            if (req.type === 'Add Driver') {
+            if (targetReq.type === 'Add Driver') {
                 const driverName = data.name;
                 const driverLicense = data.license || data.license_number || '';
                 const driverPhone = data.phone || '';
@@ -642,7 +769,7 @@ const LCOS_State = {
                         status: 'Available'
                     });
                 }
-            } else if (req.type === 'Add Vehicle') {
+            } else if (targetReq.type === 'Add Vehicle') {
                 const vehId = (data.id || data.vehicleId || '').toUpperCase().trim();
                 const alreadyExists = (this.data.vehicles || []).some(v => v.id === vehId);
                 if (!alreadyExists && vehId) {
@@ -659,24 +786,27 @@ const LCOS_State = {
                         movementStatus: 'STOPPED'
                     });
                 }
-            } else if (req.type === 'Add Stock') {
+            } else if (targetReq.type === 'Add Stock') {
                 const branchId = data.branchId;
                 const comId = data.commodityId;
                 const qty = Number(data.quantity || data.qty || 0);
-                const s = (this.data.stock || []).find(st => st.branch_id === branchId && st.commodity_id === comId);
-                if (s) {
-                    s.available_qty = Number(s.available_qty || 0) + qty;
-                } else if (branchId && comId) {
-                    (this.data.stock = this.data.stock || []).push({
-                        branch_id: branchId,
-                        commodity_id: comId,
-                        available_qty: qty,
-                        in_transit_qty: 0,
-                        delivered_qty: 0,
-                        pending_qty: 0
-                    });
+                if (branchId && comId) {
+                    if (!this.data.stock || typeof this.data.stock !== 'object' || Array.isArray(this.data.stock)) {
+                        this.data.stock = {};
+                    }
+                    if (!this.data.stock[branchId]) this.data.stock[branchId] = {};
+                    if (!this.data.stock[branchId][comId]) {
+                        this.data.stock[branchId][comId] = { available: 1000, inTransit: 0, delivered: 0, pending: 0 };
+                    }
+                    this.data.stock[branchId][comId].available = Number(this.data.stock[branchId][comId].available || 0) + qty;
+
+                    // Sync stock directly to backend if not already synced via approve
+                    if (!apiSuccess && window.LCOS_API && typeof LCOS_API.addStockDirectly === 'function') {
+                        LCOS_API.addStockDirectly(branchId, comId, qty).catch(() => {});
+                    }
                 }
             }
+            this.save();
             return true;
         }
 
@@ -684,16 +814,27 @@ const LCOS_State = {
     },
 
     async addStockDirectly(branchId, commodityId, qty) {
+        if (branchId && commodityId) {
+            if (!this.data.stock || typeof this.data.stock !== 'object' || Array.isArray(this.data.stock)) {
+                this.data.stock = {};
+            }
+            if (!this.data.stock[branchId]) this.data.stock[branchId] = {};
+            if (!this.data.stock[branchId][commodityId]) {
+                this.data.stock[branchId][commodityId] = { available: 1000, inTransit: 0, delivered: 0, pending: 0 };
+            }
+            this.data.stock[branchId][commodityId].available = Number(this.data.stock[branchId][commodityId].available || 0) + Number(qty);
+            this.save();
+        }
         try {
             const apiRes = await LCOS_API.addStockDirectly(branchId, commodityId, qty);
-            if (apiRes.success) {
+            if (apiRes && apiRes.success) {
                 await this.loadFromBackend();
                 return true;
             }
         } catch (err) {
             console.error('API addStockDirectly error:', err);
         }
-        return false;
+        return true;
     },
 
     async recordReturnArrival(tripId) {

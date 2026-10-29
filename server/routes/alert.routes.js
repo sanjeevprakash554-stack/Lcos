@@ -72,11 +72,11 @@ router.post('/', authenticateToken, async (req, res) => {
         const cleanOfficialPhone = (higherOfficial || '').replace(/[^0-9]/g, '');
         const cleanDriverPhone = (driverPhone || '').replace(/[^0-9]/g, '');
 
-        // 1. Notify Driver ONLY if driver has separate phone
-        if (driverPhone && cleanDriverPhone !== cleanOfficialPhone) {
+        // 1. Notify Driver on WhatsApp
+        if (driverPhone) {
           await whatsappService.sendTextMessage(
             driverPhone,
-            `⚠️ *OPERATIONS ALERT: ${type || 'Incident'}*\n------------------------\n${message}\nTrip ID: ${tripId || 'N/A'} | Vehicle: ${vehicleId || 'Assigned'}\n------------------------\nPlease check in with Operations Control immediately.`
+            `🚨 *DRIVER URGENT ALERT: ${type || 'Incident'}*\n────────────────────────────\n${message}\n📋 *Trip ID:* ${tripId || 'N/A'}\n🚛 *Vehicle:* ${vehicleId || 'Assigned Lorry'}\n────────────────────────────\n⚠️ Central Operations requires your immediate attention.\nReply *MOVING* if in transit, *DELAY <reason>* if halted, or *SOS* for emergency.`
           ).catch(e => console.warn('Driver alert error:', e.message));
         }
 
@@ -271,8 +271,140 @@ router.post('/:id/resolve', authenticateToken, async (req, res) => {
 // POST /api/alerts/:id/dismiss
 router.post('/:id/dismiss', authenticateToken, async (req, res) => {
   try {
-    const result = await db.query(`UPDATE alerts SET status = 'Dismissed' WHERE id = $1 RETURNING *`, [req.params.id]);
-    res.json({ success: true, alert: result.rows[0] });
+    const alertId = req.params.id;
+    const { reason, notes, isUnverified } = req.body || {};
+    const userRole = (req.user?.role || '').toLowerCase();
+    const isHigherOfficial = userRole === 'owner' || userRole === 'branch_manager' || userRole === 'super_admin';
+
+    // Fetch existing alert
+    const existingRes = await db.query(`SELECT * FROM alerts WHERE id = $1`, [alertId]);
+    if (existingRes.rows.length === 0) return res.status(404).json({ success: false, message: 'Alert not found' });
+    const existing = existingRes.rows[0];
+
+    // Determine if this is an unverified dismissal that must route to the Supervisor Review Queue:
+    // 1. Operator explicitly chose "Accidental Tap / Mistake" OR selected unverified
+    // 2. OR dismissed by tracking team while status was active/stoppage and not an authorized higher official direct close
+    const isAccidental = reason && reason.toLowerCase().includes('accidental');
+    const isStoppageAwaitingReply = existing.type === 'Stoppage Detected' || (existing.message && existing.message.toLowerCase().includes('halted'));
+    
+    const shouldRouteToSupervisor = !isHigherOfficial && (isUnverified || isAccidental || isStoppageAwaitingReply || reason === 'Other / Sent to Supervisor');
+
+    const newStatus = shouldRouteToSupervisor ? 'Pending_Supervisor' : 'Dismissed';
+    const noteText = `Dismissed by ${req.user?.name || req.user?.role || 'Operator'}. Reason: ${reason || 'General Dismissal'}${notes ? ' - ' + notes : ''}`;
+
+    const result = await db.query(
+      `UPDATE alerts 
+       SET status = $1, 
+           escalated = $2, 
+           escalated_to_role = $3, 
+           escalated_at = CASE WHEN $2 = TRUE THEN NOW() ELSE escalated_at END 
+       WHERE id = $4 RETURNING *`,
+      [newStatus, shouldRouteToSupervisor, shouldRouteToSupervisor ? 'SUPERVISOR' : null, alertId]
+    );
+
+    // Record response audit trail in alert_responses
+    try {
+      await db.query(
+        `INSERT INTO alert_responses (alert_id, responder_user_id, action_taken, notes)
+         VALUES ($1, $2, $3, $4)`,
+        [alertId, req.user?.id || null, shouldRouteToSupervisor ? 'Dismissed (Routed to Supervisor Queue)' : 'Alert Dismissed', noteText]
+      );
+    } catch (e) {
+      console.warn('Audit response insert notice:', e.message);
+    }
+
+    const updatedAlert = result.rows[0];
+    broadcastAlert(updatedAlert);
+
+    res.json({
+      success: true,
+      alert: updatedAlert,
+      routedToSupervisor: shouldRouteToSupervisor,
+      message: shouldRouteToSupervisor
+        ? 'Alert routed to Supervisor Review Queue for higher official verification.'
+        : 'Alert dismissed successfully.'
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/alerts/:id/reopen (Higher official re-opens alert back to tracking team)
+router.post('/:id/reopen', authenticateToken, async (req, res) => {
+  try {
+    const alertId = req.params.id;
+    const { notes } = req.body || {};
+    const supervisorName = req.user?.name || req.user?.role || 'Supervisor';
+
+    const result = await db.query(
+      `UPDATE alerts 
+       SET status = 'Active', 
+           escalated = TRUE, 
+           escalated_to_role = NULL, 
+           severity = 'danger',
+           created_at = NOW() 
+       WHERE id = $1 RETURNING *`,
+      [alertId]
+    );
+
+    if (result.rows.length === 0) return res.status(404).json({ success: false, message: 'Alert not found' });
+
+    try {
+      await db.query(
+        `INSERT INTO alert_responses (alert_id, responder_user_id, action_taken, notes)
+         VALUES ($1, $2, 'Re-opened by Supervisor', $3)`,
+        [alertId, req.user?.id || null, `Re-opened by ${supervisorName}. Note: ${notes || 'Immediate operator verification required'}`]
+      );
+    } catch (e) {
+      console.warn('Audit response insert notice:', e.message);
+    }
+
+    const updatedAlert = result.rows[0];
+    broadcastAlert(updatedAlert);
+
+    res.json({ success: true, alert: updatedAlert, message: 'Alert re-opened and pushed back to tracking team.' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/alerts/:id/supervisor-approve (Higher official permanently approves and resolves alert)
+router.post('/:id/supervisor-approve', authenticateToken, async (req, res) => {
+  try {
+    const alertId = req.params.id;
+    const { notes } = req.body || {};
+    const supervisorName = req.user?.name || req.user?.role || 'Supervisor';
+
+    const result = await db.query(
+      `UPDATE alerts 
+       SET status = 'Resolved', 
+           resolved_at = NOW(),
+           escalated = FALSE,
+           escalated_to_role = NULL 
+       WHERE id = $1 RETURNING *`,
+      [alertId]
+    );
+
+    if (result.rows.length === 0) return res.status(404).json({ success: false, message: 'Alert not found' });
+    const alert = result.rows[0];
+
+    // Refresh vehicle stoppage so it resets cleanly
+    if (alert.vehicle_id) {
+      await db.query(`UPDATE vehicles SET last_ping_at = NOW(), stoppage_start_time = NULL WHERE id = $1`, [alert.vehicle_id]);
+    }
+
+    try {
+      await db.query(
+        `INSERT INTO alert_responses (alert_id, responder_user_id, action_taken, notes)
+         VALUES ($1, $2, 'Supervisor Approved & Closed', $3)`,
+        [alertId, req.user?.id || null, `Approved by ${supervisorName}. Note: ${notes || 'Verified vehicle safe and on route.'}`]
+      );
+    } catch (e) {
+      console.warn('Audit response insert notice:', e.message);
+    }
+
+    broadcastAlert(alert);
+    res.json({ success: true, alert, message: 'Alert verified and resolved by supervisor.' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

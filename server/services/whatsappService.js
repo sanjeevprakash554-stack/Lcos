@@ -165,7 +165,27 @@ class WhatsAppService {
             reroutedPayload.interactive.body.text = noticeHeader + reroutedPayload.interactive.body.text;
           }
           const reroutedSummary = `[Auto-Forwarded to +${officialPhone}]: ${rawContentSummary}`;
-          return this.sendPayload(reroutedPayload, reroutedSummary, officialPhone);
+          await this.logMessage({
+            direction: 'OUTBOUND',
+            fromNumber: config.phoneNumberId,
+            toNumber: formattedTo,
+            messageType: payload.type || 'text',
+            content: `[Meta Developer Sandbox Blocked: Number +${formattedTo} is not in allowed test list (Code 131030)] ${rawContentSummary}`,
+            status: 'SANDBOX_NOT_IN_ALLOWED_LIST',
+            metaMessageId: null,
+          });
+          const forwardRes = await this.sendPayload(reroutedPayload, reroutedSummary, officialPhone);
+          return {
+            success: false,
+            sandboxForwarded: true,
+            sandboxRestricted: true,
+            forwardedTo: officialPhone,
+            recipientPhone: formattedTo,
+            errorCode: 131030,
+            error: `Driver number (+${formattedTo}) is not registered in your Meta Developer allowed recipient list (Code 131030). A forwarded copy was sent to official phone (+${officialPhone}).`,
+            metaDetails: data.error,
+            forwardResult: forwardRes
+          };
         }
 
         await this.logMessage({
@@ -309,7 +329,8 @@ class WhatsAppService {
         ...(components.length > 0 ? { components } : {}),
       },
     };
-    const summary = `[Template ${templateName}] Language: ${languageCode}`;
+    const paramSummary = components[0]?.parameters?.map(p => p.text).filter(Boolean).join(' | ');
+    const summary = `[Meta Template: ${templateName}] Language: ${languageCode}${paramSummary ? ' - ' + paramSummary : ''}`;
     return this.sendPayload(payload, summary, to);
   }
 
@@ -385,12 +406,15 @@ _Logistics Operations Control_`;
     const duration = `${alertData.stoppage_duration_minutes || 20}+ minutes`;
     const coords = `${vehicle.current_lat || '11.6455'}, ${vehicle.current_lng || '78.1576'}`;
 
-    // 1. Primary: Send the officially approved Meta template (_unscheduled_halt_warning_v1)
+    const templateName = process.env.WHATSAPP_STOPPAGE_TEMPLATE || '_unscheduled_halt_warning_v1';
+    const langCode = process.env.WHATSAPP_STOPPAGE_TEMPLATE_LANG || 'en';
+
+    // 1. Primary: Send the officially approved Meta template created in Meta (_unscheduled_halt_warning_v1)
     try {
       const templateRes = await this.sendTemplate(
         recipientPhone,
-        '_unscheduled_halt_warning_v1',
-        'en',
+        templateName,
+        langCode,
         [
           {
             type: 'body',
@@ -402,7 +426,7 @@ _Logistics Operations Control_`;
           }
         ]
       );
-      if (templateRes && templateRes.success) {
+      if (templateRes && (templateRes.success || templateRes.sandboxForwarded)) {
         return templateRes;
       }
     } catch (err) {
@@ -428,13 +452,14 @@ Central Operations flagged an unscheduled halt (>20 minutes without movement).
 
     try {
       const btnRes = await this.sendInteractiveButtons(recipientPhone, '🚨 Unscheduled Halt Warning', bodyText, buttons, 'LCOS Monitoring Unit');
-      if (!btnRes.success) {
-        return await this.sendTextMessage(recipientPhone, bodyText);
+      if (btnRes && (btnRes.success || btnRes.sandboxForwarded)) {
+        return btnRes;
       }
-      return btnRes;
     } catch (e) {
-      return this.sendTextMessage(recipientPhone, bodyText);
+      console.warn('⚠️ [WhatsApp] Interactive buttons send notice:', e.message);
     }
+
+    return this.sendTextMessage(recipientPhone, bodyText);
   }
 
   /**

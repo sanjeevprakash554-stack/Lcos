@@ -328,27 +328,27 @@ async function handleIncomingMessage(msg, contact = null) {
   }
 
   // Process Text Commands
-  const upperText = textContent.toUpperCase();
+  const upperText = textContent.toUpperCase().trim();
 
-  // Handle Text Button Echoes & Driver Chat Responses
-  // 1. Puncture / Breakdown (Checked FIRST so 'BREAKDOWN' is not misidentified as 'BREAK' for lunch)
-  if (upperText.includes('PUNCTURE') || upperText.includes('BREAKDOWN') || upperText.includes('MECHANICAL') || upperText.includes('FLAT TYRE')) {
-    await triggerEmergencyAlert(senderNumber, driver, activeTrip, 'Tyre Puncture / Vehicle Mechanical Breakdown', targetV !== 'manual' ? targetV : null);
-    return;
-  }
-  // 2. Resuming Movement
-  if (upperText.includes('RESUMING') || upperText.includes('RESUME') || upperText.includes('STARTING') || upperText.includes('MOVING NOW')) {
-    await handleTransitResumed(senderNumber, driver, activeTrip, activeTrip?.vehicle_id || (targetV !== 'manual' ? targetV : null));
-    return;
-  }
-  // 3. Traffic / Toll Congestion
-  if (upperText.includes('TRAFFIC') || upperText.includes('TOLL') || upperText.includes('JAM') || upperText.includes('CONGESTION')) {
+  // Handle Numbered Options (1, 2, 3, 4), Text Button Echoes & Driver Chat Responses
+  // 1. Option 1 or Traffic / Toll Congestion
+  if (upperText === '1' || upperText.includes('TRAFFIC') || upperText.includes('TOLL') || upperText.includes('JAM') || upperText.includes('CONGESTION')) {
     await recordTransitDelay(senderNumber, driver, activeTrip, 'Heavy Traffic / Toll Plaza Congestion', targetV !== 'manual' ? targetV : null);
     return;
   }
-  // 4. Lunch / Food / Rest Break
-  if (upperText.includes('LUNCH') || upperText.includes('FOOD') || upperText.includes('REST') || upperText.includes('TEA') || upperText.includes('BREAK') || upperText.includes('MEAL')) {
+  // 2. Option 2 or Puncture / Breakdown (Checked before lunch to avoid 'BREAK' collision)
+  if (upperText === '2' || upperText.includes('PUNCTURE') || upperText.includes('BREAKDOWN') || upperText.includes('MECHANICAL') || upperText.includes('FLAT TYRE')) {
+    await triggerEmergencyAlert(senderNumber, driver, activeTrip, 'Tyre Puncture / Vehicle Mechanical Breakdown', targetV !== 'manual' ? targetV : null);
+    return;
+  }
+  // 3. Option 3 or Lunch / Food / Rest Break
+  if (upperText === '3' || upperText.includes('LUNCH') || upperText.includes('FOOD') || upperText.includes('REST') || upperText.includes('TEA') || upperText.includes('BREAK') || upperText.includes('MEAL')) {
     await recordTransitDelay(senderNumber, driver, activeTrip, 'Driver Rest / Lunch Break', targetV !== 'manual' ? targetV : null);
+    return;
+  }
+  // 4. Option 4 or Resuming Movement
+  if (upperText === '4' || upperText === 'MOVING' || upperText.includes('RESUMING') || upperText.includes('RESUME') || upperText.includes('STARTING') || upperText.includes('MOVING NOW') || upperText.includes('RESUMED')) {
+    await handleTransitResumed(senderNumber, driver, activeTrip, activeTrip?.vehicle_id || (targetV !== 'manual' ? targetV : null));
     return;
   }
 
@@ -921,7 +921,14 @@ router.post('/send', async (req, res) => {
     }
 
     let result;
-    if (type === 'template') {
+    if (type === 'stoppage_template') {
+      const vId = req.body.vehicleId || 'TN-59-EF-9012';
+      result = await whatsappService.sendStoppageAlertNotification(
+        { vehicle_id: vId, current_lat: '11.6455', current_lng: '78.1576' },
+        { stoppage_duration_minutes: 25 },
+        to
+      );
+    } else if (type === 'template') {
       result = await whatsappService.sendTemplate(to, req.body.templateName || 'hello_world', req.body.language || 'en_US');
     } else if (type === 'interactive' && Array.isArray(buttons) && buttons.length > 0) {
       result = await whatsappService.sendInteractiveButtons(to, header || 'LCOS Logistics', message || 'Notification', buttons);
@@ -968,7 +975,7 @@ router.post('/notify-trip', async (req, res) => {
     const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
     const cleanDriverPhone = (trip.driver_phone || '').replace(/[^0-9]/g, '');
     const cleanOfficialPhone = (higherOfficial || '').replace(/[^0-9]/g, '');
-    if (higherOfficial && cleanDriverPhone !== cleanOfficialPhone) {
+    if (higherOfficial) {
       await whatsappService.sendTripDispatchNotification(trip, higherOfficial).catch(e => console.warn('Higher official dispatch notice error:', e.message));
     }
     const cleanPhone = whatsappService.formatPhoneNumber(trip.driver_phone);
@@ -1044,7 +1051,7 @@ router.post('/simulate-incoming', async (req, res) => {
  */
 router.post('/test-stoppage-alert', async (req, res) => {
   try {
-    const { vehicleId, tripId, testPhone, minutes } = req.body || {};
+    const { vehicleId, tripId, testPhone, minutes, driverName: reqDriverName } = req.body || {};
     const stoppageMins = parseInt(minutes, 10) || 25;
     const phoneToUse = testPhone || process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
 
@@ -1056,18 +1063,18 @@ router.post('/test-stoppage-alert', async (req, res) => {
         ON CONFLICT (id) DO NOTHING
       `);
       await db.query(`
-        INSERT INTO branches (id, company_id, name, code, district, city, lat, lng)
-        VALUES ('BR-CBE', 'COMP-001', 'Coimbatore Branch', 'CBE', 'Coimbatore', 'Coimbatore', 11.0168, 76.9558)
+        INSERT INTO branches (id, company_id, name, lat, lng)
+        VALUES ('BR-CBE', 'COMP-001', 'Coimbatore Branch', 11.0168, 76.9558)
         ON CONFLICT (id) DO NOTHING
       `);
       await db.query(`
-        INSERT INTO branches (id, company_id, name, code, district, city, lat, lng)
-        VALUES ('BR-CHE', 'COMP-001', 'Chennai Central', 'CHE', 'Chennai', 'Chennai', 13.0827, 80.2707)
+        INSERT INTO branches (id, company_id, name, lat, lng)
+        VALUES ('BR-CHE', 'COMP-001', 'Chennai Central', 13.0827, 80.2707)
         ON CONFLICT (id) DO NOTHING
       `);
       await db.query(`
-        INSERT INTO commodities (id, company_id, name, category, unit)
-        VALUES ('COM-RIC', 'COMP-001', 'Rice', 'Grain', 'Tons')
+        INSERT INTO commodities (id, company_id, name, unit, weight_kg, unit_value)
+        VALUES ('COM-RIC', 'COMP-001', 'Rice', 'Tons', 1000, 25000)
         ON CONFLICT (id) DO NOTHING
       `);
     } catch (parentErr) {
@@ -1122,17 +1129,17 @@ router.post('/test-stoppage-alert', async (req, res) => {
     );
     if (dCheck.rows.length > 0) {
       driverId = dCheck.rows[0].id;
-      driverName = dCheck.rows[0].name || driverName;
+      driverName = dCheck.rows[0].name || reqDriverName || driverName;
     } else {
-      const d101 = await db.query(`SELECT id FROM drivers WHERE id = 'DRV-101'`);
-      if (d101.rows.length === 0) {
-        await db.query(`
-          INSERT INTO drivers (id, company_id, name, phone, license_number, status, current_lat, current_lng, created_at)
-          VALUES ('DRV-101', 'COMP-001', 'Saravanan K.', $1, 'TN-59-2021-00982', 'AVAILABLE', 11.6455, 78.1576, NOW())
-        `, [phoneToUse]);
-      } else {
-        await db.query(`UPDATE drivers SET phone = $1 WHERE id = 'DRV-101'`, [phoneToUse]);
-      }
+      const maxRes = await db.query(`SELECT id FROM drivers WHERE id LIKE 'DRV-%'`);
+      const nums = maxRes.rows.map(r => parseInt(String(r.id).replace('DRV-', ''), 10)).filter(n => !isNaN(n));
+      const nextNum = nums.length > 0 ? Math.max(...nums) + 1 : 102;
+      driverId = 'DRV-' + nextNum;
+      driverName = reqDriverName || 'Driver ' + nextNum;
+      await db.query(`
+        INSERT INTO drivers (id, company_id, name, phone, license_number, status, current_lat, current_lng, created_at)
+        VALUES ($1, 'COMP-001', $2, $3, $4, 'AVAILABLE', 11.6455, 78.1576, NOW())
+      `, [driverId, driverName, phoneToUse, 'TN-59-2024-' + nextNum]);
     }
 
     const vCheck = await db.query(`SELECT id FROM vehicles WHERE id = $1`, [targetVehicle]);
@@ -1143,13 +1150,17 @@ router.post('/test-stoppage-alert', async (req, res) => {
       `, [targetVehicle]);
     }
 
+    // Ensure driver phone is explicitly set to the active test phone
+    await db.query(`UPDATE drivers SET phone = $1, name = $2 WHERE id = $3`, [phoneToUse, driverName, driverId]);
+
     let verifiedTripId = null;
     const tCheck = await db.query(
-      `SELECT id FROM trips WHERE vehicle_id = $1 AND status IN ('IN_TRANSIT', 'DELAYED', 'CREATED') LIMIT 1`,
+      `SELECT id FROM trips WHERE vehicle_id = $1 AND status IN ('IN_TRANSIT', 'DELAYED', 'CREATED') ORDER BY created_at DESC LIMIT 1`,
       [targetVehicle]
     );
     if (tCheck.rows.length > 0) {
       verifiedTripId = tCheck.rows[0].id;
+      await db.query(`UPDATE trips SET driver_id = $1, status = 'IN_TRANSIT' WHERE id = $2`, [driverId, verifiedTripId]);
     } else {
       const trip1002 = await db.query(`SELECT id FROM trips WHERE id = 'TRIP-1002'`);
       if (trip1002.rows.length === 0) {
@@ -1166,6 +1177,12 @@ router.post('/test-stoppage-alert', async (req, res) => {
       }
       verifiedTripId = 'TRIP-1002';
     }
+
+    // Mark any other obsolete trips for this vehicle as COMPLETED so there is only 1 active trip per vehicle
+    await db.query(
+      `UPDATE trips SET status = 'COMPLETED' WHERE vehicle_id = $1 AND id <> $2 AND status IN ('IN_TRANSIT', 'DELAYED')`,
+      [targetVehicle, verifiedTripId]
+    );
 
     // 5. Set vehicle stopped in the past (> 20 mins ago) & refresh last_ping_at to NOW so GPS watchdog does not skip it
     const isEmbedded = db.isUsingEmbedded && db.isUsingEmbedded();
@@ -1260,12 +1277,15 @@ router.post('/test-stoppage-alert', async (req, res) => {
     // ONLY dispatch fallback if checkVehicleStoppages() did not already dispatch!
     // Prevents duplicate double messages.
     if (!alreadyDispatched) {
-      // 1. Dispatch stoppage notification to Driver ONLY if driver has separate phone
-      if (cleanRecipientPhone && cleanDriverPhone !== cleanOfficialPhone) {
+      // 1. Dispatch stoppage notification to Driver
+      if (cleanRecipientPhone) {
         whatsappService.sendStoppageAlertNotification(
           {
             id: targetVehicle,
             vehicle_id: targetVehicle,
+            driver_name: driverName,
+            driver_phone: cleanRecipientPhone,
+            trip_id: tripIdText,
             current_lat: '11.6455',
             current_lng: '78.1576'
           },
@@ -1295,17 +1315,36 @@ router.post('/test-stoppage-alert', async (req, res) => {
       }
     }
 
+    const alertMessage = `🚨 URGENT STOPPAGE ALERT (>20 MINS)
+🚛 Vehicle: ${targetVehicle}
+👤 Driver: ${driverName}
+⏱️ Stationary: ${stoppageMins}+ mins
+📍 Coordinates: 11.6455, 78.1576
+⚠️ Tap reason: Traffic / Breakdown / Lunch / Resuming`;
+
+    const latestLogRes = await db.query(
+      `SELECT * FROM whatsapp_logs WHERE to_number = $1 ORDER BY created_at DESC LIMIT 1`,
+      [cleanRecipientPhone]
+    );
+    const latestLog = latestLogRes.rows[0] || null;
+    const isSandboxBlocked = latestLog && (latestLog.status === 'SANDBOX_NOT_IN_ALLOWED_LIST');
+
     const waMeUrl = `https://wa.me/${cleanRecipientPhone}?text=${encodeURIComponent(alertMessage)}`;
     const apiWhatsappUrl = `https://api.whatsapp.com/send?phone=${cleanRecipientPhone}&text=${encodeURIComponent(alertMessage)}`;
 
     res.json({
       success: true,
-      message: `Automated stoppage detector ran successfully! Vehicle ${targetVehicle} flagged for ${stoppageMins}m halt.`,
+      message: isSandboxBlocked 
+        ? `Stoppage alert triggered for ${targetVehicle} (${driverName}), but WhatsApp number +${cleanRecipientPhone} is not in Meta Developer Allowed Numbers list.`
+        : `Automated stoppage detector ran successfully! Vehicle ${targetVehicle} flagged for ${stoppageMins}m halt.`,
       vehicleId: targetVehicle,
       stoppageMinutes: stoppageMins,
       alert: alertData,
       driverPhone: cleanRecipientPhone,
-      higherOfficialPhone: process.env.HIGHER_OFFICIAL_PHONE || cleanRecipientPhone,
+      driverName: driverName,
+      higherOfficialPhone: process.env.HIGHER_OFFICIAL_PHONE || '916382897998',
+      sandboxRestricted: !!isSandboxBlocked,
+      sandboxError: isSandboxBlocked ? `Driver phone +${cleanRecipientPhone} is not registered in your Meta Developer allowed test numbers list (Code 131030).` : null,
       redirectUrl: waMeUrl,
       waMeUrl,
       apiWhatsappUrl,

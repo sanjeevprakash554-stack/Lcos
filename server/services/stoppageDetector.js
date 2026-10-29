@@ -41,7 +41,11 @@ async function checkVehicleStoppages() {
              t.id AS trip_id, t.driver_id, d.name AS driver_name, d.phone AS driver_phone,
              sb.name AS source_name, dest_b.name AS dest_name, dest_b.phone AS manager_phone, dest_b.manager_name
       FROM vehicles v
-      JOIN trips t ON t.vehicle_id = v.id AND t.status IN ('IN_TRANSIT', 'DELAYED')
+      JOIN trips t ON t.id = (
+        SELECT t2.id FROM trips t2 
+        WHERE t2.vehicle_id = v.id AND t2.status IN ('IN_TRANSIT', 'DELAYED') 
+        ORDER BY t2.created_at DESC LIMIT 1
+      )
       LEFT JOIN drivers d ON d.id = t.driver_id
       LEFT JOIN branches sb ON sb.id = t.source_branch_id
       LEFT JOIN branches dest_b ON dest_b.id = t.destination_branch_id
@@ -52,11 +56,19 @@ async function checkVehicleStoppages() {
 
     const res = await db.query(query, [thresholdMinutes]);
 
+    const parseUtc = (s) => {
+      if (!s) return new Date();
+      if (s instanceof Date) return s;
+      const str = String(s).trim();
+      if (str.endsWith('Z') || str.includes('+')) return new Date(str);
+      return new Date(str.replace(' ', 'T') + 'Z');
+    };
+
     for (const row of res.rows) {
       // Skip vehicles that have experienced a GPS signal outage (> noUpdateThresholdMinutes without pings)
       // to avoid firing duplicate Stoppage Detected and No Update alerts simultaneously
       if (row.last_ping_at) {
-        const lastPingMs = new Date(row.last_ping_at).getTime();
+        const lastPingMs = parseUtc(row.last_ping_at).getTime();
         if (!isNaN(lastPingMs) && lastPingMs < noUpdateCutoffMs) {
           continue;
         }
@@ -104,9 +116,11 @@ async function checkVehicleStoppages() {
         const cleanDriverPhone = (row.driver_phone || '').replace(/[^0-9]/g, '');
         const cleanOfficialPhone = (higherOfficialPhone || '').replace(/[^0-9]/g, '');
 
-        // 1. Send automated WhatsApp stoppage alert to Driver ONLY (3 interactive buttons)
-        if (row.driver_phone && cleanDriverPhone !== cleanOfficialPhone) {
-          whatsappService.sendStoppageAlertNotification(row, { stoppage_duration_minutes: durationMins }, row.driver_phone)
+        const targetDriverPhone = row.driver_phone || higherOfficialPhone || '916382897998';
+
+        // 1. Send automated WhatsApp stoppage alert to Driver ONLY (Approved Meta Template _unscheduled_halt_warning_v1)
+        if (targetDriverPhone) {
+          whatsappService.sendStoppageAlertNotification(row, { stoppage_duration_minutes: durationMins }, targetDriverPhone)
             .catch(err => console.warn('⚠️ Stoppage WhatsApp alert error (Driver):', err.message));
         }
 

@@ -33,6 +33,53 @@
     --shadow-premium: 0 10px 30px -10px rgba(19, 42, 36, 0.08), 0 4px 12px -2px rgba(19, 42, 36, 0.04);
 }
 
+
+/* Flexible Vector Icon System */
+.ui-icon {
+    display: inline-block;
+    vertical-align: -0.15em;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.btn .ui-icon, .portal-submit-btn .ui-icon {
+    margin-right: 0.35rem;
+}
+
+.btn-icon-only .ui-icon {
+    margin-right: 0;
+}
+
+.ui-icon-spin {
+    animation: ui-icon-spin 1s linear infinite;
+}
+
+@keyframes ui-icon-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.status-indicator-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+.status-indicator-dot.green {
+    background: #10b981;
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}
+.status-indicator-dot.amber {
+    background: #f59e0b;
+    box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+}
+.status-indicator-dot.red {
+    background: #ef4444;
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -43,9 +90,10 @@ html {
     width: 100%;
     min-height: 100%;
     min-height: 100dvh;
-    height: auto !important;
-    overflow-x: hidden !important;
-    overflow-y: auto !important;
+    height: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
     -webkit-overflow-scrolling: touch;
 }
 
@@ -58,9 +106,9 @@ body {
     width: 100%;
     min-height: 100%;
     min-height: 100dvh;
-    height: auto !important;
-    overflow-x: hidden !important;
-    overflow-y: auto !important;
+    height: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
     -webkit-overflow-scrolling: touch;
 }
 
@@ -86,8 +134,7 @@ body {
     min-height: 100vh;
     min-height: 100dvh;
     width: 100%;
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: hidden;
     position: relative;
 }
 
@@ -255,6 +302,7 @@ aside.sidebar {
 main.main-content {
     flex: 1 1 0%;
     min-height: 0;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     height: 100%;
@@ -264,6 +312,7 @@ main.main-content {
     overscroll-behavior-y: contain;
     padding: 1.5rem;
     position: relative;
+    scrollbar-gutter: stable;
 }
 
 /* Top Header */
@@ -387,6 +436,8 @@ header.top-header {
     display: none;
     flex-direction: column;
     gap: 1.5rem;
+    min-width: 0;
+    width: 100%;
 }
 
 .tab-content.active {
@@ -570,8 +621,11 @@ header.top-header {
     margin-bottom: 1.5rem;
     overflow: hidden;
     box-shadow: 0 4px 16px rgba(225, 29, 72, 0.08);
-    transition: var(--transition-smooth);
+    transition: opacity 0.2s ease;
     min-height: 48px;
+    max-height: 48px;
+    height: 48px;
+    flex-shrink: 0;
 }
 
 .alert-label {
@@ -589,7 +643,8 @@ header.top-header {
 }
 
 .alerts-ticker-wrap {
-    flex-grow: 1;
+    flex: 1 1 0%;
+    min-width: 0;
     overflow: hidden;
     position: relative;
     height: 32px;
@@ -643,6 +698,7 @@ header.top-header {
     gap: 0.5rem;
     align-items: center;
     flex-shrink: 0;
+    white-space: nowrap;
 }
 
 #alerts-banner-actions .btn {
@@ -1166,8 +1222,8 @@ aside.sim-panel.collapsed {
 
 /* Keyframe Animations */
 @keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.5; transform: scale(0.95); }
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
 }
 
 @keyframes dash {
@@ -1964,28 +2020,41 @@ aside.sim-panel.collapsed {
     100% { transform: translate(-50%, -50%) scale(3.0); opacity: 0; }
 }
 
-/* Vehicle Rotator & Directional Chassis */
+/* Vehicle Rotator & Lorry Marker Chassis */
 .vehicle-rotator {
-    width: 30px;
-    height: 30px;
+    position: relative;
+    width: 34px;
+    height: 34px;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.2s linear;
-    will-change: transform;
     z-index: 2;
 }
 
 .vehicle-body {
-    width: 26px;
-    height: 26px;
+    position: relative;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     border: 2.5px solid #ffffff;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45);
     transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    z-index: 3;
+}
+
+.vehicle-emoji {
+    font-size: 18px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+    user-select: none;
+    -webkit-user-select: none;
+    transition: transform 0.2s ease;
 }
 
 .vehicle-svg {
@@ -3766,11 +3835,12 @@ aside.sim-panel.collapsed {
 @media (min-width: 993px) {
     /* 1. Landing Page / Public View (window body scrolls smoothly) */
     html, body {
-        height: auto !important;
-        min-height: 100% !important;
-        min-height: 100dvh !important;
-        overflow-x: hidden !important;
-        overflow-y: auto !important;
+        height: auto;
+        min-height: 100%;
+        min-height: 100dvh;
+        overflow-x: hidden;
+        overflow-y: auto;
+        scrollbar-gutter: stable;
     }
 
     #app-container {
@@ -3778,35 +3848,44 @@ aside.sim-panel.collapsed {
         min-height: 100vh;
         min-height: 100dvh;
         width: 100%;
-        overflow-x: hidden;
-        overflow-y: visible;
+        overflow: hidden;
         position: relative;
     }
 
     main.main-content {
         flex: 1 1 0%;
         min-height: 0;
+        min-width: 0;
         display: flex;
         flex-direction: column;
-        min-height: 100vh;
+        height: 100%;
         overflow-y: auto;
         overflow-x: hidden;
         padding: 1.5rem;
         position: relative;
+        scrollbar-gutter: stable;
     }
 
     /* 2. Operations Dashboard Shell (Pinned sidebar + independently scrolling main workspace) */
+    html.dashboard-active,
+    html:has(body.dashboard-active),
     body.dashboard-active,
     body:has(#app-container:not([style*="display: none"])) {
+        height: 100% !important;
         height: 100vh !important;
         height: 100dvh !important;
+        max-height: 100% !important;
+        max-height: 100vh !important;
+        max-height: 100dvh !important;
         overflow: hidden !important;
     }
 
     body.dashboard-active #app-container,
     body:has(#app-container:not([style*="display: none"])) #app-container {
+        height: 100% !important;
         height: 100vh !important;
         height: 100dvh !important;
+        max-height: 100% !important;
         max-height: 100vh !important;
         max-height: 100dvh !important;
         overflow: hidden !important;
@@ -3814,22 +3893,29 @@ aside.sim-panel.collapsed {
 
     body.dashboard-active aside.sidebar,
     body:has(#app-container:not([style*="display: none"])) aside.sidebar {
+        height: 100% !important;
         height: 100vh !important;
         height: 100dvh !important;
+        max-height: 100% !important;
+        max-height: 100vh !important;
+        max-height: 100dvh !important;
         overflow-y: auto !important;
         flex-shrink: 0;
     }
 
     body.dashboard-active main.main-content,
     body:has(#app-container:not([style*="display: none"])) main.main-content {
+        height: 100% !important;
         height: 100vh !important;
         height: 100dvh !important;
+        max-height: 100% !important;
         max-height: 100vh !important;
         max-height: 100dvh !important;
         overflow-y: auto !important;
         overflow-x: hidden !important;
         -webkit-overflow-scrolling: touch;
         overscroll-behavior-y: contain;
+        scrollbar-gutter: stable;
         padding-bottom: 5rem !important;
     }
 }
@@ -3838,6 +3924,7 @@ aside.sim-panel.collapsed {
    BREAKPOINT: <= 992px (Tablets & Landscape)
    ========================================== */
 @media (max-width: 992px) {
+    html,
     body,
     body.dashboard-active {
         height: auto !important;
@@ -3846,6 +3933,12 @@ aside.sim-panel.collapsed {
         overflow-x: hidden !important;
         overflow-y: auto !important;
         -webkit-overflow-scrolling: touch !important;
+    }
+
+    body.dashboard-active main.main-content {
+        height: auto !important;
+        max-height: none !important;
+        overflow-y: visible !important;
     }
 
     #app-container,

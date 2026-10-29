@@ -20,6 +20,18 @@ services:
         value: "true"
       - key: ENABLE_KEEP_ALIVE
         value: "true"
+      - key: RAZORPAY_KEY_ID
+        value: "rzp_test_TCr9Me1AydiZMF"
+      - key: RAZORPAY_KEY_SECRET
+        value: "uPUkfk9gWbTOaewirN8KHI0T"
+      - key: WHATSAPP_API_VERSION
+        value: "v22.0"
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        value: "1246879781843655"
+      - key: WHATSAPP_ACCESS_TOKEN
+        value: "EAAQeAI63ZAikBO0x1aP5iS3l7WZB7xHkE131aN2T37ZCLiF23v7xZCjVw942m8fE3f6QWqHq06u5PjC0gEIZC7ZBCQZCLqHw6jVfV4u9b66ZCEpT4yS7lSZA8ZBQzSgC5s6g1o9H2ZCjW4G3nK3LqS13n7p4l3mX3WZAwSg27ZA3bVw9K1"
+      - key: WHATSAPP_BUSINESS_ACCOUNT_ID
+        value: "1414166297312152"
       - key: WHATSAPP_VERIFY_TOKEN
         value: lcos_meta_verify_token_2026
       - key: WHATSAPP_ENABLED

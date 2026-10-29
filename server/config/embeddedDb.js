@@ -60,6 +60,8 @@ function initEmbeddedDb() {
       if (fs.existsSync(seedPath)) {
         let seed = fs.readFileSync(seedPath, 'utf8')
           .replace(/::[a-zA-Z0-9_]+/gi, '')
+          .replace(/NOW\(\)\s*-\s*INTERVAL\s*'(\d+)\s*(?:minutes?|mins?)'/gi, "datetime('now', '-$1 minutes')")
+          .replace(/NOW\(\)\s*\+\s*INTERVAL\s*'(\d+)\s*(?:minutes?|mins?)'/gi, "datetime('now', '+$1 minutes')")
           .replace(/NOW\(\)\s*-\s*INTERVAL\s*'(\d+)\s*hours?'/gi, "datetime('now', '-$1 hours')")
           .replace(/NOW\(\)\s*\+\s*INTERVAL\s*'(\d+)\s*hours?'/gi, "datetime('now', '+$1 hours')")
           .replace(/NOW\(\)\s*-\s*INTERVAL\s*'(\d+)\s*days?'/gi, "datetime('now', '-$1 days')")
@@ -105,6 +107,8 @@ async function query(sqlText, params = []) {
   let sql = sqlText
     .replace(/::[a-zA-Z0-9_]+/gi, '')
     .replace(/\$(\d+)/g, '?$1')
+    .replace(/(?:NOW\(\)|datetime\('now'\))\s*-\s*INTERVAL\s*'(\d+)\s*(?:minutes?|mins?)'/gi, "datetime('now', '-$1 minutes')")
+    .replace(/(?:NOW\(\)|datetime\('now'\))\s*\+\s*INTERVAL\s*'(\d+)\s*(?:minutes?|mins?)'/gi, "datetime('now', '+$1 minutes')")
     .replace(/(?:NOW\(\)|datetime\('now'\))\s*-\s*INTERVAL\s*'(\d+)\s*hours?'/gi, "datetime('now', '-$1 hours')")
     .replace(/(?:NOW\(\)|datetime\('now'\))\s*\+\s*INTERVAL\s*'(\d+)\s*hours?'/gi, "datetime('now', '+$1 hours')")
     .replace(/(?:NOW\(\)|datetime\('now'\))\s*-\s*INTERVAL\s*'(\d+)\s*days?'/gi, "datetime('now', '-$1 days')")
@@ -124,6 +128,26 @@ async function query(sqlText, params = []) {
     .replace(/;+$/, '');
 
   const isSelect = /^\s*(SELECT|WITH|PRAGMA)/i.test(sql) || /RETURNING/i.test(sql);
+
+  // Handle SQLite incompatibility with "ALTER TABLE ... ADD COLUMN IF NOT EXISTS"
+  if (/^\s*ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+(\w+)(.*)/i.test(sql)) {
+    const m = sql.match(/^\s*ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+(\w+)(.*)/i);
+    const tbl = m[1];
+    const col = m[2];
+    const rest = m[3]
+      .replace(/VARCHAR\(\d+\)/gi, 'TEXT')
+      .replace(/TIMESTAMPTZ/gi, 'TEXT')
+      .replace(/NUMERIC\([^)]+\)/gi, 'NUMERIC')
+      .replace(/BOOLEAN/gi, 'INTEGER')
+      .replace(/DEFAULT\s+FALSE/gi, 'DEFAULT 0')
+      .replace(/DEFAULT\s+TRUE/gi, 'DEFAULT 1');
+    const tableInfo = db.prepare(`PRAGMA table_info(${tbl})`).all();
+    const exists = tableInfo.some(c => (c.name || '').toLowerCase() === col.toLowerCase());
+    if (exists) {
+      return { rows: [], rowCount: 0 };
+    }
+    sql = `ALTER TABLE ${tbl} ADD COLUMN ${col} ${rest}`;
+  }
 
   const sanitizedParams = (params || []).map(p => {
     if (p instanceof Date) return p.toISOString();

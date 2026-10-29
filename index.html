@@ -6,7 +6,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Logistics Operations Control System (LCOS)</title>
-    <link rel="stylesheet" href="/css/styles.css?v=4.8">
+    <link rel="stylesheet" href="/css/styles.css?v=6.0">
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 </head>
 <body>
@@ -159,6 +159,17 @@
                 </div>
             </div>
 
+            <!-- Supervisor Review Queue Alert Bar (Exclusively for Higher Officials) -->
+            <div id="supervisor-queue-banner" style="display: none; background: linear-gradient(90deg, rgba(220, 38, 38, 0.15) 0%, rgba(245, 158, 11, 0.1) 100%); border-bottom: 1px solid rgba(220, 38, 38, 0.35); padding: 0.5rem 1.5rem; align-items: center; justify-content: space-between; font-size: 0.85rem; color: #dc2626;">
+                <div style="display:flex; align-items:center; gap:0.6rem;">
+                    <span class="badge" style="background:#dc2626; color:#fff; font-weight:700; font-size:0.75rem; padding:0.2rem 0.5rem; border-radius:4px;">SUPERVISOR ACTION REQUIRED</span>
+                    <span id="supervisor-queue-banner-text" style="font-weight:600; color:var(--text-main);">Unverified alert dismissed by operator. Review required.</span>
+                </div>
+                <button class="btn btn-danger" style="padding:0.25rem 0.75rem; font-size:0.75rem; font-weight:700; background:#dc2626; border-color:#b91c1c;" onclick="app.openSupervisorReviewQueue()">
+                    <svg class="ui-icon ui-icon-shield" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> Open Review Queue &rarr;
+                </button>
+            </div>
+
             <!-- TABS CONTAINER -->
             <div id="tabs-container">
                 
@@ -208,7 +219,7 @@
                                 <span>Tamil Nadu - Logistics Network Map</span>
                                 <span style="font-size: 0.78rem; display:inline-flex; align-items:center; gap:0.5rem;">
                                     <span style="color: var(--color-primary); font-weight: 600;">38 District Hubs</span>
-                                    <button type="button" class="btn btn-secondary" id="btn-toggle-district-list" style="font-size:0.72rem; padding:0.2rem 0.55rem; border-radius:6px; background:rgba(15,118,110,0.08); color:var(--color-primary); font-weight:600; cursor:pointer;" onclick="app.toggleMapDistrictsDrawer()">📍 View Districts List (38)</button>
+                                    <button type="button" class="btn btn-secondary" id="btn-toggle-district-list" style="font-size:0.72rem; padding:0.2rem 0.55rem; border-radius:6px; background:rgba(15,118,110,0.08); color:var(--color-primary); font-weight:600; cursor:pointer;" onclick="app.toggleMapDistrictsDrawer()"><svg class="ui-icon ui-icon-map-pin" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg> View Districts List (38)</button>
                                 </span>
                             </div>
                             
@@ -246,7 +257,7 @@
                                 </div>
                                 <div style="margin-left:auto; display:flex; align-items:center; gap:0.5rem; flex-shrink:0;">
                                     <button type="button" class="btn btn-secondary" id="btn-reset-tn-map" style="font-size:0.75rem; padding:0.25rem 0.65rem; height:auto; display:inline-flex; align-items:center; gap:0.35rem;" title="Reset Map to Full Tamil Nadu Regional Structure">
-                                        🗺️ Reset TN View
+                                        <svg class="ui-icon ui-icon-map" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg> Reset TN View
                                     </button>
                                 </div>
                             </div>
@@ -272,7 +283,7 @@
                             <div class="glass-card interactive-sim-panel" style="flex:1; display:flex; flex-direction:column; min-height: 540px;">
                                 <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
                                     <span style="display:flex; align-items:center; gap:0.5rem;">
-                                        <span>⚡</span> Live Telemetry & Route Simulator
+                                        <svg class="ui-icon ui-icon-zap" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Live Telemetry & Route Simulator
                                     </span>
                                     <span class="badge badge-sim-live">Interactive Cockpit</span>
                                 </div>
@@ -284,7 +295,7 @@
                                         <div class="sim-tracker-card">
                                             <div class="sim-tracker-header">
                                                 <label class="sim-tracker-title">
-                                                    <span>🚚</span> Live Running Vehicle & Trip Tracker
+                                                    <svg class="ui-icon ui-icon-truck" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg> Live Running Vehicle & Trip Tracker
                                                 </label>
                                                 <span class="badge sim-count-badge" id="sim-running-count-badge">
                                                     Live Vehicles
@@ -330,7 +341,7 @@
                                         </div>
 
                                         <div class="sim-section-header">
-                                            🛣️ Corridor & Toll Estimator
+                                            <svg class="ui-icon ui-icon-route" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"></circle><path d="M9 19h8.5a4.5 4.5 0 0 0 0-9H7a4 4 0 0 1 0-8h11"></path><polyline points="15 5 18 2 21 5"></polyline></svg> Corridor & Toll Estimator
                                         </div>
                                         <div class="sim-grid-inputs">
                                             <div>
@@ -380,18 +391,18 @@
                                     <!-- Interactive Simulation Actions -->
                                     <div class="sim-actions-box">
                                         <div class="sim-section-header">
-                                            🎮 Real-Time Simulation Actions
+                                            <svg class="ui-icon ui-icon-sliders" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg> Real-Time Simulation Actions
                                         </div>
                                         <div class="sim-actions-container">
                                             <button type="button" class="btn btn-primary sim-action-btn sim-action-btn-main" id="btn-sim-dispatch">
-                                                🚀 Simulate Live Dispatch on Map
+                                                <svg class="ui-icon ui-icon-send" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg> Simulate Live Dispatch on Map
                                             </button>
                                             <div class="sim-action-row">
                                                 <button type="button" class="btn btn-warning sim-action-btn sim-action-btn-sub" id="btn-sim-stoppage">
-                                                    ⚠️ >20m Stoppage Alert
+                                                    <svg class="ui-icon ui-icon-alert-triangle" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> >20m Stoppage Alert
                                                 </button>
                                                 <button type="button" class="btn btn-secondary sim-action-btn sim-action-btn-sub" id="btn-sim-ping">
-                                                    📡 Ping Driver Now
+                                                    <svg class="ui-icon ui-icon-radio" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path></svg> Ping Driver Now
                                                 </button>
                                             </div>
                                             <div id="console-ping-feedback" style="font-size:0.75rem; text-align:center; min-height:16px; margin-top:6px;"></div>
@@ -401,9 +412,9 @@
                                     <!-- Live Telemetry HUD & Diagnostics -->
                                     <div class="sim-hud-box">
                                         <div class="sim-section-header">
-                                            <span>📊 Vehicle Speed & OBD-II Telemetry</span>
+                                            <svg class="ui-icon ui-icon-gauge" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"></path><path d="M3.34 19a10 10 0 1 1 17.32 0"></path></svg> Vehicle Speed & OBD-II Telemetry
                                             <span class="badge" id="sim-speed-badge" style="font-size:0.72rem; padding:0.2rem 0.55rem; background:rgba(16,185,129,0.15); color:#059669; border:1px solid rgba(16,185,129,0.3); border-radius:6px; font-weight:700;">
-                                                🟢 Cruising Normal
+                                                <span class="status-indicator-dot green"></span> Cruising Normal
                                             </span>
                                         </div>
 
@@ -425,19 +436,19 @@
                                         <!-- Diagnostic Indicators -->
                                         <div class="sim-diag-grid">
                                             <div class="sim-diag-item">
-                                                <span class="diag-name">🌡️ Engine:</span>
+                                                <span class="diag-name"><svg class="ui-icon ui-icon-thermometer" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path></svg> Engine:</span>
                                                 <span id="sim-engine-temp" class="diag-value">86°C OK</span>
                                             </div>
                                             <div class="sim-diag-item">
-                                                <span class="diag-name">⛽ Fuel Tank:</span>
+                                                <span class="diag-name"><svg class="ui-icon ui-icon-fuel" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="22" x2="15" y2="22"></line><line x1="4" y1="9" x2="14" y2="9"></line><path d="M14 22V4a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v18"></path><path d="M14 13h2a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2a2 2 0 0 0 2-2V9.83a2 2 0 0 0-.59-1.42L18 5"></path></svg> Fuel Tank:</span>
                                                 <span id="sim-fuel-level" class="diag-value" style="color:var(--color-primary);">74% (185L)</span>
                                             </div>
                                             <div class="sim-diag-item">
-                                                <span class="diag-name">🛞 Tyre Pressure:</span>
+                                                <span class="diag-name"><svg class="ui-icon ui-icon-disc" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg> Tyre Pressure:</span>
                                                 <span class="diag-value" style="color:var(--color-transit);">108 PSI OK</span>
                                             </div>
                                             <div class="sim-diag-item">
-                                                <span class="diag-name">🛰️ GPS Lock:</span>
+                                                <span class="diag-name"><svg class="ui-icon ui-icon-satellite" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 7 9 3 5 7l4 4"></path><path d="m17 11 4 4-4 4-4-4"></path><path d="m8 12 4 4 6-6-4-4Z"></path><path d="m16 8 3-3"></path><path d="M9 21a6 6 0 0 0-6-6"></path></svg> GPS Lock:</span>
                                                 <span class="diag-value" style="color:var(--color-transit);">4G-LTE ±1.5m</span>
                                             </div>
                                         </div>
@@ -450,11 +461,11 @@
                     <!-- Bottom Analytics row -->
                     <div class="analytics-grid">
                         <div class="glass-card">
-                            <div class="card-title">📈 Branch Distribution Trip Volumes</div>
+                            <div class="card-title"><svg class="ui-icon ui-icon-trending-up" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg> Branch Distribution Trip Volumes</div>
                             <div id="branch-chart-container" style="height: 200px;"></div>
                         </div>
                         <div class="glass-card">
-                            <div class="card-title">⚠️ Transit Incident Delay Reasons</div>
+                            <div class="card-title"><svg class="ui-icon ui-icon-alert-triangle" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> Transit Incident Delay Reasons</div>
                             <div id="delay-chart-container" style="height: 200px;"></div>
                         </div>
                     </div>
@@ -1039,10 +1050,13 @@
                         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-glass); padding-bottom:1rem; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem;">
                             <div style="display:flex; gap:0.75rem;">
                                 <button class="btn notif-subtab-btn btn-primary" data-notif-sub="alerts" id="btn-notif-sub-alerts" style="padding:0.45rem 1rem; font-size:0.85rem; border-radius:8px;">
-                                    🚨 Operations Alerts <span class="badge badge-delayed" id="notif-count-alerts" style="margin-left:0.35rem; font-size:0.7rem; padding:0.1rem 0.35rem;">0</span>
+                                    <svg class="ui-icon ui-icon-bell" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg> Operations Alerts <span class="badge badge-delayed" id="notif-count-alerts" style="margin-left:0.35rem; font-size:0.7rem; padding:0.1rem 0.35rem;">0</span>
                                 </button>
                                 <button class="btn notif-subtab-btn btn-secondary" data-notif-sub="requests" id="btn-notif-sub-requests" style="padding:0.45rem 1rem; font-size:0.85rem; border-radius:8px;">
-                                    📋 Supervisor Requests <span class="badge badge-pending" id="notif-count-requests" style="margin-left:0.35rem; font-size:0.7rem; padding:0.1rem 0.35rem;">0</span>
+                                    <svg class="ui-icon ui-icon-clipboard-list" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><line x1="9" y1="12" x2="11" y2="12"></line><line x1="13" y1="12" x2="15" y2="12"></line><line x1="9" y1="16" x2="15" y2="16"></line></svg> Supervisor Requests <span class="badge badge-pending" id="notif-count-requests" style="margin-left:0.35rem; font-size:0.7rem; padding:0.1rem 0.35rem;">0</span>
+                                </button>
+                                <button class="btn notif-subtab-btn btn-secondary" data-notif-sub="unverified" id="btn-notif-sub-unverified" style="padding:0.45rem 1rem; font-size:0.85rem; border-radius:8px;">
+                                    <svg class="ui-icon ui-icon-shield" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> Supervisor Review Queue <span class="badge" id="notif-count-unverified" style="margin-left:0.35rem; font-size:0.7rem; padding:0.1rem 0.45rem; background:#dc2626; color:#fff;">0</span>
                                 </button>
                             </div>
                             
@@ -1079,6 +1093,24 @@
                                 <!-- Full requests list renders here -->
                             </div>
                         </div>
+
+                        <!-- Sub-tab 3: Supervisor Review Queue (Unverified Dismissals) -->
+                        <div class="notif-sub-content" id="notif-sub-unverified" style="display:none;">
+                            <div style="margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem; background:rgba(220, 38, 38, 0.06); padding:0.85rem 1rem; border-radius:10px; border:1px solid rgba(220, 38, 38, 0.2);">
+                                <div>
+                                    <h4 style="margin:0; font-size:0.95rem; font-weight:700; color:#dc2626; display:flex; align-items:center; gap:0.4rem;">
+                                        <span><svg class="ui-icon ui-icon-shield-alert" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></span> Supervisor Review Queue: Unverified Dismissals
+                                    </h4>
+                                    <p style="margin:0.25rem 0 0; font-size:0.8rem; color:var(--text-muted);">
+                                        Alerts dismissed by operators without driver reply or marked as accidental taps. Higher officials must review vehicle safety and verify status.
+                                    </p>
+                                </div>
+                                <button class="btn btn-secondary" style="font-size:0.75rem; padding:0.3rem 0.75rem;" onclick="app.refreshAlertsAndDashboard()">↻ Refresh Queue</button>
+                            </div>
+                            <div id="full-unverified-feed-content" class="lcos-scroll-container" style="display:flex; flex-direction:column; gap:0.75rem; max-height:380px; overflow-y:auto; padding-right:0.4rem;">
+                                <!-- Injected dynamically in app.js -->
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1105,29 +1137,29 @@
                                 </div>
                                 <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
                                     <button type="button" class="btn btn-warning" id="btn-trigger-test-stoppage" style="font-size:0.8rem; padding:0.4rem 0.75rem; background:#f59e0b; border-color:#d97706; color:#fff; font-weight:700; display:inline-flex; align-items:center; gap:0.35rem;" onclick="app.triggerTestStoppage()">
-                                        🚨 Test 20m Stoppage Alert
+                                        <svg class="ui-icon ui-icon-alert-octagon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg> Test 20m Stoppage Alert
                                     </button>
                                     <div style="position:relative; display:inline-block;">
                                         <button type="button" class="btn btn-secondary" id="btn-simulate-driver-dropdown" style="font-size:0.8rem; padding:0.4rem 0.75rem; display:inline-flex; align-items:center; gap:0.35rem;" onclick="const m = document.getElementById('simulate-driver-menu'); m.style.display = m.style.display === 'block' ? 'none' : 'block';">
-                                            📱 Simulate Driver Reply ▾
+                                            <svg class="ui-icon ui-icon-smartphone" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg> Simulate Driver Reply &#9662;
                                         </button>
                                         <div id="simulate-driver-menu" style="display:none; position:absolute; top:100%; left:0; z-index:1100; min-width:220px; background:#1e293b; border:1px solid rgba(255,255,255,0.15); border-radius:8px; box-shadow:0 10px 25px rgba(0,0,0,0.6); padding:0.4rem; margin-top:0.35rem;">
                                             <div style="font-size:0.7rem; font-weight:700; color:#94a3b8; padding:0.25rem 0.5rem; text-transform:uppercase;">Driver Taps WhatsApp Button:</div>
-                                            <button type="button" style="width:100%; text-align:left; padding:0.4rem 0.6rem; font-size:0.8rem; background:none; border:none; color:#f8fafc; border-radius:4px; cursor:pointer;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='none'" onclick="app.simulateDriverButtonReply('traffic'); document.getElementById('simulate-driver-menu').style.display='none';">🚦 Traffic / Toll Delay</button>
-                                            <button type="button" style="width:100%; text-align:left; padding:0.4rem 0.6rem; font-size:0.8rem; background:none; border:none; color:#f8fafc; border-radius:4px; cursor:pointer;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='none'" onclick="app.simulateDriverButtonReply('lunch'); document.getElementById('simulate-driver-menu').style.display='none';">🍲 Lunch / Food Break</button>
-                                            <button type="button" style="width:100%; text-align:left; padding:0.4rem 0.6rem; font-size:0.8rem; background:none; border:none; color:#f8fafc; border-radius:4px; cursor:pointer;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='none'" onclick="app.simulateDriverButtonReply('breakdown'); document.getElementById('simulate-driver-menu').style.display='none';">🔧 Puncture / Breakdown</button>
+                                            <button type="button" style="width:100%; text-align:left; padding:0.4rem 0.6rem; font-size:0.8rem; background:none; border:none; color:#f8fafc; border-radius:4px; cursor:pointer;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='none'" onclick="app.simulateDriverButtonReply('traffic'); document.getElementById('simulate-driver-menu').style.display='none';"><svg class="ui-icon ui-icon-truck" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg> Traffic / Toll Delay</button>
+                                            <button type="button" style="width:100%; text-align:left; padding:0.4rem 0.6rem; font-size:0.8rem; background:none; border:none; color:#f8fafc; border-radius:4px; cursor:pointer;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='none'" onclick="app.simulateDriverButtonReply('lunch'); document.getElementById('simulate-driver-menu').style.display='none';"><svg class="ui-icon ui-icon-coffee" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg> Lunch / Food Break</button>
+                                            <button type="button" style="width:100%; text-align:left; padding:0.4rem 0.6rem; font-size:0.8rem; background:none; border:none; color:#f8fafc; border-radius:4px; cursor:pointer;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='none'" onclick="app.simulateDriverButtonReply('breakdown'); document.getElementById('simulate-driver-menu').style.display='none';"><svg class="ui-icon ui-icon-wrench" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg> Puncture / Breakdown</button>
                                             <div style="height:1px; background:rgba(255,255,255,0.1); margin:0.3rem 0;"></div>
-                                            <button type="button" style="width:100%; text-align:left; padding:0.4rem 0.6rem; font-size:0.8rem; background:none; border:none; color:#34d399; font-weight:600; border-radius:4px; cursor:pointer;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='none'" onclick="app.simulateDriverButtonReply('resuming'); document.getElementById('simulate-driver-menu').style.display='none';">🟢 Resuming Movement</button>
+                                            <button type="button" style="width:100%; text-align:left; padding:0.4rem 0.6rem; font-size:0.8rem; background:none; border:none; color:#34d399; font-weight:600; border-radius:4px; cursor:pointer;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='none'" onclick="app.simulateDriverButtonReply('resuming'); document.getElementById('simulate-driver-menu').style.display='none';"><svg class="ui-icon ui-icon-play" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> Resuming Movement</button>
                                         </div>
                                     </div>
                                     <button type="button" class="btn btn-secondary" id="btn-wa-credentials-modal" style="font-size:0.8rem; padding:0.4rem 0.75rem; display:inline-flex; align-items:center; gap:0.35rem;" onclick="document.getElementById('modal-wa-credentials').style.display='flex';">
-                                        ⚙️ Credentials
+                                        <svg class="ui-icon ui-icon-settings" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg> Credentials
                                     </button>
                                     <button type="button" class="btn btn-secondary" id="btn-wa-guide-modal" style="font-size:0.8rem; padding:0.4rem 0.75rem; display:inline-flex; align-items:center; gap:0.35rem;">
-                                        📖 Docs
+                                        <svg class="ui-icon ui-icon-book-open" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg> Docs
                                     </button>
                                     <button type="button" class="btn btn-primary" id="btn-wa-refresh-logs" style="font-size:0.8rem; padding:0.4rem 0.75rem; background:#25D366; border-color:#20ba5a; display:inline-flex; align-items:center; gap:0.35rem;">
-                                        🔄 Refresh
+                                        <svg class="ui-icon ui-icon-refresh-cw" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg> Refresh
                                     </button>
                                 </div>
                             </div>
@@ -1137,7 +1169,7 @@
                         <div class="glass-card" style="margin-bottom:1.5rem;">
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid var(--border-glass); padding-bottom:0.75rem;">
                                 <h4 style="margin:0; font-size:1rem; font-weight:600; display:flex; align-items:center; gap:0.5rem;">
-                                    <span>📤</span> Driver WhatsApp Dispatcher
+                                    <svg class="ui-icon ui-icon-send" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg> Driver WhatsApp Dispatcher
                                 </h4>
                                 <span class="badge" style="background:rgba(37, 211, 102, 0.15); color:#25D366; font-size:0.7rem;">Outbound API</span>
                             </div>
@@ -1156,10 +1188,11 @@
                                 <div class="form-group" style="margin:0;">
                                     <label style="font-size:0.8rem; font-weight:600;">Message Template / Mode</label>
                                     <select class="form-control" id="wa-send-type" style="font-size:0.8rem;">
-                                        <option value="template">⭐ Official Meta Template (hello_world - Initiates 24h Chat Window)</option>
-                                        <option value="text">Custom Text Message</option>
-                                        <option value="trip_dispatch">Trip Dispatch Assignment (Interactive Buttons)</option>
+                                        <option value="stoppage_template" selected>Official Meta Stoppage Template (_unscheduled_halt_warning_v1)</option>
+                                        <option value="template">Official Meta Template (hello_world - Initiates 24h Chat Window)</option>
+                                        <option value="trip_dispatch">Trip Dispatch Assignment (Direct Alert)</option>
                                         <option value="stoppage_inquiry">Stoppage Alert Inquiry (Interactive Buttons)</option>
+                                        <option value="text">Custom Text Message</option>
                                         <option value="delivery_confirm">Shipment Delivery Receipt Confirmation</option>
                                     </select>
                                 </div>
@@ -1181,7 +1214,7 @@
                                         Delivers via Meta Cloud API
                                     </span>
                                     <button type="submit" class="btn btn-primary" id="btn-submit-wa-send" style="background:#25D366; border-color:#20ba5a; font-weight:600; padding:0.45rem 1.25rem;">
-                                        🚀 Send WhatsApp Message
+                                        <svg class="ui-icon ui-icon-send" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg> Send WhatsApp Message
                                     </button>
                                 </div>
                             </form>
@@ -1192,7 +1225,7 @@
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; border-bottom:1px solid var(--border-glass); padding-bottom:0.75rem; flex-wrap:wrap; gap:0.5rem;">
                                 <div>
                                     <h4 style="margin:0; font-size:1rem; font-weight:600; display:flex; align-items:center; gap:0.5rem;">
-                                        <span>📋</span> WhatsApp Communication History & Webhook Activity
+                                        <svg class="ui-icon ui-icon-clipboard-list" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><line x1="9" y1="12" x2="11" y2="12"></line><line x1="13" y1="12" x2="15" y2="12"></line><line x1="9" y1="16" x2="15" y2="16"></line></svg> WhatsApp Communication History & Webhook Activity
                                     </h4>
                                     <span style="font-size:0.75rem; color:var(--text-muted);">Real-time log of automated dispatches, status receipts, and driver interactions.</span>
                                 </div>
@@ -1334,6 +1367,84 @@
         </div>
     </div>
 
+    <!-- MODAL OVERLAY: DISMISS ALERT CONFIRMATION & SUPERVISOR ESCALATION -->
+    <div class="modal-overlay" id="modal-dismiss-alert" style="z-index: 10000;">
+        <div class="glass-card modal-container" style="max-width: 520px; border: 1px solid rgba(239, 68, 68, 0.4); box-shadow: 0 20px 40px rgba(0,0,0,0.4);">
+            <div class="modal-header" style="border-bottom: 1px solid rgba(239, 68, 68, 0.2); padding-bottom: 0.75rem;">
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                    <svg class="ui-icon ui-icon-shield-alert" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    <div>
+                        <h3 style="margin:0; font-family:var(--font-heading); font-size:1.15rem; color:#dc2626;">Dismiss Alert Confirmation</h3>
+                        <span style="font-size:0.75rem; color:var(--text-muted);">Prevent accidental loss & log supervisor escalation</span>
+                    </div>
+                </div>
+                <button class="modal-close" onclick="app.closeModal('modal-dismiss-alert')">×</button>
+            </div>
+            
+            <div style="padding: 1rem 0;">
+                <input type="hidden" id="dismiss-alert-id">
+                <input type="hidden" id="dismiss-alert-veh">
+                
+                <!-- Target Alert Summary -->
+                <div id="dismiss-alert-details-card" style="padding: 0.85rem; border-radius: 8px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); margin-bottom: 1rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem;">
+                        <span id="dismiss-alert-vehicle" style="font-weight:700; color:var(--text-main); font-size:0.95rem;">TN-59-EF-9012</span>
+                        <span id="dismiss-alert-status-badge" class="badge" style="background:#f59e0b; color:#fff; font-size:0.7rem; font-weight:700;">AWAITING DRIVER REPLY</span>
+                    </div>
+                    <div id="dismiss-alert-msg" style="font-size:0.82rem; color:var(--text-muted); line-height:1.4;">AUTOMATIC DETECTED: Vehicle stationary > 20 mins</div>
+                </div>
+
+                <!-- Unverified Warning Box -->
+                <div id="dismiss-unverified-warning" style="display:flex; gap:0.6rem; padding: 0.75rem; border-radius: 8px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); margin-bottom: 1rem;">
+                    <svg class="ui-icon ui-icon-alert-triangle" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                    <div style="font-size:0.78rem; color:#d97706; line-height:1.4;">
+                        <strong>Driver has not responded yet!</strong><br>
+                        Dismissing this alert will automatically route it to the <strong>Supervisor Review Queue</strong> so higher officials can verify vehicle safety.
+                    </div>
+                </div>
+
+                <!-- Reason Selector -->
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label class="form-label" style="font-weight:600; font-size:0.85rem; margin-bottom:0.4rem; display:block;">Select Reason for Dismissing:</label>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.5rem; margin-bottom:0.5rem;">
+                        <button type="button" class="btn btn-secondary dismiss-reason-btn active" data-reason="Accidental Tap / Mistake" style="font-size:0.78rem; padding:0.45rem 0.5rem; text-align:left; border-radius:6px; font-weight:600;" onclick="app.selectDismissReason(this, 'Accidental Tap / Mistake')">
+                            <svg class="ui-icon ui-icon-alert-triangle" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> Accidental Tap
+                        </button>
+                        <button type="button" class="btn btn-secondary dismiss-reason-btn" data-reason="Spoke to Driver via Phone" style="font-size:0.78rem; padding:0.45rem 0.5rem; text-align:left; border-radius:6px; font-weight:600;" onclick="app.selectDismissReason(this, 'Spoke to Driver via Phone')">
+                            <svg class="ui-icon ui-icon-phone-call" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.05 5A5 5 0 0 1 19 8.95M15.05 1A9 9 0 0 1 23 8.94m-1 7.98v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg> Spoke to Driver
+                        </button>
+                        <button type="button" class="btn btn-secondary dismiss-reason-btn" data-reason="Traffic Jam / Toll Delay" style="font-size:0.78rem; padding:0.45rem 0.5rem; text-align:left; border-radius:6px; font-weight:600;" onclick="app.selectDismissReason(this, 'Traffic Jam / Toll Delay')">
+                            <svg class="ui-icon ui-icon-truck" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg> Traffic / Toll Delay
+                        </button>
+                        <button type="button" class="btn btn-secondary dismiss-reason-btn" data-reason="Planned Rest / Meal Break" style="font-size:0.78rem; padding:0.45rem 0.5rem; text-align:left; border-radius:6px; font-weight:600;" onclick="app.selectDismissReason(this, 'Planned Rest / Meal Break')">
+                            <svg class="ui-icon ui-icon-pause-circle" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="10" y1="15" x2="10" y2="9"></line><line x1="14" y1="15" x2="14" y2="9"></line></svg> Planned Rest Break
+                        </button>
+                        <button type="button" class="btn btn-secondary dismiss-reason-btn" data-reason="False Alarm / Duplicate" style="font-size:0.78rem; padding:0.45rem 0.5rem; text-align:left; border-radius:6px; font-weight:600;" onclick="app.selectDismissReason(this, 'False Alarm / Duplicate')">
+                            <svg class="ui-icon ui-icon-check-circle" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> False Alarm
+                        </button>
+                        <button type="button" class="btn btn-secondary dismiss-reason-btn" data-reason="Other / Sent to Supervisor" style="font-size:0.78rem; padding:0.45rem 0.5rem; text-align:left; border-radius:6px; font-weight:600;" onclick="app.selectDismissReason(this, 'Other / Sent to Supervisor')">
+                            <svg class="ui-icon ui-icon-shield" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg> Escalate to Mgr
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0.5rem;">
+                    <label class="form-label" style="font-size:0.8rem; color:var(--text-muted);">Additional Notes (Optional):</label>
+                    <input type="text" id="dismiss-alert-notes" class="form-control" placeholder="e.g., Driver stopped at Krishnagiri bypass hotel..." style="font-size:0.82rem; padding:0.4rem 0.6rem;">
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:0.75rem; border-top:1px solid var(--border-glass); padding-top:0.85rem;">
+                <button type="button" class="btn btn-secondary" style="font-size:0.85rem; padding:0.45rem 1rem;" onclick="app.closeModal('modal-dismiss-alert')">
+                    <svg class="ui-icon ui-icon-x" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Keep Alert Active (Cancel)
+                </button>
+                <button type="button" id="btn-confirm-dismiss-submit" class="btn btn-danger" style="font-size:0.85rem; padding:0.45rem 1.15rem; font-weight:700; background:#dc2626; border-color:#b91c1c;" onclick="app.executeDismissWithReason()">
+                    Confirm Dismissal →
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL OVERLAY: LOG MANUAL CALL -->
     <div class="modal-overlay" id="modal-log-call">
         <div class="glass-card modal-container" style="max-width: 480px;">
@@ -1406,7 +1517,7 @@
         <div class="modal-container" style="max-width: 650px; width: 95%;">
             <div style="background:var(--bg-glass); border-radius:16px; padding:1.25rem 1.5rem; margin-bottom:1rem; border: 1px solid var(--border-glass);" class="flex justify-between align-center">
                 <h3 style="font-family:var(--font-heading); font-size:1.1rem; display:flex; align-items:center; gap:0.5rem;">
-                    🧾 Official GST Tax Invoice
+                    <svg class="ui-icon ui-icon-file-text" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Official GST Tax Invoice
                 </h3>
                 <div class="flex gap-2">
                     <button class="btn btn-secondary" onclick="window.print()">Print / Save PDF</button>
@@ -1476,7 +1587,7 @@
             <div class="modal-header" style="border-bottom: 1px solid var(--border-glass); padding-bottom: 0.75rem; margin-bottom: 1rem;">
                 <div>
                     <h3 style="font-family:var(--font-heading); display:flex; align-items:center; gap:0.5rem; margin:0;">
-                        <span style="font-size:1.4rem;">🔄</span> Return Load & Backload Management Hub
+                        <svg class="ui-icon ui-icon-repeat" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg> Return Load & Backload Management Hub
                     </h3>
                     <p style="font-size:0.8rem; color:var(--text-muted); margin:0.25rem 0 0 0;">
                         Match idle returning lorries with pending branch return shipments to eliminate empty deadhead runs.
@@ -1525,7 +1636,7 @@
             <!-- Active Matched Return Trips Section -->
             <div style="margin-top:1.25rem; border-top:1px solid var(--border-glass); padding-top:1rem;">
                 <h4 style="font-size:0.9rem; margin-bottom:0.75rem; color:#34d399; display:flex; align-items:center; gap:0.4rem;">
-                    🔄 Active & Dispatched Matched Return Cargo Legs
+                    <svg class="ui-icon ui-icon-repeat" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg> Active & Dispatched Matched Return Cargo Legs
                 </h4>
                 <div class="table-container" style="max-height: 200px; overflow-y: auto;">
                     <table class="lcos-table">
@@ -1558,7 +1669,7 @@
         <div class="modal-card" style="max-width: 580px; max-height: 85vh; overflow-y: auto;">
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-glass); padding-bottom:0.75rem; margin-bottom:1rem;">
                 <h3 style="margin:0; font-size:1.15rem; font-weight:700; color:var(--text-main); display:flex; align-items:center; gap:0.5rem;">
-                    <span>⚙️</span> Meta WhatsApp API Credentials & Webhook
+                    <svg class="ui-icon ui-icon-settings" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg> Meta WhatsApp API Credentials & Webhook
                 </h3>
                 <button type="button" class="btn-close-modal" style="background:transparent; border:none; color:var(--text-muted); font-size:1.25rem; cursor:pointer;" onclick="document.getElementById('modal-wa-credentials').style.display='none';">&times;</button>
             </div>
@@ -1622,7 +1733,7 @@
                 <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:0.5rem;">
                     <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-wa-credentials').style.display='none';">Cancel</button>
                     <button type="submit" class="btn btn-primary" style="background:#25D366; border-color:#20ba5a; font-weight:600; padding:0.45rem 1.25rem;">
-                        💾 Save Credentials
+                        <svg class="ui-icon ui-icon-save" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg> Save Credentials
                     </button>
                 </div>
             </form>
@@ -1634,7 +1745,7 @@
         <div class="modal-card" style="max-width: 680px; max-height: 85vh; overflow-y: auto;">
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-glass); padding-bottom:0.75rem; margin-bottom:1rem;">
                 <h3 style="margin:0; font-size:1.15rem; font-weight:700; color:var(--text-main); display:flex; align-items:center; gap:0.5rem;">
-                    <span>📖</span> Meta for Developers WhatsApp Cloud API Setup Guide
+                    <svg class="ui-icon ui-icon-book-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg> Meta for Developers WhatsApp Cloud API Setup Guide
                 </h3>
                 <button type="button" class="btn-close-modal" id="btn-close-wa-guide" style="background:transparent; border:none; color:var(--text-muted); font-size:1.25rem; cursor:pointer;" onclick="document.getElementById('modal-wa-guide').style.display='none';">&times;</button>
             </div>
@@ -1807,14 +1918,14 @@
                     <span class="status-pill-badge pill-active" id="status-pill-badge">ACTIVE</span>
                 </div>
                 <div class="sub-status-desc" id="sub-status-desc">
-                    ✅ Company <strong>LCOS Central Logistics</strong> is active on <strong>Professional Plan</strong>. All operational portals (Tracking Team, Branch Manager, 2 Owners) are fully unlocked.
+                    <span class="status-indicator-dot green"></span> Company <strong>LCOS Central Logistics</strong> is active on <strong>Professional Plan</strong>. All operational portals (Tracking Team, Branch Manager, 2 Owners) are fully unlocked.
                 </div>
                 <div class="sub-demo-controls" style="display: none;">
                     <button type="button" class="btn-demo-sub-toggle" id="btn-toggle-demo-expired" title="Test Gating by Simulating Expired Status" onclick="window.app && window.app.simulateSubscriptionStatus('EXPIRED')">
-                        🔒 Test Inactive/Expired Gate
+                        <svg class="ui-icon ui-icon-lock" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg> Test Inactive/Expired Gate
                     </button>
                     <button type="button" class="btn-demo-sub-toggle btn-demo-active" id="btn-toggle-demo-active" title="Restore Active Plan" onclick="window.app && window.app.simulateSubscriptionStatus('ACTIVE')">
-                        🟢 Restore Active Plan
+                        <svg class="ui-icon ui-icon-check-circle" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> Restore Active Plan
                     </button>
                 </div>
             </div>
@@ -1855,7 +1966,7 @@
 
                     <!-- Plan 2: Professional (Popular / Recommended) -->
                     <div class="landing-plan-card popular-plan" id="landing-plan-pro" data-plan="PLAN-PRO">
-                        <div class="popular-ribbon">⭐ RECOMMENDED</div>
+                        <div class="popular-ribbon"><svg class="ui-icon ui-icon-star" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg> RECOMMENDED</div>
                         <div class="plan-card-header">
                             <span class="plan-tag tag-cyan">EXPANDING FLEET</span>
                             <h3 class="plan-title">Professional</h3>
@@ -1909,11 +2020,11 @@
                 </div>
 
                 <div class="payment-guarantee-bar">
-                    <span>🔒 Secured by Razorpay Payment Gateway (PCI-DSS)</span>
+                    <span><svg class="ui-icon ui-icon-shield-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 11 14 15 10"></polyline></svg> Secured by Razorpay Payment Gateway (PCI-DSS)</span>
                     <span class="sep">•</span>
-                    <span>⚡ Instant UPI / Cards / NetBanking</span>
+                    <span><svg class="ui-icon ui-icon-zap" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Instant UPI / Cards / NetBanking</span>
                     <span class="sep">•</span>
-                    <span>📑 Automated GST Invoices</span>
+                    <span><svg class="ui-icon ui-icon-file-text" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Automated GST Invoices</span>
                 </div>
             </div>
 
@@ -1930,7 +2041,7 @@
                     <!-- Role Card 1: Tracking Team -->
                     <div class="login-card card-tracking" id="card-login-tracking" onclick="window.app && window.app.openPortalLoginModal('tracking_team')" style="cursor:pointer;">
                         <div class="role-gate-badge gate-unlocked" id="gate-badge-tracking">
-                            <span class="gate-icon">🟢</span> <span class="gate-text">Access Unlocked</span>
+                            <span class="gate-icon"><svg class="ui-icon ui-icon-check-circle" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></span> <span class="gate-text">Access Unlocked</span>
                         </div>
                         <div class="login-card-icon icon-tracking">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -1949,7 +2060,7 @@
                     <!-- Role Card 2: Branch Manager -->
                     <div class="login-card card-manager" id="card-login-manager" onclick="window.app && window.app.openPortalLoginModal('branch_manager')" style="cursor:pointer;">
                         <div class="role-gate-badge gate-unlocked" id="gate-badge-manager">
-                            <span class="gate-icon">🟢</span> <span class="gate-text">Access Unlocked</span>
+                            <span class="gate-icon"><svg class="ui-icon ui-icon-check-circle" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></span> <span class="gate-text">Access Unlocked</span>
                         </div>
                         <div class="login-card-icon icon-manager">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1968,7 +2079,7 @@
                     <!-- Role Card 3: 2 Owners -->
                     <div class="login-card card-owner" id="card-login-owner" onclick="window.app && window.app.openPortalLoginModal('owner')" style="cursor:pointer;">
                         <div class="role-gate-badge gate-unlocked" id="gate-badge-owner">
-                            <span class="gate-icon">🟢</span> <span class="gate-text">Access Unlocked</span>
+                            <span class="gate-icon"><svg class="ui-icon ui-icon-check-circle" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></span> <span class="gate-text">Access Unlocked</span>
                         </div>
                         <div class="login-card-icon icon-owner">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1997,7 +2108,7 @@
     <!-- Subscription Required Alert Modal (Styled with Eco-Fleet Design System) -->
     <div id="sub-gate-modal" class="modal-backdrop" style="display: none; z-index: 99999;">
         <div class="portal-modal-card" style="max-width: 480px; text-align: center;">
-            <div style="font-size: 2.8rem; margin-bottom: 0.5rem; animation: pulse 2s infinite;">🔒</div>
+            <div style="display:flex; justify-content:center; margin-bottom:0.75rem;"><svg class="ui-icon ui-icon-lock" width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: pulse 2s infinite;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></div>
             <h3 style="font-family: var(--font-heading); color: var(--color-danger); font-size: 1.45rem; font-weight: 700; margin-bottom: 0.5rem;">Subscription Required</h3>
             <p style="color: var(--text-secondary); font-size: 0.92rem; line-height: 1.5; margin-bottom: 1.25rem;">
                 Customers must purchase an active SaaS subscription before accessing the Logistics Operations Control System.
@@ -2005,10 +2116,10 @@
             <div style="background: #f8faf9; border: 1px solid rgba(15, 118, 110, 0.16); border-radius: 14px; padding: 1.15rem; margin-bottom: 1.5rem; text-align: left;">
                 <div style="color: var(--color-primary); font-size: 0.85rem; font-weight: 700; margin-bottom: 0.4rem;">Subscription Unlocks:</div>
                 <div style="color: var(--text-primary); font-size: 0.82rem; line-height: 1.6;">
-                    • 🗺️ Real-Time Tamil Nadu GPS Highway Telemetry<br>
-                    • 🚚 Fleet Operations & 38-District Tracking<br>
-                    • ⚡ 20-Min Stoppage Detection & Approvals<br>
-                    • 🧾 Automated 18% GST Compliance Invoicing
+                    • <svg class="ui-icon ui-icon-map" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg> Real-Time Tamil Nadu GPS Highway Telemetry<br>
+                    • <svg class="ui-icon ui-icon-truck" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg> Fleet Operations & 38-District Tracking<br>
+                    • <svg class="ui-icon ui-icon-zap" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> 20-Min Stoppage Detection & Approvals<br>
+                    • <svg class="ui-icon ui-icon-file-text" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Automated 18% GST Compliance Invoicing
                 </div>
             </div>
             <div style="display: flex; gap: 0.75rem; justify-content: center;">
@@ -2028,9 +2139,7 @@
 
             <!-- Modal Header -->
             <div style="text-align: center; margin-bottom: 1.5rem;">
-                <div id="portal-modal-icon-badge" class="portal-icon-wrapper">
-                    🎯
-                </div>
+                <div id="portal-modal-icon-badge" class="portal-icon-wrapper"><svg class="ui-icon ui-icon-target" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg></div>
                 <div id="portal-modal-badge" class="portal-role-badge">
                     TRACKING OPERATIONS
                 </div>
@@ -2044,7 +2153,7 @@
 
             <!-- Error Banner -->
             <div id="portal-login-error" class="portal-error-banner" role="alert">
-                <span style="font-size: 1.2rem; line-height: 1;">⚠️</span>
+                <svg class="ui-icon ui-icon-alert-triangle" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
                 <div>
                     <strong id="portal-login-error-title" style="display: block; font-weight: 700; margin-bottom: 0.15rem; color: #9f1239;">Authentication Failed</strong>
                     <span id="portal-login-error-text" style="color: #881337;">Invalid username or password. Please verify credentials.</span>
@@ -2061,7 +2170,7 @@
                         Username or Employee ID
                     </label>
                     <div class="portal-input-container">
-                        <span class="portal-input-icon">👤</span>
+                        <span class="portal-input-icon"><svg class="ui-icon ui-icon-user" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></span>
                         <input type="text" id="portal-input-username" class="portal-text-input" placeholder="e.g. tracking or EMP-101" autocomplete="username" spellcheck="false" required />
                     </div>
                     <div id="portal-user-error" class="portal-field-error-msg"></div>
@@ -2076,9 +2185,9 @@
                         
                     </div>
                     <div class="portal-input-container">
-                        <span class="portal-input-icon">🔒</span>
+                        <span class="portal-input-icon"><svg class="ui-icon ui-icon-lock" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></span>
                         <input type="password" id="portal-input-password" class="portal-text-input" style="padding-right: 2.6rem;" placeholder="••••••••" autocomplete="current-password" required />
-                        <button type="button" id="portal-toggle-pwd" class="portal-pwd-toggle-btn" title="Show/Hide Password">👁️</button>
+                        <button type="button" id="portal-toggle-pwd" class="portal-pwd-toggle-btn" title="Show/Hide Password"><svg class="ui-icon ui-icon-eye" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
                     </div>
                     <div id="portal-pass-error" class="portal-field-error-msg"></div>
                 </div>
@@ -2095,9 +2204,10 @@
 
     <!-- SCRIPTS -->
     <script src="/socket.io/socket.io.js"></script>
-    <script type="module" src="/js/api.js?v=4.2"></script>
-    <script type="module" src="/js/state.js?v=4.8"></script>
-    <script type="module" src="/js/charts.js?v=4.8"></script>
-    <script type="module" src="/js/app.js?v=4.8"></script>
+    <script type="module" src="/js/icons.js?v=6.0"></script>
+    <script type="module" src="/js/api.js?v=6.0"></script>
+    <script type="module" src="/js/state.js?v=6.0"></script>
+    <script type="module" src="/js/charts.js?v=6.0"></script>
+    <script type="module" src="/js/app.js?v=6.0"></script>
 </body>
 </html>

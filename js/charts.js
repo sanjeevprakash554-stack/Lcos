@@ -3,6 +3,8 @@
  * Provides custom SVG-based interactive charts matching the glassmorphic styling.
  */
 
+import { getIcon } from './icons.js';
+
 const LCOS_Charts = {
     /**
      * Renders a Donut Chart for Delay Reasons
@@ -214,7 +216,13 @@ const LCOS_Charts = {
             if (drv.performance < 75) scoreColor = 'var(--color-danger)';
             else if (drv.performance < 90) scoreColor = 'var(--color-warning)';
 
-            const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+            const medal = index === 0
+                ? `<span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:rgba(234,179,8,0.2); color:#eab308; border:1px solid rgba(234,179,8,0.4);" title="Rank 1">${getIcon('award', { size: 14, color: '#eab308' })}</span>`
+                : index === 1
+                ? `<span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:rgba(148,163,184,0.2); color:#94a3b8; border:1px solid rgba(148,163,184,0.4);" title="Rank 2">${getIcon('award', { size: 14, color: '#94a3b8' })}</span>`
+                : index === 2
+                ? `<span style="display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:rgba(217,119,6,0.2); color:#cd7f32; border:1px solid rgba(217,119,6,0.4);" title="Rank 3">${getIcon('award', { size: 14, color: '#cd7f32' })}</span>`
+                : `<span style="font-size:0.8rem; font-weight:700; color:var(--text-muted); width:22px; text-align:center;">${index + 1}</span>`;
 
             html += `
                 <div class="flex align-center justify-between" style="padding: 0.4rem 0.5rem; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid var(--border-glass)">

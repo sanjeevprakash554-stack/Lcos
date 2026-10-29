@@ -82,11 +82,18 @@ class LCOS_API {
       ...(options.headers || {}),
     };
 
+    const timeoutMs = options.timeout || 6000;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         ...options,
         headers,
+        signal: options.signal || controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       const data = await response.json();
       if (!response.ok) {
@@ -94,8 +101,11 @@ class LCOS_API {
       }
       return data;
     } catch (err) {
-      console.error(`[API Error ${endpoint}]:`, err.message);
-      throw err;
+      clearTimeout(timeoutId);
+      const isTimeout = err.name === 'AbortError';
+      const msg = isTimeout ? `Request timed out after ${timeoutMs}ms` : err.message;
+      console.error(`[API Error ${endpoint}]:`, msg);
+      throw new Error(msg);
     }
   }
 
@@ -277,9 +287,24 @@ class LCOS_API {
     });
   }
 
-  static async dismissAlert(alertId) {
+  static async dismissAlert(alertId, reason = '', notes = '', isUnverified = false) {
     return this.request(`/alerts/${alertId}/dismiss`, {
       method: 'POST',
+      body: JSON.stringify({ reason, notes, isUnverified }),
+    });
+  }
+
+  static async reopenAlert(alertId, notes = '') {
+    return this.request(`/alerts/${alertId}/reopen`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    });
+  }
+
+  static async supervisorApproveAlert(alertId, notes = '') {
+    return this.request(`/alerts/${alertId}/supervisor-approve`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
     });
   }
 
@@ -310,9 +335,10 @@ class LCOS_API {
     });
   }
 
-  static async approveManagerRequest(reqId) {
+  static async approveManagerRequest(reqId, fallbackData = null) {
     return this.request(`/requests/${reqId}/approve`, {
       method: 'POST',
+      body: fallbackData ? JSON.stringify(fallbackData) : undefined,
     });
   }
 

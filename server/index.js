@@ -87,8 +87,16 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static frontend files directly from project root
-app.use(express.static(path.join(__dirname, '..')));
+// Serve static frontend files directly from project root with cache-busting headers
+app.use(express.static(path.join(__dirname, '..'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.js') || filePath.endsWith('.css') || filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
 
 // Lightweight Health check endpoints (root & API for Render / uptime monitors)
 const healthHandler = (req, res) => {

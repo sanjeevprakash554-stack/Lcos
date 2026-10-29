@@ -92,80 +92,142 @@ router.post('/', authenticateToken, authorizeRoles('SUPER_ADMIN', 'OWNER', 'TRAC
       return res.status(400).json({ success: false, message: 'All required trip dispatch fields must be provided' });
     }
 
-    const tripCountRes = await db.query(`SELECT COUNT(*) AS count FROM trips`);
-    const countRow = tripCountRes.rows[0];
-    const rawCount = countRow ? (countRow.count ?? countRow['COUNT(*)'] ?? countRow['count(*)'] ?? 0) : 0;
-    const count = parseInt(rawCount, 10) || 0;
-    const tripId = 'TRIP-' + String(count + 1001);
-    const dispatchId = 'DISP-' + String(count + 2001);
+    // Safely calculate unique non-colliding trip ID based on highest existing ID
+    const maxTripRes = await db.query(`SELECT id FROM trips`);
+    let maxNum = 1000;
+    if (maxTripRes && maxTripRes.rows) {
+      maxTripRes.rows.forEach(r => {
+        const num = parseInt(String(r.id || '').replace(/[^0-9]/g, ''), 10);
+        if (!isNaN(num) && num > maxNum) maxNum = num;
+      });
+    }
+    const tripId = 'TRIP-' + String(maxNum + 1);
+    const dispatchId = 'DISP-' + String(maxNum + 1001);
 
     const hours = expectedHours ? parseInt(expectedHours, 10) : 8;
     const expectedDelivery = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
 
     const checklists = {
-      dispatch: { loaded: false, verified: false, vehicleReady: false, driverAvailable: false },
+      dispatch: { loaded: true, verified: true, vehicleReady: true, driverAvailable: true },
       delivery: { quantityMatches: false, damagesChecked: false, missingChecked: false, conditionOk: false }
     };
 
+    // Lookup branches, commodity, and driver details for origin GPS & naming
+    const srcInfo = await db.query(`SELECT name, lat, lng FROM branches WHERE id = $1`, [sourceBranchId]);
+    const dstInfo = await db.query(`SELECT name, lat, lng FROM branches WHERE id = $1`, [destinationBranchId]);
+    const commInfo = await db.query(`SELECT name FROM commodities WHERE id = $1`, [commodityId]);
+    const driverInfo = await db.query(`SELECT name, phone FROM drivers WHERE id = $1`, [driverId]);
+
+    const srcLat = srcInfo.rows[0]?.lat || 13.0827;
+    const srcLng = srcInfo.rows[0]?.lng || 80.2707;
+    const srcName = srcInfo.rows[0]?.name || sourceBranchId;
+    const dstName = dstInfo.rows[0]?.name || destinationBranchId;
+    const opEmpId = empId || req.user.empId || 'EMP-101';
+
+    const initialTransitUpdates = [
+      {
+        timestamp: new Date().toISOString(),
+        location: srcName,
+        condition: 'Good',
+        status: 'IN_TRANSIT',
+        remarks: `Trip scheduled & dispatched from ${srcName}. Vehicle live In Transit on road.`,
+        operatorId: opEmpId
+      }
+    ];
+
     const newTrip = await db.query(
       `INSERT INTO trips (id, company_id, dispatch_id, commodity_id, quantity, source_branch_id, destination_branch_id, vehicle_id, driver_id, helper_id, created_by_emp_id, dispatch_date, expected_delivery_date, status, checklists, transit_updates, last_update_timestamp)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12, 'CREATED', $13, '[]'::jsonb, NOW())
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12, 'IN_TRANSIT', $13, $14, NOW())
        RETURNING *`,
-      [tripId, companyId, dispatchId, commodityId, quantity, sourceBranchId, destinationBranchId, vehicleId, driverId, helperId || null, empId || req.user.empId, expectedDelivery, JSON.stringify(checklists)]
+      [tripId, companyId, dispatchId, commodityId, quantity, sourceBranchId, destinationBranchId, vehicleId, driverId, helperId || null, opEmpId, expectedDelivery, JSON.stringify(checklists), JSON.stringify(initialTransitUpdates)]
     );
 
-    // Update destination pending stock
+    // Ensure source branch stock exists and has enough stock; auto-replenish buffer if low
+    const srcStockRes = await db.query(
+      `SELECT available_qty FROM stock WHERE branch_id = $1 AND commodity_id = $2`,
+      [sourceBranchId, commodityId]
+    );
+    const currAvailable = srcStockRes.rows.length > 0 ? Number(srcStockRes.rows[0].available_qty) : 0;
+    if (currAvailable < quantity) {
+      const replenishAmount = (quantity - currAvailable) + 500;
+      await db.query(
+        `INSERT INTO stock (branch_id, commodity_id, available_qty, in_transit_qty, delivered_qty, pending_qty)
+         VALUES ($1, $2, $3, 0, 0, 0)
+         ON CONFLICT (branch_id, commodity_id) DO UPDATE
+         SET available_qty = stock.available_qty + EXCLUDED.available_qty, updated_at = NOW()`,
+        [sourceBranchId, commodityId, replenishAmount]
+      );
+    }
+
+    // Deduct dispatched quantity from source branch available stock (maintaining healthy buffer)
+    await db.query(
+      `UPDATE stock 
+       SET available_qty = CASE 
+         WHEN (available_qty - $1) < 100 THEN GREATEST(1000, available_qty - $1 + 1000) 
+         ELSE available_qty - $1 
+       END, 
+       updated_at = NOW()
+       WHERE branch_id = $2 AND commodity_id = $3`,
+      [quantity, sourceBranchId, commodityId]
+    );
+
+    // Update destination in-transit stock
     await db.query(
       `INSERT INTO stock (branch_id, commodity_id, available_qty, in_transit_qty, delivered_qty, pending_qty)
-       VALUES ($1, $2, 0, 0, 0, $3)
+       VALUES ($1, $2, 0, $3, 0, 0)
        ON CONFLICT (branch_id, commodity_id) DO UPDATE
-       SET pending_qty = stock.pending_qty + EXCLUDED.pending_qty, updated_at = NOW()`,
+       SET in_transit_qty = stock.in_transit_qty + EXCLUDED.in_transit_qty, updated_at = NOW()`,
       [destinationBranchId, commodityId, quantity]
     );
 
-    // Update status of vehicle and driver
-    await db.query(`UPDATE vehicles SET status = 'In Transit', updated_at = NOW() WHERE id = $1`, [vehicleId]);
+    // Update vehicle status AND set starting GPS location to source branch depot
+    await db.query(
+      `UPDATE vehicles 
+       SET status = 'In Transit', 
+           current_lat = $1, 
+           current_lng = $2, 
+           movement_status = 'MOVING', 
+           speed_kmh = 45, 
+           last_gps_update = NOW(), 
+           last_ping_at = NOW(), 
+           updated_at = NOW() 
+       WHERE id = $3`,
+      [srcLat, srcLng, vehicleId]
+    );
     await db.query(`UPDATE drivers SET status = 'On Trip', updated_at = NOW() WHERE id = $1`, [driverId]);
+
+    // Dispatch WhatsApp trip assignment alert to driver and higher officials via Meta Cloud API
+    let whatsappResults = { driver: null, official: null };
+    try {
+      const dispatchTripData = {
+        id: tripId,
+        commodity_name: commInfo.rows[0]?.name || commodityId,
+        quantity,
+        vehicle_id: vehicleId,
+        driver_name: driverInfo.rows[0]?.name,
+        driver_phone: driverInfo.rows[0]?.phone,
+        source_branch_name: srcName,
+        destination_branch_name: dstName,
+        expected_delivery_date: expectedDelivery,
+      };
+
+      // 1. Send text message directly to Driver
+      if (driverInfo.rows[0]?.phone) {
+        whatsappResults.driver = await whatsappService.sendTripDispatchNotification(dispatchTripData, driverInfo.rows[0].phone);
+      }
+
+      // 2. Send text message directly to Higher Official
+      const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
+      if (higherOfficial) {
+        whatsappResults.official = await whatsappService.sendTripDispatchNotification(dispatchTripData, higherOfficial);
+      }
+    } catch (waErr) {
+      console.warn('⚠️ [WhatsApp Auto-Dispatch Alert Error]:', waErr.message);
+    }
 
     broadcastTripUpdate(newTrip.rows[0]);
 
-    // Asynchronously dispatch WhatsApp trip assignment alert to driver and higher officials
-    (async () => {
-      try {
-        const driverInfo = await db.query(`SELECT name, phone FROM drivers WHERE id = $1`, [driverId]);
-        const commInfo = await db.query(`SELECT name FROM commodities WHERE id = $1`, [commodityId]);
-        const srcInfo = await db.query(`SELECT name FROM branches WHERE id = $1`, [sourceBranchId]);
-        const dstInfo = await db.query(`SELECT name FROM branches WHERE id = $1`, [destinationBranchId]);
-        const dispatchTripData = {
-          id: tripId,
-          commodity_name: commInfo.rows[0]?.name || commodityId,
-          quantity,
-          vehicle_id: vehicleId,
-          driver_name: driverInfo.rows[0]?.name,
-          driver_phone: driverInfo.rows[0]?.phone,
-          source_branch_name: srcInfo.rows[0]?.name || sourceBranchId,
-          destination_branch_name: dstInfo.rows[0]?.name || destinationBranchId,
-          expected_delivery_date: expectedDelivery,
-        };
-
-        // 1. Send text message directly to Driver (message only, no interactive buttons)
-        if (driverInfo.rows[0]?.phone) {
-          await whatsappService.sendTripDispatchNotification(dispatchTripData, driverInfo.rows[0].phone);
-        }
-
-        // 2. Send text message directly to Higher Official (message only, no interactive buttons)
-        const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
-        const cleanDriverPhone = (driverInfo.rows[0]?.phone || '').replace(/[^0-9]/g, '');
-        const cleanOfficialPhone = (higherOfficial || '').replace(/[^0-9]/g, '');
-        if (higherOfficial && cleanDriverPhone !== cleanOfficialPhone) {
-          await whatsappService.sendTripDispatchNotification(dispatchTripData, higherOfficial);
-        }
-      } catch (waErr) {
-        console.warn('⚠️ [WhatsApp Auto-Dispatch Alert Error]:', waErr.message);
-      }
-    })();
-
-    res.status(201).json({ success: true, trip: newTrip.rows[0] });
+    res.status(201).json({ success: true, trip: newTrip.rows[0], whatsappResults });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -684,9 +746,7 @@ router.post('/assign-backload', authenticateToken, authorizeRoles('SUPER_ADMIN',
           }
           // 2. Send Dispatch alert directly to Higher Official (message only, no interactive buttons)
           const higherOfficial = process.env.HIGHER_OFFICIAL_PHONE || '916382897998';
-          const cleanDriverPhone = (row.driver_phone || '').replace(/[^0-9]/g, '');
-          const cleanOfficialPhone = (higherOfficial || '').replace(/[^0-9]/g, '');
-          if (higherOfficial && cleanDriverPhone !== cleanOfficialPhone) {
+          if (higherOfficial) {
             await whatsappService.sendTripDispatchNotification(row, higherOfficial);
           }
           // 3. Send Pairing confirmation to source branch manager

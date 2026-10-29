@@ -49,18 +49,46 @@ router.post('/', authenticateToken, async (req, res) => {
 // POST /api/requests/:id/approve (Manager/Owner approves request)
 router.post('/:id/approve', authenticateToken, authorizeRoles('SUPER_ADMIN', 'OWNER', 'BRANCH_MANAGER', 'super_admin', 'owner', 'branch_manager'), async (req, res) => {
   try {
-    const reqRes = await db.query(`SELECT * FROM manager_requests WHERE id = $1`, [req.params.id]);
-    if (reqRes.rows.length === 0) return res.status(404).json({ success: false, message: 'Request not found' });
+    const reqId = req.params.id;
+    let reqRes = await db.query(`SELECT * FROM manager_requests WHERE id = $1`, [reqId]);
+    let request;
 
-    const request = reqRes.rows[0];
-    if (request.status !== 'Pending') {
-      return res.status(400).json({ success: false, message: `Request is already ${request.status}` });
+    if (reqRes.rows.length === 0) {
+      // If request was created locally / offline, upsert it from request payload
+      if (req.body && req.body.type) {
+        const type = req.body.type;
+        let dataPayload = req.body.requestData || req.body.data || {};
+        if (typeof dataPayload === 'string') {
+          try { dataPayload = JSON.parse(dataPayload); } catch (_) {}
+        }
+        const companyId = req.user.companyId || 'COMP-001';
+        const insRes = await db.query(
+          `INSERT INTO manager_requests (id, company_id, type, request_data, status, submitted_by, created_at)
+           VALUES ($1, $2, $3, $4, 'Pending', $5, NOW())
+           ON CONFLICT (id) DO UPDATE SET type = EXCLUDED.type
+           RETURNING *`,
+          [reqId, companyId, type, JSON.stringify(dataPayload || {}), req.user.id || 'USR-MANAGER']
+        );
+        request = insRes.rows[0];
+      } else {
+        return res.status(404).json({ success: false, message: `Request ${reqId} not found` });
+      }
+    } else {
+      request = reqRes.rows[0];
+    }
+
+    if (request.status === 'Approved') {
+      return res.json({ success: true, message: `Request ${reqId} is already Approved`, request });
     }
 
     const type = request.type;
     let data = request.request_data;
-    if (typeof data === 'string') {
-      try { data = JSON.parse(data); } catch (_) { data = {}; }
+    while (typeof data === 'string') {
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed === data) break;
+        data = parsed;
+      } catch (_) { break; }
     }
     data = data || {};
     const companyId = request.company_id || 'COMP-001';
