@@ -1504,7 +1504,7 @@ const app = {
                     </div>
                     <div class="flex gap-2 align-center">
                         ${actionBtn}
-                        <button class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; background:#ffffff; border:1px solid #fca5a5; color:#9f1239; font-weight:600;" onclick="app.promptDismissAlert('${a.id}')">✓ Dismiss</button>
+                        <button class="btn btn-secondary" style="padding:0.35rem 0.65rem; font-size:0.8rem; background:#ffffff; border:1px solid #fca5a5; color:#9f1239; font-weight:600;" onclick="app.promptDismissAlert('${a.id}')">${getIcon('check', { size: 12 })} Dismiss</button>
                     </div>
                 </div>
             `;
@@ -1539,7 +1539,7 @@ const app = {
             } else if (!isApp) {
                 actionBtn = `<span class="badge badge-request-pending" style="font-size:0.75rem; padding:0.25rem 0.5rem;">Pending Approval</span>`;
             } else if (isApp) {
-                actionBtn = `<span class="badge badge-request-approved" style="font-size:0.75rem; padding:0.25rem 0.5rem;">✓ Approved</span>`;
+                actionBtn = `<span class="badge badge-request-approved" style="font-size:0.75rem; padding:0.25rem 0.5rem;">${getIcon('check', { size: 12 })} Approved</span>`;
             }
 
             const rData = (typeof r.data === 'string' ? JSON.parse(r.data) : r.data) || {};
@@ -1628,7 +1628,7 @@ const app = {
                         const src = branches.find(b => b.id === t.sourceBranchId);
                         const dest = branches.find(b => b.id === t.destinationBranchId);
                         const drv = drivers.find(d => d.id === t.driverId);
-                        const routeStr = src && dest ? `${src.name} ➔ ${dest.name}` : t.id;
+                        const routeStr = src && dest ? `${src.name} → ${dest.name}` : t.id;
                         const drvStr = drv ? ` - ${drv.name}` : '';
                         return `<option value="${t.id}">${t.id} : ${t.vehicleId} (${routeStr}${drvStr})</option>`;
                     }).join('');
@@ -2503,7 +2503,7 @@ const app = {
                     bannerActions.innerHTML = `
                         <button class="btn btn-success" style="padding:0.25rem 0.65rem; font-size:0.75rem; background:#10b981; border:1px solid #059669; font-weight:700; color:#fff; border-radius:6px; cursor:pointer;" onclick="app.acceptCurrentStoppageReason('${vehId}', '${alert.id}')">${getIcon('check', { size: 12 })} Accept Reason</button>
                         <button class="btn btn-danger" style="padding:0.25rem 0.65rem; font-size:0.75rem; background:#ef4444; border:1px solid #dc2626; font-weight:700; color:#fff; border-radius:6px; cursor:pointer;" onclick="app.declineAndCallDriver('${vehId}', '${phone}', '${alert.id}')">${getIcon('phone', { size: 12 })} Decline & Call</button>
-                        <button class="btn btn-secondary" style="background:#ffffff; border:1px solid #fca5a5; color:#9f1239; font-weight:700; padding:0.25rem 0.6rem; font-size:0.75rem; border-radius:6px; cursor:pointer;" onclick="app.promptDismissAlert('${alert.id}')">✓ Dismiss</button>
+                        <button class="btn btn-secondary" style="background:#ffffff; border:1px solid #fca5a5; color:#9f1239; font-weight:700; padding:0.25rem 0.6rem; font-size:0.75rem; border-radius:6px; cursor:pointer;" onclick="app.promptDismissAlert('${alert.id}')">${getIcon('check', { size: 12 })} Dismiss</button>
                         <button class="btn btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="app.showDashboardAlerts()">View All (${this._currentAlertsList.length})</button>
                     `;
                 } else if (isStoppage) {
@@ -2511,12 +2511,12 @@ const app = {
                     bannerActions.innerHTML = `
                         <span class="badge" style="background:rgba(245, 158, 11, 0.15); color:#d97706; border:1px solid #f59e0b; padding:0.25rem 0.6rem; font-size:0.75rem; font-weight:700; border-radius:6px; display:inline-flex; align-items:center; gap:0.25rem;">${getIcon('clock', { size: 12, className: 'ui-icon-spin' })} Awaiting Driver Reason</span>
                         <button class="btn btn-secondary" style="background:#ffffff; border:1px solid #d1d5db; color:#374151; font-weight:700; padding:0.25rem 0.6rem; font-size:0.75rem; border-radius:6px; cursor:pointer;" onclick="app.declineAndCallDriver('${vehId}', '${phone}', '${alert.id}')">${getIcon('phone', { size: 12 })} Call Driver</button>
-                        <button class="btn btn-secondary" style="background:#ffffff; border:1px solid #fca5a5; color:#9f1239; font-weight:700; padding:0.25rem 0.6rem; font-size:0.75rem; border-radius:6px; cursor:pointer;" onclick="app.promptDismissAlert('${alert.id}')">✓ Dismiss</button>
+                        <button class="btn btn-secondary" style="background:#ffffff; border:1px solid #fca5a5; color:#9f1239; font-weight:700; padding:0.25rem 0.6rem; font-size:0.75rem; border-radius:6px; cursor:pointer;" onclick="app.promptDismissAlert('${alert.id}')">${getIcon('check', { size: 12 })} Dismiss</button>
                         <button class="btn btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="app.showDashboardAlerts()">View All (${this._currentAlertsList.length})</button>
                     `;
                 } else {
                     bannerActions.innerHTML = `
-                        <button class="btn btn-secondary" style="background:#ffffff; border:1px solid #fca5a5; color:#9f1239; font-weight:700; padding:0.25rem 0.6rem; font-size:0.75rem; border-radius:6px; cursor:pointer;" onclick="app.promptDismissAlert('${alert.id}')">✓ Dismiss</button>
+                        <button class="btn btn-secondary" style="background:#ffffff; border:1px solid #fca5a5; color:#9f1239; font-weight:700; padding:0.25rem 0.6rem; font-size:0.75rem; border-radius:6px; cursor:pointer;" onclick="app.promptDismissAlert('${alert.id}')">${getIcon('check', { size: 12 })} Dismiss</button>
                         <button class="btn btn-secondary" style="background:rgba(15, 118, 110, 0.08); border:1px solid rgba(15, 118, 110, 0.2); color:var(--color-primary); font-weight:600; padding:0.25rem 0.6rem; font-size:0.75rem; border-radius:6px; cursor:pointer;" onclick="app.showDashboardAlerts()">View Alerts (${this._currentAlertsList.length})</button>
                     `;
                 }
@@ -2552,7 +2552,7 @@ const app = {
         const isHidden = drawer.style.display === 'none' || !drawer.style.display;
         if (isHidden) {
             drawer.style.display = 'block';
-            if (btn) btn.innerHTML = '✕ Close Districts (38)';
+            if (btn) btn.innerHTML = `${getIcon('x', { size: 14 })} Close Districts (38)`;
             this.renderMapDistrictsList();
         } else {
             drawer.style.display = 'none';
@@ -3147,7 +3147,7 @@ const app = {
             // 4. Moving truck marker at midpoint
             const simTruckIcon = L.divIcon({
                 className: 'sim-truck-marker',
-                html: `<div style="background:#0284c7; width:34px; height:34px; border-radius:50%; border:2.5px solid #ffffff; display:flex; align-items:center; justify-content:center; box-shadow:0 0 20px rgba(56,189,248,1);"><span class="vehicle-emoji" style="font-size:18px; line-height:1;">🚚</span></div>`,
+                html: `<div style="background:#0284c7; width:34px; height:34px; border-radius:50%; border:2.5px solid #ffffff; display:flex; align-items:center; justify-content:center; box-shadow:0 0 20px rgba(56,189,248,1);"><div class="vehicle-icon-wrap">${getIcon('truck', { size: 18, color: '#ffffff', strokeWidth: 2.2 })}</div></div>`,
                 iconSize: [34, 34],
                 iconAnchor: [17, 17]
             });
@@ -4818,9 +4818,9 @@ const app = {
 
             
 
-            const emojiEl = iconEl.querySelector('.vehicle-emoji');
-            if (emojiEl) {
-                emojiEl.style.transform = (entry.heading >= 0 && entry.heading < 180) ? 'scaleX(-1)' : 'scaleX(1)';
+            const iconWrap = iconEl.querySelector('.vehicle-icon-wrap');
+            if (iconWrap) {
+                iconWrap.style.transform = (entry.heading >= 0 && entry.heading < 180) ? 'scaleX(1)' : 'scaleX(-1)';
             }
 
             const pulseRing = iconEl.querySelector('.vehicle-pulse-ring');
@@ -4882,7 +4882,9 @@ const app = {
                     <div class="vehicle-pulse-ring-outer" style="border-color:${visual.color};"></div>
                     <div class="vehicle-rotator">
                         <div class="vehicle-body" style="background-color:${visual.color}; box-shadow:0 0 14px ${visual.color};">
-                            <span class="vehicle-emoji" style="transform:${(heading >= 0 && heading < 180) ? 'scaleX(-1)' : 'scaleX(1)'};">🚚</span>
+                            <div class="vehicle-icon-wrap" style="transform:${(heading >= 0 && heading < 180) ? 'scaleX(1)' : 'scaleX(-1)'};">
+                                ${getIcon('truck', { size: 17, color: '#ffffff', strokeWidth: 2.2 })}
+                            </div>
                         </div>
                     </div>
                     <div class="vehicle-hud-pill">
@@ -6625,7 +6627,7 @@ const app = {
 
                     <!-- Primary Pay Button -->
                     <button type="button" id="btn-submit-inapp-pay" style="width:100%; padding:0.95rem; border-radius:12px; background:linear-gradient(135deg, #10b981 0%, #059669 100%); border:none; color:#ffffff; font-weight:800; font-size:1rem; cursor:pointer; box-shadow:0 8px 25px rgba(16,185,129,0.4); display:flex; align-items:center; justify-content:center; gap:0.5rem; transition:all 0.2s ease;">
-                        <span>✓ Authorize & Pay ₹${totalInr.toLocaleString('en-IN')}</span>
+                        <span>Authorize & Pay ₹${totalInr.toLocaleString('en-IN')}</span>
                     </button>
 
                     <!-- Security / PCI Notice -->
@@ -6720,7 +6722,7 @@ const app = {
             } catch (e) {
                 this.showToast('Payment verification error: ' + e.message, 'danger');
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = `✓ Authorize & Pay ₹${totalInr.toLocaleString('en-IN')}`;
+                submitBtn.innerHTML = `Authorize & Pay ₹${totalInr.toLocaleString('en-IN')}`;
             } finally {
                 this._isSubmittingInAppPay = false;
                 this._isPaying = false;
@@ -6784,7 +6786,7 @@ const app = {
                         ${getIcon('crown', { size: 14, color: '#ffffff' })} 2 Owners Login
                     </button>
                     <button type="button" id="btn-close-payment-modal" class="btn btn-success" style="background: #10b981; border: 1px solid #059669; color: #ffffff; font-weight: 700; padding: 0.65rem 1.25rem; border-radius: 8px; font-size: 0.85rem; cursor: pointer;">
-                        ✓ Go to Dashboard
+                        Go to Dashboard
                     </button>
                 </div>
             </div>
