@@ -228,6 +228,7 @@ aside.sidebar {
     stroke-width: 2;
     transition: var(--transition-smooth);
     flex-shrink: 0;
+    overflow: visible;
 }
 
 .nav-links li a:hover,
